@@ -13,7 +13,7 @@ type flag_d struct {
 }
 
 type Dijkstra struct {
-	heap     util.PriorityQueue[int32]
+	heap     util.PriorityQueue[int32, float64]
 	start_id int32
 	end_id   int32
 	graph    IGraph
@@ -32,7 +32,7 @@ func NewDijkstra(graph IGraph, start, end int32) *Dijkstra {
 	flags[start].path_length = 0
 	d.flags = flags
 
-	heap := util.NewPriorityQueue[int32](100)
+	heap := util.NewPriorityQueue[int32, float64](100)
 	heap.Enqueue(d.start_id, 0)
 	d.heap = heap
 
@@ -67,7 +67,7 @@ func (self *Dijkstra) CalcShortestPath() bool {
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
-				self.heap.Enqueue(other_id, float32(new_length))
+				self.heap.Enqueue(other_id, new_length)
 			}
 			self.flags[other_id] = other_flag
 		}

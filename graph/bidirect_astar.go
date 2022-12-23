@@ -19,8 +19,8 @@ type flag_ba struct {
 }
 
 type BidirectAStar struct {
-	startheap   util.PriorityQueue[int32]
-	endheap     util.PriorityQueue[int32]
+	startheap   util.PriorityQueue[int32, float64]
+	endheap     util.PriorityQueue[int32, float64]
 	mid_id      int32
 	start_id    int32
 	end_id      int32
@@ -47,10 +47,10 @@ func NewBidirectAStar(graph IGraph, start, end int32) *BidirectAStar {
 	flags[end].path_length2 = 0
 	d.flags = flags
 
-	startheap := util.NewPriorityQueue[int32](100)
+	startheap := util.NewPriorityQueue[int32, float64](100)
 	startheap.Enqueue(d.start_id, 0)
 	d.startheap = startheap
-	endheap := util.NewPriorityQueue[int32](100)
+	endheap := util.NewPriorityQueue[int32, float64](100)
 	endheap.Enqueue(d.end_id, 0)
 	d.endheap = endheap
 
@@ -85,7 +85,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 				if self.flags[other_id].path_length1 > new_length {
 					self.flags[other_id].prev_edge1 = edge_id
 					self.flags[other_id].path_length1 = new_length
-					self.startheap.Enqueue(other_id, float32(new_length))
+					self.startheap.Enqueue(other_id, new_length)
 				}
 			}
 		}
@@ -116,7 +116,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 				if self.flags[other_id].path_length2 > new_length {
 					self.flags[other_id].prev_edge2 = edge_id
 					self.flags[other_id].path_length2 = new_length
-					self.endheap.Enqueue(other_id, float32(new_length))
+					self.endheap.Enqueue(other_id, new_length)
 				}
 			}
 		}
