@@ -28,6 +28,10 @@ func (self *Dict[K, V]) FindKey(value V) (K, bool) {
 	var t K
 	return t, false
 }
+func (self *Dict[K, V]) ContainsKey(key K) bool {
+	_, ok := (*self)[key]
+	return ok
+}
 
 func NewDict[K comparable, V comparable](cap int) Dict[K, V] {
 	return make(map[K]V, cap)
