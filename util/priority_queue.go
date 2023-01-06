@@ -4,12 +4,12 @@ import (
 	"container/heap"
 )
 
-type PriorityQueueItem[T any, P number] struct {
+type _PriorityQueueItem[T any, P number] struct {
 	value    T
 	priority P
 }
 
-type PriorityQueue[T any, P number] []PriorityQueueItem[T, P]
+type PriorityQueue[T any, P number] []_PriorityQueueItem[T, P]
 
 func (self *PriorityQueue[T, P]) Len() int { return len(*self) }
 
@@ -22,7 +22,7 @@ func (self *PriorityQueue[T, P]) Swap(i, j int) {
 }
 
 func (self *PriorityQueue[T, P]) Push(x any) {
-	item := x.(PriorityQueueItem[T, P])
+	item := x.(_PriorityQueueItem[T, P])
 	*self = append(*self, item)
 }
 
@@ -41,7 +41,7 @@ func (self *PriorityQueue[T, P]) Update(item int, value T, priority P) {
 }
 
 func (self *PriorityQueue[T, P]) Enqueue(value T, priority P) {
-	heap.Push(self, PriorityQueueItem[T, P]{value: value, priority: priority})
+	heap.Push(self, _PriorityQueueItem[T, P]{value: value, priority: priority})
 }
 
 func (self *PriorityQueue[T, P]) Dequeue() (T, bool) {
@@ -49,7 +49,7 @@ func (self *PriorityQueue[T, P]) Dequeue() (T, bool) {
 		var result T
 		return result, false
 	}
-	item := heap.Pop(self).(PriorityQueueItem[T, P])
+	item := heap.Pop(self).(_PriorityQueueItem[T, P])
 	return item.value, true
 }
 
