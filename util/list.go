@@ -22,7 +22,7 @@ func (self *List[T]) Remove(index int) {
 	if index >= l || index < 0 {
 		return
 	}
-	copy((*self)[index:l-index], (*self)[index+1:l-index+1])
+	copy((*self)[index:l-1], (*self)[index+1:l])
 	*self = (*self)[:l-1]
 }
 func (self *List[T]) Slice(start int, end int) List[T] {
