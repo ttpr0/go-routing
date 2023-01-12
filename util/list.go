@@ -49,3 +49,21 @@ func (self _ListIterator[T]) Next() (T, bool) {
 func NewList[T any](cap int) List[T] {
 	return make([]T, 0, cap)
 }
+
+func GetIndexOf[T comparable](list List[T], value T) int {
+	for i, v := range list {
+		if v == value {
+			return i
+		}
+	}
+	return -1
+}
+
+func Contains[T comparable](list List[T], value T) bool {
+	for _, v := range list {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}

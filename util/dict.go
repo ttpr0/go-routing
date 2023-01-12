@@ -1,6 +1,6 @@
 package util
 
-type Dict[K comparable, V comparable] map[K]V
+type Dict[K comparable, V any] map[K]V
 
 func (self *Dict[K, V]) Length() int {
 	return len(*self)
@@ -19,20 +19,21 @@ func (self *Dict[K, V]) Set(key K, value V) {
 func (self *Dict[K, V]) Delete(key K) {
 	delete(*self, key)
 }
-func (self *Dict[K, V]) FindKey(value V) (K, bool) {
-	for k, v := range *self {
+func (self *Dict[K, V]) ContainsKey(key K) bool {
+	_, ok := (*self)[key]
+	return ok
+}
+
+func NewDict[K comparable, V any](cap int) Dict[K, V] {
+	return make(map[K]V, cap)
+}
+
+func GetKeyOf[K comparable, V comparable](dict Dict[K, V], value V) (K, bool) {
+	for k, v := range dict {
 		if v == value {
 			return k, true
 		}
 	}
 	var t K
 	return t, false
-}
-func (self *Dict[K, V]) ContainsKey(key K) bool {
-	_, ok := (*self)[key]
-	return ok
-}
-
-func NewDict[K comparable, V comparable](cap int) Dict[K, V] {
-	return make(map[K]V, cap)
 }
