@@ -3,9 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"net/http"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type RoutingRequest struct {
@@ -15,6 +17,21 @@ type RoutingRequest struct {
 	Draw      bool      `json:"drawRouting"`
 	Alg       string    `json:"algorithm"`
 	Stepcount int       `json:"stepount"`
+}
+
+type DrawContextRequest struct {
+	Start     []float32 `json:"start"`
+	End       []float32 `json:"end"`
+	Algorithm string    `json:"algorithm"`
+}
+
+type DrawRoutingRequest struct {
+	Key       int `json:"key"`
+	Stepcount int `json:"stepcount"`
+}
+
+type DrawContextResponse struct {
+	Key int `json:"key"`
 }
 
 type RoutingResponse struct {
@@ -86,6 +103,78 @@ func HandleRoutingRequest(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("start building response")
 	resp := NewRoutingResponse(path.GetGeometry(), true, int(req.Key))
 	fmt.Println("reponse build")
+	data, _ = json.Marshal(resp)
+	w.Write(data)
+}
+
+var algs_dict util.Dict[int, graph.IShortestPath] = util.NewDict[int, graph.IShortestPath](10)
+
+func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
+	// read body
+	data := make([]byte, r.ContentLength)
+	r.Body.Read(data)
+	req := DrawContextRequest{}
+	json.Unmarshal(data, &req)
+
+	// process request
+	start := graph.Coord{Lon: req.Start[0], Lat: req.Start[1]}
+	end := graph.Coord{Lon: req.End[0], Lat: req.End[1]}
+	var alg graph.IShortestPath
+	switch req.Algorithm {
+	case "Dijkstra":
+		alg = graph.NewDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+	case "A*":
+		alg = graph.NewAStar(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+	case "Bidirect-Dijkstra":
+		alg = graph.NewBidirectDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+	case "Bidirect-A*":
+		alg = graph.NewBidirectAStar(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+	default:
+		alg = graph.NewDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+	}
+	key := -1
+	for {
+		k := rand.Intn(1000)
+		if !algs_dict.ContainsKey(k) {
+			algs_dict[k] = alg
+			key = k
+			break
+		}
+	}
+	resp := DrawContextResponse{key}
+
+	// write response
+	data, _ = json.Marshal(resp)
+	w.Write(data)
+}
+
+func HandleRoutingStepRequest(w http.ResponseWriter, r *http.Request) {
+	// read body
+	data := make([]byte, r.ContentLength)
+	r.Body.Read(data)
+	req := DrawRoutingRequest{}
+	json.Unmarshal(data, &req)
+
+	// process request
+	var alg graph.IShortestPath
+	if req.Key != -1 && algs_dict.ContainsKey(req.Key) {
+		alg = algs_dict[req.Key]
+	} else {
+		w.WriteHeader(400)
+		return
+	}
+
+	edges := util.NewList[graph.CoordArray](10)
+	finished := !alg.Steps(req.Stepcount, &edges)
+	var resp RoutingResponse
+	if finished {
+		path := alg.GetShortestPath()
+		resp = NewRoutingResponse(path.GetGeometry(), true, req.Key)
+	} else {
+		resp = NewRoutingResponse(edges, finished, req.Key)
+	}
+
+	// write response
 	data, _ = json.Marshal(resp)
 	w.Write(data)
 }
