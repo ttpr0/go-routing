@@ -142,6 +142,64 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 	return true
 }
 
+func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[CoordArray]) bool {
+	for c := 0; c < count; c++ {
+		curr_id, _ := self.startheap.Dequeue()
+		//curr := (*d.graph).GetNode(curr_id)
+		if self.flags[curr_id].visited1 {
+			continue
+		}
+		if self.flags[curr_id].visited2 || curr_id == self.end_id {
+			self.mid_id = curr_id
+			return false
+		}
+		self.flags[curr_id].visited1 = true
+		edges := self.graph.GetAdjacentEdges(curr_id)
+		for _, edge_id := range edges {
+			edge := self.graph.GetEdge(edge_id)
+			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			//other := (*d.graph).GetNode(other_id)
+			if self.flags[other_id].visited1 || (edge.Oneway && dir == BACKWARD) {
+				continue
+			}
+			visitededges.Add(self.geom.GetEdge(edge_id))
+			new_length := self.flags[curr_id].path_length1 + float64(self.weight.GetEdgeWeight(edge_id))
+			if self.flags[other_id].path_length1 > new_length {
+				self.flags[other_id].prev_edge1 = edge_id
+				self.flags[other_id].path_length1 = new_length
+				self.startheap.Enqueue(other_id, new_length)
+			}
+		}
+		curr_id, _ = self.endheap.Dequeue()
+		//curr := (*d.graph).GetNode(curr_id)
+		if self.flags[curr_id].visited2 {
+			continue
+		}
+		if self.flags[curr_id].visited1 || curr_id == self.start_id {
+			self.mid_id = curr_id
+			return false
+		}
+		self.flags[curr_id].visited2 = true
+		edges = self.graph.GetAdjacentEdges(curr_id)
+		for _, edge_id := range edges {
+			edge := self.graph.GetEdge(edge_id)
+			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			//other := (*d.graph).GetNode(other_id)
+			if self.flags[other_id].visited2 || (edge.Oneway && dir == BACKWARD) {
+				continue
+			}
+			visitededges.Add(self.geom.GetEdge(edge_id))
+			new_length := self.flags[curr_id].path_length2 + float64(self.weight.GetEdgeWeight(edge_id))
+			if self.flags[other_id].path_length2 > new_length {
+				self.flags[other_id].prev_edge2 = edge_id
+				self.flags[other_id].path_length2 = new_length
+				self.endheap.Enqueue(other_id, new_length)
+			}
+		}
+	}
+	return true
+}
+
 func (self *BidirectDijkstra) GetShortestPath() Path {
 	path := make([]int32, 0, 10)
 	curr_id := self.mid_id
