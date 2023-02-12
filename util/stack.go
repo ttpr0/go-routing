@@ -12,12 +12,14 @@ type Stack[T any] struct {
 	length int
 }
 
+// Creates and returns a new Stack
 func NewStack[T any]() Stack[T] {
 	return Stack[T]{}
 }
 
 var stack_lock sync.Mutex
 
+// Adds a new item to the stack
 func (self *Stack[T]) Push(value T) {
 	stack_lock.Lock()
 	defer stack_lock.Unlock()
@@ -35,6 +37,9 @@ func (self *Stack[T]) Push(value T) {
 		self.length += 1
 	}
 }
+
+// Returns and removes the last added item from the stack and a bool indicating success.
+// If the stack is empty then the returned bool is false.
 func (self *Stack[T]) Pop() (T, bool) {
 	if self.length <= 0 {
 		var i T
@@ -49,6 +54,8 @@ func (self *Stack[T]) Pop() (T, bool) {
 	self.length -= 1
 	return value, true
 }
+
+// Returns the number of elements in the stack
 func (self *Stack[T]) Size() int {
 	return self.length
 }

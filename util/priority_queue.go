@@ -29,14 +29,21 @@ func (self *PriorityQueue[T, P]) Pop() any {
 	*self = old[0 : n-1]
 	return item
 }
+
+// Updates the value and priority of an item in the PriorityQueue.
 func (self *PriorityQueue[T, P]) Update(item int, value T, priority P) {
 	(*self)[item].value = value
 	(*self)[item].priority = priority
 	heap.Fix(self, item)
 }
+
+// Adds a new item to the PriorityQueue with a given value and priority.
 func (self *PriorityQueue[T, P]) Enqueue(value T, priority P) {
 	heap.Push(self, _PriorityQueueItem[T, P]{value: value, priority: priority})
 }
+
+// Removes and returns the item with the lowest priority from the PriorityQueue and a bool indicating success.
+// If the PriorityQueue is empty false will be returned.
 func (self *PriorityQueue[T, P]) Dequeue() (T, bool) {
 	if len(*self) == 0 {
 		var result T
@@ -45,10 +52,15 @@ func (self *PriorityQueue[T, P]) Dequeue() (T, bool) {
 	item := heap.Pop(self).(_PriorityQueueItem[T, P])
 	return item.value, true
 }
+
+// Clears the PriorityQueue.
 func (self *PriorityQueue[T, P]) Clear() {
 	*self = (*self)[:0]
 }
 
+// Creates and returns a new PriorityQueue with value T and Priority P.
+//
+// length specifies initial capacity.
 func NewPriorityQueue[T any, P number](length int) PriorityQueue[T, P] {
 	pq := make(PriorityQueue[T, P], 0, length)
 	heap.Init(&pq)

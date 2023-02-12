@@ -15,12 +15,14 @@ type Queue[T any] struct {
 	length int
 }
 
+// Creates and returns a new Queue
 func NewQueue[T any]() Queue[T] {
 	return Queue[T]{}
 }
 
 var queue_lock sync.Mutex
 
+// Adds a new item to the queue
 func (self *Queue[T]) Push(value T) {
 	queue_lock.Lock()
 	defer queue_lock.Unlock()
@@ -39,6 +41,9 @@ func (self *Queue[T]) Push(value T) {
 		self.length += 1
 	}
 }
+
+// Returns and removes the currently earliest added item from the queue and a bool indicating success.
+// If Queue is empty, returned bool is false
 func (self *Queue[T]) Pop() (T, bool) {
 	if self.length <= 0 {
 		var i T
@@ -53,6 +58,8 @@ func (self *Queue[T]) Pop() (T, bool) {
 	self.length -= 1
 	return value, true
 }
+
+// Returns the number of items in the queue
 func (self *Queue[T]) Size() int {
 	return self.length
 }

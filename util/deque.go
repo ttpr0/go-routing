@@ -17,12 +17,14 @@ type Deque[T any] struct {
 	length int
 }
 
+// creates and returns a new Deque
 func NewDeque[T any]() Deque[T] {
 	return Deque[T]{}
 }
 
 var deque_lock sync.Mutex
 
+// push the value to the back of the deque
 func (self *Deque[T]) PushBack(value T) {
 	deque_lock.Lock()
 	defer deque_lock.Unlock()
@@ -43,6 +45,8 @@ func (self *Deque[T]) PushBack(value T) {
 		self.length += 1
 	}
 }
+
+// push the value to the front of the deque
 func (self *Deque[T]) PushFront(value T) {
 	deque_lock.Lock()
 	defer deque_lock.Unlock()
@@ -63,6 +67,10 @@ func (self *Deque[T]) PushFront(value T) {
 		self.length += 1
 	}
 }
+
+// Returns and removes the last element from the deque and a bool indicating success.
+//
+// If the deque is empty the returned bool will be false else true.
 func (self *Deque[T]) PopBack() (T, bool) {
 	if self.length <= 0 {
 		var i T
@@ -86,6 +94,10 @@ func (self *Deque[T]) PopBack() (T, bool) {
 		return value, true
 	}
 }
+
+// Returns and removes the first element from the deque and a bool indicating success.
+//
+// If the deque is empty the returned bool will be false else true.
 func (self *Deque[T]) PopFront() (T, bool) {
 	if self.length <= 0 {
 		var i T
@@ -109,6 +121,10 @@ func (self *Deque[T]) PopFront() (T, bool) {
 		return value, true
 	}
 }
+
+// Returns the element at the given index from the deque and a bool indicating success.
+//
+// If the element does not exist the returned bool will be false else true.
 func (self *Deque[T]) GetAt(index int) (T, bool) {
 	if index < 0 || index >= self.length {
 		var i T
@@ -120,6 +136,8 @@ func (self *Deque[T]) GetAt(index int) (T, bool) {
 	}
 	return curr.value, true
 }
+
+// Sets the element at the given index from the deque and a bool indicating success.
 func (self *Deque[T]) SetAt(index int, value T) bool {
 	if index < 0 || index >= self.length {
 		return false
@@ -131,6 +149,8 @@ func (self *Deque[T]) SetAt(index int, value T) bool {
 	curr.value = value
 	return true
 }
+
+// Adds an element to the deque at the given index. Elements after this index will be moved back by one.
 func (self *Deque[T]) AddAt(index int, value T) bool {
 	if index < 0 || index > self.length {
 		return false
@@ -162,6 +182,8 @@ func (self *Deque[T]) AddAt(index int, value T) bool {
 	self.length += 1
 	return true
 }
+
+// Removes an element from the deque at the given index. Index of Elements after this index will be reduced by one.
 func (self *Deque[T]) RemoveAt(index int) bool {
 	if index < 0 || index >= self.length {
 		return false
@@ -189,9 +211,13 @@ func (self *Deque[T]) RemoveAt(index int) bool {
 	self.length -= 1
 	return true
 }
+
+// Returns the number of elements in the deque
 func (self *Deque[T]) Size() int {
 	return self.length
 }
+
+// Returns a string representation of the deque
 func (self Deque[T]) String() string {
 	s := "{"
 	curr := self.head

@@ -234,6 +234,9 @@ type QuadTree[T any] struct {
 	calc func(T, T) T
 }
 
+// Returns the value from the given x and y location and a bool indicating success
+//
+// If no value is found, false will be returned else true.
 func (self *QuadTree[T]) Get(x int32, y int32) (T, bool) {
 	node := _GetNode(self.root, x, y)
 	if node == nil {
@@ -244,6 +247,8 @@ func (self *QuadTree[T]) Get(x int32, y int32) (T, bool) {
 	}
 }
 
+// Inserts a new node into the QuadTree.
+// If a node at position x and y already exists the node will be updated with calc method.
 func (self *QuadTree[T]) Insert(x, y int32, value T) {
 	if self.root == nil {
 		self.root = &QuadNode[T]{X: x, Y: y, Value: value}
@@ -252,10 +257,12 @@ func (self *QuadTree[T]) Insert(x, y int32, value T) {
 	}
 }
 
+// Removes a node from the QuadTree.
 func (self *QuadTree[T]) Remove(x int32, y int32) {
 	self.root = _RemoveNode(self.root, x, y)
 }
 
+// Returns all nodes in the QuadTree as a slice of nodes.
 func (self *QuadTree[T]) ToSlice() []*QuadNode[T] {
 	nodes := make([]*QuadNode[T], 0, 10)
 	self._Traverse(self.root, &nodes)
@@ -273,6 +280,7 @@ func (self *QuadTree[T]) _Traverse(node *QuadNode[T], nodes *[]*QuadNode[T]) {
 	self._Traverse(node.child4, nodes)
 }
 
+// Merges all nodes from the other QuadTree into the current one.
 func (self *QuadTree[T]) MergeQuadTree(tree *QuadTree[T]) {
 	nodes := tree.ToSlice()
 	for _, node := range nodes {
@@ -280,6 +288,9 @@ func (self *QuadTree[T]) MergeQuadTree(tree *QuadTree[T]) {
 	}
 }
 
+// Creates and returns a new QuadTree.
+//
+// Method calc is used to compare values when Insert is called.
 func NewQuadTree[T any](calc func(T, T) T) *QuadTree[T] {
 	return &QuadTree[T]{calc: calc}
 }
