@@ -72,11 +72,19 @@ func (self *Deque[T]) PopBack() (T, bool) {
 	deque_lock.Lock()
 	defer deque_lock.Unlock()
 
-	value := self.tail.value
-	self.tail = self.tail.prev
-	self.tail.next = nil
-	self.length -= 1
-	return value, true
+	if self.length == 1 {
+		value := self.tail.value
+		self.head = nil
+		self.tail = nil
+		self.length -= 1
+		return value, true
+	} else {
+		value := self.tail.value
+		self.tail = self.tail.prev
+		self.tail.next = nil
+		self.length -= 1
+		return value, true
+	}
 }
 func (self *Deque[T]) PopFront() (T, bool) {
 	if self.length <= 0 {
@@ -87,11 +95,19 @@ func (self *Deque[T]) PopFront() (T, bool) {
 	deque_lock.Lock()
 	defer deque_lock.Unlock()
 
-	value := self.head.value
-	self.head = self.head.next
-	self.head.prev = nil
-	self.length -= 1
-	return value, true
+	if self.length == 1 {
+		value := self.head.value
+		self.tail = nil
+		self.head = nil
+		self.length -= 1
+		return value, true
+	} else {
+		value := self.head.value
+		self.head = self.head.next
+		self.head.prev = nil
+		self.length -= 1
+		return value, true
+	}
 }
 func (self *Deque[T]) GetAt(index int) (T, bool) {
 	if index < 0 || index >= self.length {
