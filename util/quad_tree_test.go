@@ -16,7 +16,7 @@ func _Check[T any](node *QuadNode[T]) bool {
 		}
 	}
 	if node.child2 != nil {
-		if node.child2.X < node.X || node.child2.Y < node.Y {
+		if node.child2.X >= node.X || node.child2.Y < node.Y {
 			return false
 		}
 		res := _Check(node.child2)
@@ -25,7 +25,7 @@ func _Check[T any](node *QuadNode[T]) bool {
 		}
 	}
 	if node.child3 != nil {
-		if node.child3.X < node.X || node.child3.Y < node.Y {
+		if node.child3.X >= node.X || node.child3.Y >= node.Y {
 			return false
 		}
 		res := _Check(node.child3)
@@ -34,7 +34,7 @@ func _Check[T any](node *QuadNode[T]) bool {
 		}
 	}
 	if node.child4 != nil {
-		if node.child4.X < node.X || node.child4.Y < node.Y {
+		if node.child4.X < node.X || node.child4.Y >= node.Y {
 			return false
 		}
 		res := _Check(node.child4)
@@ -44,6 +44,24 @@ func _Check[T any](node *QuadNode[T]) bool {
 	}
 
 	return true
+}
+
+func TestInsert(t *testing.T) {
+	tree := NewQuadTree(func(a, b int) int { return a })
+
+	pairs := NewList[Tuple[int32, int32]](10)
+	for i := 0; i < 100; i++ {
+		x := rand.Int31n(100)
+		y := rand.Int31n(100)
+		tree.Insert(x, y, i)
+		if i%10 == 0 {
+			pairs.Add(MakeTuple(x, y))
+		}
+	}
+
+	if !_Check(tree.root) {
+		t.Errorf("tree.Check() = false; want true")
+	}
 }
 
 func TestRemove(t *testing.T) {
@@ -64,6 +82,29 @@ func TestRemove(t *testing.T) {
 	}
 
 	if !_Check(tree.root) {
+		t.Errorf("tree.Check() = false; want true")
+	}
+}
+
+func TestGet(t *testing.T) {
+	tree := NewQuadTree(func(a, b int) int { return a })
+
+	var tx int32
+	var ty int32
+	var tvalue int
+	for i := 0; i < 100; i++ {
+		x := rand.Int31n(100)
+		y := rand.Int31n(100)
+		tree.Insert(x, y, i)
+		if i == 50 {
+			tx = x
+			ty = y
+			tvalue = i
+		}
+	}
+
+	ovalue, ok := tree.Get(tx, ty)
+	if !ok || ovalue != tvalue {
 		t.Errorf("tree.Check() = false; want true")
 	}
 }
