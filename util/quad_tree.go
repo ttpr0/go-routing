@@ -1,5 +1,7 @@
 package util
 
+import "math"
+
 type QuadNode[T any] struct {
 	X      int32
 	Y      int32
@@ -25,6 +27,47 @@ func _GetNode[T any](node *QuadNode[T], x, y int32) *QuadNode[T] {
 		return _GetNode(node.child3, x, y)
 	} else {
 		return _GetNode(node.child4, x, y)
+	}
+}
+
+func _GetClosestNode[T any](node *QuadNode[T], x, y int32, max_dist int32) (*QuadNode[T], float64) {
+	if node == nil {
+		return nil, -1
+	}
+	closest := node
+	dist := math.Sqrt(float64((node.X-x)*(node.X-x) + (node.Y-y)*(node.Y-y)))
+	if (node.X-x) < max_dist && (node.Y-y) < max_dist {
+		new_closest, new_dist := _GetClosestNode(node.child1, x, y, max_dist)
+		if new_closest != nil && new_dist < dist {
+			closest = new_closest
+			dist = new_dist
+		}
+	}
+	if (x-node.X) < max_dist && (node.Y-y) < max_dist {
+		new_closest, new_dist := _GetClosestNode(node.child2, x, y, max_dist)
+		if new_closest != nil && new_dist < dist {
+			closest = new_closest
+			dist = new_dist
+		}
+	}
+	if (x-node.X) < max_dist && (y-node.Y) < max_dist {
+		new_closest, new_dist := _GetClosestNode(node.child3, x, y, max_dist)
+		if new_closest != nil && new_dist < dist {
+			closest = new_closest
+			dist = new_dist
+		}
+	}
+	if (node.X-x) < max_dist && (y-node.Y) < max_dist {
+		new_closest, new_dist := _GetClosestNode(node.child4, x, y, max_dist)
+		if new_closest != nil && new_dist < dist {
+			closest = new_closest
+			dist = new_dist
+		}
+	}
+	if dist > float64(max_dist) {
+		return nil, -1
+	} else {
+		return closest, dist
 	}
 }
 
@@ -239,6 +282,20 @@ type QuadTree[T any] struct {
 // If no value is found, false will be returned else true.
 func (self *QuadTree[T]) Get(x int32, y int32) (T, bool) {
 	node := _GetNode(self.root, x, y)
+	if node == nil {
+		var t T
+		return t, false
+	} else {
+		return node.Value, true
+	}
+}
+
+// Returns the value of the closest node from the given x and y location and a bool indicating success
+//
+// If no node is found, false will be returned.
+// Only nodes up to the maximum distance max_dist will be found.
+func (self *QuadTree[T]) GetClosest(x int32, y int32, max_dist int32) (T, bool) {
+	node, _ := _GetClosestNode(self.root, x, y, max_dist)
 	if node == nil {
 		var t T
 		return t, false

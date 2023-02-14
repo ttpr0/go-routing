@@ -1,6 +1,8 @@
 package util
 
 import (
+	"fmt"
+	"math"
 	"math/rand"
 	"testing"
 )
@@ -106,5 +108,45 @@ func TestGet(t *testing.T) {
 	ovalue, ok := tree.Get(tx, ty)
 	if !ok || ovalue != tvalue {
 		t.Errorf("tree.Check() = false; want true")
+	}
+}
+
+func TestQuadTreeGetCloset(t *testing.T) {
+	tree := NewQuadTree(func(a, b int) int { return a })
+
+	values := NewList[Triple[int32, int32, int]](100)
+	for i := 0; i < 100; i++ {
+		x := rand.Int31n(100)
+		y := rand.Int31n(100)
+		tree.Insert(x, y, i)
+		values.Add(MakeTriple(x, y, i))
+	}
+
+	for i := 0; i < 10; i++ {
+		x := rand.Int31n(100)
+		y := rand.Int31n(100)
+		dist := 10000000.0
+		tvalue := -1
+		for _, value := range values {
+			new_dist := math.Sqrt(float64((value.A-x)*(value.A-x) + (value.B-y)*(value.B-y)))
+			if new_dist < dist {
+				tvalue = value.C
+				dist = new_dist
+			}
+		}
+
+		ovalue, ok := tree.GetClosest(x, y, 10)
+
+		fmt.Println(ovalue, ok)
+
+		if dist <= 10 {
+			if !ok || ovalue != tvalue {
+				t.Errorf("tree has not found a closest node, extected %d but got %d", tvalue, ovalue)
+			}
+		} else {
+			if ok {
+				t.Errorf("tree found a value but should not")
+			}
+		}
 	}
 }
