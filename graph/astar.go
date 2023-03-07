@@ -10,7 +10,6 @@ import (
 type flag_a struct {
 	path_length float64
 	prev_edge   int32
-	distance    float64
 	visited     bool
 }
 
@@ -68,12 +67,12 @@ func (self *AStar) CalcShortestPath() bool {
 			if other_flag.visited || (edge.Oneway && dir == BACKWARD) {
 				continue
 			}
-			other_flag.distance = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-			new_length := curr_flag.path_length - curr_flag.distance + float64(self.weight.GetEdgeWeight(edge_id)) + other_flag.distance
+			lambda := geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
-				self.heap.Enqueue(other_id, new_length)
+				self.heap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
 		}
@@ -106,12 +105,12 @@ func (self *AStar) Steps(count int, visitededges *util.List[CoordArray]) bool {
 				continue
 			}
 			visitededges.Add(self.geom.GetEdge(edge_id))
-			other_flag.distance = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-			new_length := curr_flag.path_length - curr_flag.distance + float64(self.weight.GetEdgeWeight(edge_id)) + other_flag.distance
+			lambda := geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
-				self.heap.Enqueue(other_id, new_length)
+				self.heap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
 		}
