@@ -58,6 +58,16 @@ func (self *PriorityQueue[T, P]) Clear() {
 	*self = (*self)[:0]
 }
 
+// Returns the item with the lowest priority from the PriorityQueue without removing.
+func (self *PriorityQueue[T, P]) Peek() (T, bool) {
+	if self.Len() == 0 {
+		var t T
+		return t, false
+	}
+	item := (*self)[0]
+	return item.value, true
+}
+
 // Creates and returns a new PriorityQueue with value T and Priority P.
 //
 // length specifies initial capacity.
