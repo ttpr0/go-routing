@@ -11,9 +11,7 @@ import (
 type IGraph interface {
 	GetGeometry() IGeometry
 	GetWeighting() IWeighting
-	GetTraffic() *TrafficTable
 	GetOtherNode(edge, node int32) (int32, Direction)
-	GetEdgeIndex(edge, node int32) byte
 	GetAdjacentEdges(node int32) []int32
 	ForEachEdge(node int32, f func(int32))
 	NodeCount() int32
@@ -76,7 +74,6 @@ type Graph struct {
 	node_attributes []NodeAttributes
 	geom            IGeometry
 	weight          IWeighting
-	traffic         TrafficTable
 }
 
 func (self *Graph) GetGeometry() IGeometry {
@@ -84,9 +81,6 @@ func (self *Graph) GetGeometry() IGeometry {
 }
 func (self *Graph) GetWeighting() IWeighting {
 	return self.weight
-}
-func (self *Graph) GetTraffic() *TrafficTable {
-	return &self.traffic
 }
 func (self *Graph) GetOtherNode(edge, node int32) (int32, Direction) {
 	e := self.edges[edge]
@@ -97,9 +91,6 @@ func (self *Graph) GetOtherNode(edge, node int32) (int32, Direction) {
 		return e.NodeA, BACKWARD
 	}
 	return 0, 0
-}
-func (self *Graph) GetEdgeIndex(edge, node int32) byte {
-	return 0
 }
 func (self *Graph) GetAdjacentEdges(node int32) []int32 {
 	return self.nodes[node].Edges
@@ -224,8 +215,6 @@ func LoadGraph(file string) IGraph {
 		linearr[i] = points
 	}
 
-	traffic_table := TrafficTable{make([]int32, edgecount)}
-
 	return &Graph{
 		edges:           edgearr,
 		edge_attributes: edgeattribarr,
@@ -233,6 +222,5 @@ func LoadGraph(file string) IGraph {
 		node_attributes: nodeattribarr,
 		geom:            &Geometry{pointarr, linearr},
 		weight:          &Weighting{edgeweights},
-		traffic:         traffic_table,
 	}
 }
