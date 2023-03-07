@@ -1,8 +1,6 @@
 package graph
 
 import (
-	"sync"
-
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
@@ -14,8 +12,8 @@ type flag_ba struct {
 	prev_edge2   int32
 	visited1     bool
 	visited2     bool
-	distance1    float64
-	distance2    float64
+	lambda1      float64
+	lambda2      float64
 }
 
 type BidirectAStar struct {
@@ -58,156 +56,196 @@ func NewBidirectAStar(graph IGraph, start, end int32) *BidirectAStar {
 }
 
 func (self *BidirectAStar) CalcShortestPath() bool {
+	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
 	finished := false
-	fromStart := func() {
-		for !finished {
-			curr_id, _ := self.startheap.Dequeue()
-			//curr := (*d.graph).GetNode(curr_id)
-			if self.flags[curr_id].visited1 {
-				continue
-			}
-			if self.flags[curr_id].visited2 {
-				self.mid_id = curr_id
-				finished = true
-				return
-			}
-			self.flags[curr_id].visited1 = true
-			edges := self.graph.GetAdjacentEdges(curr_id)
-			for _, edge_id := range edges {
-				edge := self.graph.GetEdge(edge_id)
-				other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
-				//other := (*d.graph).GetNode(other_id)
-				if self.flags[other_id].visited1 || (edge.Oneway && dir == BACKWARD) {
-					continue
-				}
-				self.flags[other_id].distance1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-				new_length := self.flags[curr_id].path_length1 - self.flags[curr_id].distance1 + float64(self.weight.GetEdgeWeight(edge_id)) + self.flags[other_id].distance1
-				if self.flags[other_id].path_length1 > new_length {
-					self.flags[other_id].prev_edge1 = edge_id
-					self.flags[other_id].path_length1 = new_length
-					self.startheap.Enqueue(other_id, new_length)
-				}
-			}
-		}
-	}
-	fromEnd := func() {
-		for !finished {
-			curr_id, _ := self.endheap.Dequeue()
-			//curr := (*d.graph).GetNode(curr_id)
-			if self.flags[curr_id].visited2 {
-				continue
-			}
-			if self.flags[curr_id].visited1 {
-				self.mid_id = curr_id
-				finished = true
-				return
-			}
-			self.flags[curr_id].visited2 = true
-			edges := self.graph.GetAdjacentEdges(curr_id)
-			for _, edge_id := range edges {
-				edge := self.graph.GetEdge(edge_id)
-				other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
-				//other := (*d.graph).GetNode(other_id)
-				if self.flags[other_id].visited2 || (edge.Oneway && dir == BACKWARD) {
-					continue
-				}
-				self.flags[other_id].distance2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
-				new_length := self.flags[curr_id].path_length2 - self.flags[curr_id].distance2 + float64(self.weight.GetEdgeWeight(edge_id)) + self.flags[other_id].distance2
-				if self.flags[other_id].path_length2 > new_length {
-					self.flags[other_id].prev_edge2 = edge_id
-					self.flags[other_id].path_length2 = new_length
-					self.endheap.Enqueue(other_id, new_length)
-				}
-			}
-		}
-	}
-	wg := sync.WaitGroup{}
-	failure := false
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			err := recover()
-			if err != nil {
-				failure = true
-			}
-		}()
-		fromStart()
-	}()
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		defer func() {
-			err := recover()
-			if err != nil {
-				failure = true
-			}
-		}()
-		fromEnd()
-	}()
-	wg.Wait()
-	if failure {
-		return false
-	}
-	return true
-}
-
-func (self *BidirectAStar) Steps(count int, visitededges *util.List[CoordArray]) bool {
-	for c := 0; c < count; c++ {
+	for !finished {
+		// from start
 		curr_id, _ := self.startheap.Dequeue()
 		//curr := (*d.graph).GetNode(curr_id)
-		if self.flags[curr_id].visited1 {
+		curr_flag := self.flags[curr_id]
+		if curr_flag.visited1 {
 			continue
 		}
-		if self.flags[curr_id].visited2 {
-			self.mid_id = curr_id
-			return false
-		}
-		self.flags[curr_id].visited1 = true
+		curr_flag.visited1 = true
 		edges := self.graph.GetAdjacentEdges(curr_id)
 		for _, edge_id := range edges {
 			edge := self.graph.GetEdge(edge_id)
 			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
-			if self.flags[other_id].visited1 || (edge.Oneway && dir == BACKWARD) {
+			other_flag := self.flags[other_id]
+			if other_flag.visited1 || (edge.Oneway && dir == BACKWARD) {
 				continue
 			}
-			visitededges.Add(self.geom.GetEdge(edge_id))
-			self.flags[other_id].distance1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-			new_length := self.flags[curr_id].path_length1 - self.flags[curr_id].distance1 + float64(self.weight.GetEdgeWeight(edge_id)) + self.flags[other_id].distance1
-			if self.flags[other_id].path_length1 > new_length {
-				self.flags[other_id].prev_edge1 = edge_id
-				self.flags[other_id].path_length1 = new_length
-				self.startheap.Enqueue(other_id, new_length)
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			lambda := (other_flag.lambda1-other_flag.lambda2)/2 + lambda_route/2
+			new_length := curr_flag.path_length1 + float64(self.weight.GetEdgeWeight(edge_id))
+			if other_flag.visited2 {
+				shortest := new_length + other_flag.path_length2
+				top1, ok1 := self.startheap.Peek()
+				top2, ok2 := self.endheap.Peek()
+				if ok1 && ok2 && float64(top1+top2)+lambda_route >= shortest {
+					other_flag.prev_edge1 = edge_id
+					other_flag.path_length1 = new_length
+					self.flags[other_id] = other_flag
+					self.mid_id = other_id
+					finished = true
+					break
+				}
 			}
+			if other_flag.path_length1 > new_length {
+				other_flag.prev_edge1 = edge_id
+				other_flag.path_length1 = new_length
+				self.startheap.Enqueue(other_id, new_length+lambda)
+			}
+			self.flags[other_id] = other_flag
 		}
+		self.flags[curr_id] = curr_flag
+
+		if finished {
+			break
+		}
+		// from end
 		curr_id, _ = self.endheap.Dequeue()
 		//curr := (*d.graph).GetNode(curr_id)
-		if self.flags[curr_id].visited2 {
+		curr_flag = self.flags[curr_id]
+		if curr_flag.visited2 {
 			continue
 		}
-		if self.flags[curr_id].visited1 {
-			self.mid_id = curr_id
-			return false
-		}
-		self.flags[curr_id].visited2 = true
+		curr_flag.visited2 = true
 		edges = self.graph.GetAdjacentEdges(curr_id)
 		for _, edge_id := range edges {
 			edge := self.graph.GetEdge(edge_id)
 			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
-			if self.flags[other_id].visited2 || (edge.Oneway && dir == BACKWARD) {
+			other_flag := self.flags[other_id]
+			if other_flag.visited2 || (edge.Oneway && dir == FORWARD) {
+				continue
+			}
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			lambda := (other_flag.lambda2-other_flag.lambda1)/2 + lambda_route/2
+			new_length := curr_flag.path_length2 + float64(self.weight.GetEdgeWeight(edge_id))
+			if other_flag.visited1 {
+				shortest := new_length + other_flag.path_length1
+				top1, ok1 := self.startheap.Peek()
+				top2, ok2 := self.endheap.Peek()
+				if ok1 && ok2 && float64(top1+top2)+lambda_route >= shortest {
+					other_flag.prev_edge2 = edge_id
+					other_flag.path_length2 = new_length
+					self.flags[other_id] = other_flag
+					self.mid_id = other_id
+					finished = true
+					break
+				}
+			}
+			if other_flag.path_length2 > new_length {
+				other_flag.prev_edge2 = edge_id
+				other_flag.path_length2 = new_length
+				self.endheap.Enqueue(other_id, new_length+lambda)
+			}
+			self.flags[other_id] = other_flag
+		}
+		self.flags[curr_id] = curr_flag
+	}
+
+	return true
+}
+
+func (self *BidirectAStar) Steps(count int, visitededges *util.List[CoordArray]) bool {
+	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
+	for c := 0; c < count; c++ {
+		curr_id, _ := self.startheap.Dequeue()
+		//curr := (*d.graph).GetNode(curr_id)
+		curr_flag := self.flags[curr_id]
+		if curr_flag.visited1 {
+			continue
+		}
+		if curr_flag.visited2 {
+			self.mid_id = curr_id
+			return false
+		}
+		curr_flag.visited1 = true
+		edges := self.graph.GetAdjacentEdges(curr_id)
+		for _, edge_id := range edges {
+			edge := self.graph.GetEdge(edge_id)
+			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			//other := (*d.graph).GetNode(other_id)
+			other_flag := self.flags[other_id]
+			if other_flag.visited1 || (edge.Oneway && dir == BACKWARD) {
 				continue
 			}
 			visitededges.Add(self.geom.GetEdge(edge_id))
-			self.flags[other_id].distance2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
-			new_length := self.flags[curr_id].path_length2 - self.flags[curr_id].distance2 + float64(self.weight.GetEdgeWeight(edge_id)) + self.flags[other_id].distance2
-			if self.flags[other_id].path_length2 > new_length {
-				self.flags[other_id].prev_edge2 = edge_id
-				self.flags[other_id].path_length2 = new_length
-				self.endheap.Enqueue(other_id, new_length)
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			lambda := (other_flag.lambda1-other_flag.lambda2)/2 + lambda_route/2
+			new_length := curr_flag.path_length1 + float64(self.weight.GetEdgeWeight(edge_id))
+			if other_flag.visited2 {
+				shortest := new_length + other_flag.path_length2
+				top1, ok1 := self.startheap.Peek()
+				top2, ok2 := self.endheap.Peek()
+				if ok1 && ok2 && float64(top1+top2)+lambda_route >= shortest {
+					other_flag.prev_edge1 = edge_id
+					other_flag.path_length1 = new_length
+					self.flags[other_id] = other_flag
+					self.mid_id = other_id
+					return false
+				}
 			}
+			if other_flag.path_length1 > new_length {
+				other_flag.prev_edge1 = edge_id
+				other_flag.path_length1 = new_length
+				self.startheap.Enqueue(other_id, new_length+lambda)
+			}
+			self.flags[other_id] = other_flag
 		}
+		self.flags[curr_id] = curr_flag
+
+		curr_id, _ = self.endheap.Dequeue()
+		//curr := (*d.graph).GetNode(curr_id)
+		curr_flag = self.flags[curr_id]
+		if curr_flag.visited2 {
+			continue
+		}
+		if curr_flag.visited1 {
+			self.mid_id = curr_id
+			return false
+		}
+		curr_flag.visited2 = true
+		edges = self.graph.GetAdjacentEdges(curr_id)
+		for _, edge_id := range edges {
+			edge := self.graph.GetEdge(edge_id)
+			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			//other := (*d.graph).GetNode(other_id)
+			other_flag := self.flags[other_id]
+			if other_flag.visited2 || (edge.Oneway && dir == FORWARD) {
+				continue
+			}
+			visitededges.Add(self.geom.GetEdge(edge_id))
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			lambda := (other_flag.lambda2-other_flag.lambda1)/2 + lambda_route/2
+			new_length := curr_flag.path_length2 + float64(self.weight.GetEdgeWeight(edge_id))
+			if other_flag.visited1 {
+				shortest := new_length + other_flag.path_length1
+				top1, ok1 := self.startheap.Peek()
+				top2, ok2 := self.endheap.Peek()
+				if ok1 && ok2 && float64(top1+top2)+lambda_route >= shortest {
+					other_flag.prev_edge2 = edge_id
+					other_flag.path_length2 = new_length
+					self.flags[other_id] = other_flag
+					self.mid_id = other_id
+					return false
+				}
+			}
+			if other_flag.path_length2 > new_length {
+				other_flag.prev_edge2 = edge_id
+				other_flag.path_length2 = new_length
+				self.endheap.Enqueue(other_id, new_length+lambda)
+			}
+			self.flags[other_id] = other_flag
+		}
+		self.flags[curr_id] = curr_flag
 	}
 	return true
 }
