@@ -67,13 +67,15 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 			if !ok {
 				break
 			}
+			if ref.IsReversed() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			edge := self.graph.GetEdge(edge_id)
-			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 
-			if other_flag.visited1 || (edge.Oneway && dir == graph.BACKWARD) {
+			if other_flag.visited1 {
 				continue
 			}
 
@@ -120,13 +122,15 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 			if !ok {
 				break
 			}
+			if !ref.IsReversed() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			edge := self.graph.GetEdge(edge_id)
-			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 
-			if other_flag.visited2 || (edge.Oneway && dir == graph.FORWARD) {
+			if other_flag.visited2 {
 				continue
 			}
 
@@ -173,12 +177,14 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[geo.Coord
 			if !ok {
 				break
 			}
+			if ref.IsReversed() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			edge := self.graph.GetEdge(edge_id)
-			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-			if other_flag.visited1 || (edge.Oneway && dir == graph.BACKWARD) {
+			if other_flag.visited1 {
 				continue
 			}
 			visitededges.Add(self.geom.GetEdge(edge_id))
@@ -217,12 +223,14 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[geo.Coord
 			if !ok {
 				break
 			}
+			if !ref.IsReversed() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			edge := self.graph.GetEdge(edge_id)
-			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-			if other_flag.visited2 || (edge.Oneway && dir == graph.FORWARD) {
+			if other_flag.visited2 {
 				continue
 			}
 			visitededges.Add(self.geom.GetEdge(edge_id))

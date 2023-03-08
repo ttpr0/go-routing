@@ -62,12 +62,14 @@ func (self *Dijkstra) CalcShortestPath() bool {
 			if !ok {
 				break
 			}
+			if ref.IsReversed() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			edge := self.graph.GetEdge(edge_id)
-			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-			if other_flag.visited || (edge.Oneway && dir == graph.BACKWARD) {
+			if other_flag.visited {
 				continue
 			}
 			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
@@ -103,12 +105,14 @@ func (self *Dijkstra) Steps(count int, visitededges *util.List[geo.CoordArray]) 
 			if !ok {
 				break
 			}
+			if ref.IsReversed() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			edge := self.graph.GetEdge(edge_id)
-			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-			if other_flag.visited || (edge.Oneway && dir == graph.BACKWARD) {
+			if other_flag.visited {
 				continue
 			}
 			visitededges.Add(self.geom.GetEdge(edge_id))

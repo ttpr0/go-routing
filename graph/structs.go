@@ -73,6 +73,12 @@ type NodeAttributes struct {
 	Type int8
 }
 
+type Shortcut struct {
+	NodeA int32
+	NodeB int32
+	Edges [2]EdgeRef
+}
+
 //*******************************************
 // parser structs
 //*******************************************

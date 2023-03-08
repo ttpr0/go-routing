@@ -338,6 +338,79 @@ func LoadGraph(file string) IGraph {
 	}
 }
 
+func LoadCHGraph(file string) ICHGraph {
+	graph := LoadGraph(file).(*Graph)
+	_, err := os.Stat(file + "-level")
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file + "-level")
+	}
+	_, err = os.Stat(file + "-shortcut")
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file + "-shortcut")
+	}
+	nodecount := graph.NodeCount()
+	leveldata, _ := os.ReadFile(file + "-level")
+	levelreader := bytes.NewReader(leveldata)
+	levels := NewList[int16](int(nodecount))
+	for i := 0; i < int(nodecount); i++ {
+		var l int16
+		binary.Read(levelreader, binary.LittleEndian, &l)
+		levels.Add(l)
+	}
+
+	shortcutdata, _ := os.ReadFile(file + "-shortcut")
+	shortcutreader := bytes.NewReader(shortcutdata)
+	var shortcutcount int32
+	binary.Read(shortcutreader, binary.LittleEndian, &shortcutcount)
+	shortcuts := NewList[Shortcut](int(shortcutcount))
+	shortcut_weights := NewList[int32](int(shortcutcount))
+	for i := 0; i < int(shortcutcount); i++ {
+		var node_a int32
+		binary.Read(shortcutreader, binary.LittleEndian, &node_a)
+		var node_b int32
+		binary.Read(shortcutreader, binary.LittleEndian, &node_b)
+		var weight uint32
+		binary.Read(shortcutreader, binary.LittleEndian, &weight)
+		shortcut := Shortcut{
+			NodeA: node_a,
+			NodeB: node_b,
+			Edges: [2]EdgeRef{},
+		}
+		for j := 0; j < 2; j++ {
+			var id int32
+			binary.Read(shortcutreader, binary.LittleEndian, &id)
+			var is bool
+			binary.Read(shortcutreader, binary.LittleEndian, &is)
+			if is {
+				shortcut.Edges[j] = EdgeRef{
+					EdgeID: id,
+					Type:   2,
+				}
+			} else {
+				shortcut.Edges[j] = EdgeRef{
+					EdgeID: id,
+					Type:   0,
+				}
+			}
+		}
+		shortcuts.Add(shortcut)
+		shortcut_weights.Add(int32(weight))
+	}
+
+	return &CHGraph{
+		nodes:           graph.nodes,
+		node_attributes: graph.node_attributes,
+		node_levels:     levels,
+		edge_refs:       graph.edge_refs,
+		edges:           graph.edges,
+		edge_attributes: graph.edge_attributes,
+		shortcuts:       shortcuts,
+		geom:            graph.geom,
+		weight:          graph.weight,
+		sh_weight:       &Weighting{shortcut_weights},
+	}
+}
+
 //*******************************************
 // osm handler methods
 //*******************************************

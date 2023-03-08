@@ -82,13 +82,13 @@ type EdgeRefIterator struct {
 
 func (self *EdgeRefIterator) Next() (EdgeRef, bool) {
 	for {
-	if self.state == self.end {
-		var t EdgeRef
-		return t, false
-	}
-	self.state += 1
+		if self.state == self.end {
+			var t EdgeRef
+			return t, false
+		}
+		self.state += 1
 		if self.edge_refs.Get(self.state-1).Type <= 1 {
-	return self.edge_refs.Get(self.state - 1), true
+			return self.edge_refs.Get(self.state - 1), true
 		}
 	}
 }
