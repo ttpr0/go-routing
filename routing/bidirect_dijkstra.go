@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
@@ -147,7 +148,7 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 	return true
 }
 
-func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[graph.CoordArray]) bool {
+func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[geo.CoordArray]) bool {
 	for c := 0; c < count; c++ {
 		curr_id, _ := self.startheap.Dequeue()
 		//curr := (*d.graph).GetNode(curr_id)

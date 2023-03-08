@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
@@ -42,7 +42,7 @@ type RoutingResponse struct {
 	Key      int              `json:"key"`
 }
 
-func NewRoutingResponse(lines []graph.CoordArray, finished bool, key int) RoutingResponse {
+func NewRoutingResponse(lines []geo.CoordArray, finished bool, key int) RoutingResponse {
 	resp := RoutingResponse{}
 	resp.Type = "FeatureCollection"
 	resp.Finished = finished
@@ -76,8 +76,8 @@ func HandleRoutingRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(400)
 		return
 	}
-	start := graph.Coord{Lon: req.Start[0], Lat: req.Start[1]}
-	end := graph.Coord{Lon: req.End[0], Lat: req.End[1]}
+	start := geo.Coord{Lon: req.Start[0], Lat: req.Start[1]}
+	end := geo.Coord{Lon: req.End[0], Lat: req.End[1]}
 	var alg routing.IShortestPath
 	switch req.Alg {
 	case "Dijkstra":
@@ -118,8 +118,8 @@ func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(data, &req)
 
 	// process request
-	start := graph.Coord{Lon: req.Start[0], Lat: req.Start[1]}
-	end := graph.Coord{Lon: req.End[0], Lat: req.End[1]}
+	start := geo.Coord{Lon: req.Start[0], Lat: req.Start[1]}
+	end := geo.Coord{Lon: req.End[0], Lat: req.End[1]}
 	var alg routing.IShortestPath
 	switch req.Algorithm {
 	case "Dijkstra":
@@ -165,7 +165,7 @@ func HandleRoutingStepRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	edges := util.NewList[graph.CoordArray](10)
+	edges := util.NewList[geo.CoordArray](10)
 	finished := !alg.Steps(req.Stepcount, &edges)
 	var resp RoutingResponse
 	if finished {

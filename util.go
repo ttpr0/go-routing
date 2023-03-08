@@ -3,10 +3,11 @@ package main
 import (
 	"math"
 
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 )
 
-func GetClosestNode(point graph.Coord, graph graph.IGraph) int32 {
+func GetClosestNode(point geo.Coord, graph graph.IGraph) int32 {
 	distance := -1.0
 	id := 0
 	newdistance := 0.0

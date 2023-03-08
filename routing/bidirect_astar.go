@@ -23,8 +23,8 @@ type BidirectAStar struct {
 	mid_id      int32
 	start_id    int32
 	end_id      int32
-	start_point graph.Coord
-	end_point   graph.Coord
+	start_point geo.Coord
+	end_point   geo.Coord
 	graph       graph.IGraph
 	geom        graph.IGeometry
 	weight      graph.IWeighting
@@ -153,7 +153,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 	return true
 }
 
-func (self *BidirectAStar) Steps(count int, visitededges *util.List[graph.CoordArray]) bool {
+func (self *BidirectAStar) Steps(count int, visitededges *util.List[geo.CoordArray]) bool {
 	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
 	for c := 0; c < count; c++ {
 		curr_id, _ := self.startheap.Dequeue()

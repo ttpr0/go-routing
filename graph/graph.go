@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os"
 	"strings"
+
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 )
 
 type IGraph interface {
@@ -189,21 +191,21 @@ func LoadGraph(file string) IGraph {
 	startindex = nodecount*8 + edgecount*5
 	geomreader := bytes.NewReader(geomdata)
 	linereader := bytes.NewReader(geomdata[startindex:])
-	pointarr := make([]Coord, nodecount)
+	pointarr := make([]geo.Coord, nodecount)
 	for i := 0; i < int(nodecount); i++ {
 		var lon float32
 		binary.Read(geomreader, binary.LittleEndian, &lon)
 		var lat float32
 		binary.Read(geomreader, binary.LittleEndian, &lat)
-		pointarr[i] = Coord{lon, lat}
+		pointarr[i] = geo.Coord{lon, lat}
 	}
-	linearr := make([]CoordArray, edgecount)
+	linearr := make([]geo.CoordArray, edgecount)
 	for i := 0; i < int(edgecount); i++ {
 		var s int32
 		binary.Read(geomreader, binary.LittleEndian, &s)
 		var c byte
 		binary.Read(geomreader, binary.LittleEndian, &c)
-		points := make([]Coord, c)
+		points := make([]geo.Coord, c)
 		for j := 0; j < int(c); j++ {
 			var lon float32
 			binary.Read(linereader, binary.LittleEndian, &lon)

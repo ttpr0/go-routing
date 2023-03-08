@@ -6,7 +6,7 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
@@ -55,7 +55,7 @@ func HandleIsoRasterRequest(w http.ResponseWriter, r *http.Request) {
 	req := IsoRasterRequest{}
 	json.Unmarshal(data, &req)
 
-	start := graph.Coord{req.Locations[0][0], req.Locations[0][1]}
+	start := geo.Coord{req.Locations[0][0], req.Locations[0][1]}
 	consumer := &SPTConsumer{
 		points: util.NewQuadTree(func(val1, val2 int) int {
 			if val1 < val2 {
@@ -83,19 +83,19 @@ type SPTConsumer struct {
 	rasterizer IRasterizer
 }
 
-func (self *SPTConsumer) ConsumePoint(point graph.Coord, value int) {
+func (self *SPTConsumer) ConsumePoint(point geo.Coord, value int) {
 	x, y := self.rasterizer.PointToIndex(point)
 	self.points.Insert(x, y, value)
 }
 
 type IProjection interface {
-	Proj(graph.Coord) graph.Coord
-	ReProj(graph.Coord) graph.Coord
+	Proj(geo.Coord) geo.Coord
+	ReProj(geo.Coord) geo.Coord
 }
 
 type IRasterizer interface {
-	PointToIndex(graph.Coord) (int32, int32)
-	IndexToPoint(int32, int32) graph.Coord
+	PointToIndex(geo.Coord) (int32, int32)
+	IndexToPoint(int32, int32) geo.Coord
 }
 
 type DefaultRasterizer struct {
@@ -110,27 +110,27 @@ func NewDefaultRasterizer(precession int32) *DefaultRasterizer {
 	}
 }
 
-func (self *DefaultRasterizer) PointToIndex(point graph.Coord) (int32, int32) {
+func (self *DefaultRasterizer) PointToIndex(point geo.Coord) (int32, int32) {
 	c := self.projection.Proj(point)
 	return int32(c.Lon * self.factor), int32(c.Lat * self.factor)
 }
-func (self *DefaultRasterizer) IndexToPoint(x, y int32) graph.Coord {
-	point := graph.Coord{float32(x) / self.factor, float32(y) / self.factor}
+func (self *DefaultRasterizer) IndexToPoint(x, y int32) geo.Coord {
+	point := geo.Coord{float32(x) / self.factor, float32(y) / self.factor}
 	return self.projection.ReProj(point)
 }
 
 type WebMercatorProjection struct{}
 
-func (self *WebMercatorProjection) Proj(point graph.Coord) graph.Coord {
+func (self *WebMercatorProjection) Proj(point geo.Coord) geo.Coord {
 	a := 6378137.0
-	c := graph.Coord{}
+	c := geo.Coord{}
 	c.Lon = float32(a * float64(point.Lon) * math.Pi / 180)
 	c.Lat = float32(a * math.Log(math.Tan(math.Pi/4+float64(point.Lat)*math.Pi/360)))
 	return c
 }
-func (self *WebMercatorProjection) ReProj(point graph.Coord) graph.Coord {
+func (self *WebMercatorProjection) ReProj(point geo.Coord) geo.Coord {
 	a := 6378137.0
-	c := graph.Coord{}
+	c := geo.Coord{}
 	c.Lon = float32(float64(point.Lon) * 180 / (a * math.Pi))
 	c.Lat = float32(360 * (math.Atan(math.Exp(float64(point.Lat)/a)) - math.Pi/4) / math.Pi)
 	return c

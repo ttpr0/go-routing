@@ -1,53 +1,28 @@
 package graph
 
-import "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+import "github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 
 type IGeometry interface {
-	GetNode(node int32) Coord
-	GetEdge(edge int32) CoordArray
-	GetAllNodes() []Coord
-	GetAllEdges() []CoordArray
-}
-
-type Coord struct {
-	Lon float32
-	Lat float32
-}
-
-type CoordArray []Coord
-
-func (self *CoordArray) GetIterator() util.IIterator[Coord] {
-	return &CoordArrayIterator{self, 0}
-}
-
-type CoordArrayIterator struct {
-	coords *CoordArray
-	curr   int
-}
-
-func (self *CoordArrayIterator) Next() (Coord, bool) {
-	if len(*self.coords) <= self.curr {
-		return Coord{}, false
-	} else {
-		self.curr += 1
-		return (*self.coords)[self.curr-1], true
-	}
+	GetNode(node int32) geo.Coord
+	GetEdge(edge int32) geo.CoordArray
+	GetAllNodes() []geo.Coord
+	GetAllEdges() []geo.CoordArray
 }
 
 type Geometry struct {
-	NodeGeometry []Coord
-	EdgeGeometry []CoordArray
+	NodeGeometry []geo.Coord
+	EdgeGeometry []geo.CoordArray
 }
 
-func (self *Geometry) GetNode(node int32) Coord {
+func (self *Geometry) GetNode(node int32) geo.Coord {
 	return self.NodeGeometry[node]
 }
-func (self *Geometry) GetEdge(edge int32) CoordArray {
+func (self *Geometry) GetEdge(edge int32) geo.CoordArray {
 	return self.EdgeGeometry[edge]
 }
-func (self *Geometry) GetAllNodes() []Coord {
+func (self *Geometry) GetAllNodes() []geo.Coord {
 	return self.NodeGeometry
 }
-func (self *Geometry) GetAllEdges() []CoordArray {
+func (self *Geometry) GetAllEdges() []geo.CoordArray {
 	return self.EdgeGeometry
 }

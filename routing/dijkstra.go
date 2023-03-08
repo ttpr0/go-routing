@@ -3,6 +3,7 @@ package routing
 import (
 	"fmt"
 
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
@@ -76,7 +77,7 @@ func (self *Dijkstra) CalcShortestPath() bool {
 	}
 }
 
-func (self *Dijkstra) Steps(count int, visitededges *util.List[graph.CoordArray]) bool {
+func (self *Dijkstra) Steps(count int, visitededges *util.List[geo.CoordArray]) bool {
 	for c := 0; c < count; c++ {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {

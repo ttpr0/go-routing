@@ -1,13 +1,14 @@
 package routing
 
 import (
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type Path struct {
 	path      []int32
-	lines     []graph.CoordArray
+	lines     []geo.CoordArray
 	graph     graph.IGraph
 	geometry  graph.IGeometry
 	weighting graph.IWeighting
@@ -15,9 +16,9 @@ type Path struct {
 	changed   bool
 }
 
-func (self *Path) GetGeometry() []graph.CoordArray {
+func (self *Path) GetGeometry() []geo.CoordArray {
 	if self.lines == nil || self.changed {
-		self.lines = []graph.CoordArray{}
+		self.lines = []geo.CoordArray{}
 		for i := int(self.curr); i < len(self.path); i = i + 2 {
 			self.lines = append(self.lines, self.geometry.GetEdge(self.path[i]))
 		}
