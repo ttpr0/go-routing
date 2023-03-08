@@ -1,34 +1,43 @@
-package graph
+package routing
 
 import (
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-type flag_bd struct {
+type flag_ba struct {
 	path_length1 float64
 	path_length2 float64
 	prev_edge1   int32
 	prev_edge2   int32
 	visited1     bool
 	visited2     bool
+	lambda1      float64
+	lambda2      float64
 }
 
-type BidirectDijkstra struct {
-	startheap util.PriorityQueue[int32, float64]
-	endheap   util.PriorityQueue[int32, float64]
-	mid_id    int32
-	start_id  int32
-	end_id    int32
-	graph     IGraph
-	geom      IGeometry
-	weight    IWeighting
-	flags     []flag_bd
+type BidirectAStar struct {
+	startheap   util.PriorityQueue[int32, float64]
+	endheap     util.PriorityQueue[int32, float64]
+	mid_id      int32
+	start_id    int32
+	end_id      int32
+	start_point graph.Coord
+	end_point   graph.Coord
+	graph       graph.IGraph
+	geom        graph.IGeometry
+	weight      graph.IWeighting
+	flags       []flag_ba
 }
 
-func NewBidirectDijkstra(graph IGraph, start, end int32) *BidirectDijkstra {
-	d := BidirectDijkstra{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+func NewBidirectAStar(graph graph.IGraph, start, end int32) *BidirectAStar {
+	d := BidirectAStar{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
 
-	flags := make([]flag_bd, graph.NodeCount())
+	d.end_point = d.geom.GetNode(end)
+	d.start_point = d.geom.GetNode(start)
+
+	flags := make([]flag_ba, graph.NodeCount())
 	for i := 0; i < len(flags); i++ {
 		flags[i].path_length1 = 1000000000
 		flags[i].path_length2 = 1000000000
@@ -47,14 +56,14 @@ func NewBidirectDijkstra(graph IGraph, start, end int32) *BidirectDijkstra {
 	return &d
 }
 
-func (self *BidirectDijkstra) CalcShortestPath() bool {
+func (self *BidirectAStar) CalcShortestPath() bool {
+	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
 	finished := false
 	for !finished {
 		// from start
 		curr_id, _ := self.startheap.Dequeue()
 		//curr := (*d.graph).GetNode(curr_id)
 		curr_flag := self.flags[curr_id]
-
 		if curr_flag.visited1 {
 			continue
 		}
@@ -65,18 +74,18 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-
-			if other_flag.visited1 || (edge.Oneway && dir == BACKWARD) {
+			if other_flag.visited1 || (edge.Oneway && dir == graph.BACKWARD) {
 				continue
 			}
-
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			lambda := (other_flag.lambda1-other_flag.lambda2)/2 + lambda_route/2
 			new_length := curr_flag.path_length1 + float64(self.weight.GetEdgeWeight(edge_id))
-
 			if other_flag.visited2 {
 				shortest := new_length + other_flag.path_length2
 				top1, ok1 := self.startheap.Peek()
 				top2, ok2 := self.endheap.Peek()
-				if ok1 && ok2 && float64(top1+top2) >= shortest {
+				if ok1 && ok2 && float64(top1+top2)+lambda_route >= shortest {
 					other_flag.prev_edge1 = edge_id
 					other_flag.path_length1 = new_length
 					self.flags[other_id] = other_flag
@@ -85,11 +94,10 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 					break
 				}
 			}
-
 			if other_flag.path_length1 > new_length {
 				other_flag.prev_edge1 = edge_id
 				other_flag.path_length1 = new_length
-				self.startheap.Enqueue(other_id, new_length)
+				self.startheap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
 		}
@@ -102,7 +110,6 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 		curr_id, _ = self.endheap.Dequeue()
 		//curr := (*d.graph).GetNode(curr_id)
 		curr_flag = self.flags[curr_id]
-
 		if curr_flag.visited2 {
 			continue
 		}
@@ -113,18 +120,18 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-
-			if other_flag.visited2 || (edge.Oneway && dir == FORWARD) {
+			if other_flag.visited2 || (edge.Oneway && dir == graph.FORWARD) {
 				continue
 			}
-
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			lambda := (other_flag.lambda2-other_flag.lambda1)/2 + lambda_route/2
 			new_length := curr_flag.path_length2 + float64(self.weight.GetEdgeWeight(edge_id))
-
 			if other_flag.visited1 {
 				shortest := new_length + other_flag.path_length1
 				top1, ok1 := self.startheap.Peek()
 				top2, ok2 := self.endheap.Peek()
-				if ok1 && ok2 && float64(top1+top2) >= shortest {
+				if ok1 && ok2 && float64(top1+top2)+lambda_route >= shortest {
 					other_flag.prev_edge2 = edge_id
 					other_flag.path_length2 = new_length
 					self.flags[other_id] = other_flag
@@ -133,26 +140,31 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 					break
 				}
 			}
-
 			if other_flag.path_length2 > new_length {
 				other_flag.prev_edge2 = edge_id
 				other_flag.path_length2 = new_length
-				self.endheap.Enqueue(other_id, new_length)
+				self.endheap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
 		}
 		self.flags[curr_id] = curr_flag
 	}
+
 	return true
 }
 
-func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[CoordArray]) bool {
+func (self *BidirectAStar) Steps(count int, visitededges *util.List[graph.CoordArray]) bool {
+	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
 	for c := 0; c < count; c++ {
 		curr_id, _ := self.startheap.Dequeue()
 		//curr := (*d.graph).GetNode(curr_id)
 		curr_flag := self.flags[curr_id]
 		if curr_flag.visited1 {
 			continue
+		}
+		if curr_flag.visited2 {
+			self.mid_id = curr_id
+			return false
 		}
 		curr_flag.visited1 = true
 		edges := self.graph.GetAdjacentEdges(curr_id)
@@ -161,16 +173,19 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[CoordArra
 			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-			if other_flag.visited1 || (edge.Oneway && dir == BACKWARD) {
+			if other_flag.visited1 || (edge.Oneway && dir == graph.BACKWARD) {
 				continue
 			}
 			visitededges.Add(self.geom.GetEdge(edge_id))
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			lambda := (other_flag.lambda1-other_flag.lambda2)/2 + lambda_route/2
 			new_length := curr_flag.path_length1 + float64(self.weight.GetEdgeWeight(edge_id))
 			if other_flag.visited2 {
 				shortest := new_length + other_flag.path_length2
 				top1, ok1 := self.startheap.Peek()
 				top2, ok2 := self.endheap.Peek()
-				if ok1 && ok2 && float64(top1+top2) >= shortest {
+				if ok1 && ok2 && float64(top1+top2)+lambda_route >= shortest {
 					other_flag.prev_edge1 = edge_id
 					other_flag.path_length1 = new_length
 					self.flags[other_id] = other_flag
@@ -181,7 +196,7 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[CoordArra
 			if other_flag.path_length1 > new_length {
 				other_flag.prev_edge1 = edge_id
 				other_flag.path_length1 = new_length
-				self.startheap.Enqueue(other_id, new_length)
+				self.startheap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
 		}
@@ -193,6 +208,10 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[CoordArra
 		if curr_flag.visited2 {
 			continue
 		}
+		if curr_flag.visited1 {
+			self.mid_id = curr_id
+			return false
+		}
 		curr_flag.visited2 = true
 		edges = self.graph.GetAdjacentEdges(curr_id)
 		for _, edge_id := range edges {
@@ -200,16 +219,19 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[CoordArra
 			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-			if other_flag.visited2 || (edge.Oneway && dir == FORWARD) {
+			if other_flag.visited2 || (edge.Oneway && dir == graph.FORWARD) {
 				continue
 			}
 			visitededges.Add(self.geom.GetEdge(edge_id))
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			lambda := (other_flag.lambda2-other_flag.lambda1)/2 + lambda_route/2
 			new_length := curr_flag.path_length2 + float64(self.weight.GetEdgeWeight(edge_id))
 			if other_flag.visited1 {
 				shortest := new_length + other_flag.path_length1
 				top1, ok1 := self.startheap.Peek()
 				top2, ok2 := self.endheap.Peek()
-				if ok1 && ok2 && float64(top1+top2) >= shortest {
+				if ok1 && ok2 && float64(top1+top2)+lambda_route >= shortest {
 					other_flag.prev_edge2 = edge_id
 					other_flag.path_length2 = new_length
 					self.flags[other_id] = other_flag
@@ -220,7 +242,7 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[CoordArra
 			if other_flag.path_length2 > new_length {
 				other_flag.prev_edge2 = edge_id
 				other_flag.path_length2 = new_length
-				self.endheap.Enqueue(other_id, new_length)
+				self.endheap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
 		}
@@ -229,7 +251,7 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *util.List[CoordArra
 	return true
 }
 
-func (self *BidirectDijkstra) GetShortestPath() Path {
+func (self *BidirectAStar) GetShortestPath() Path {
 	path := make([]int32, 0, 10)
 	curr_id := self.mid_id
 	var edge int32

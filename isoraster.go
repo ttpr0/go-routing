@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
@@ -65,7 +66,7 @@ func HandleIsoRasterRequest(w http.ResponseWriter, r *http.Request) {
 		}),
 		rasterizer: NewDefaultRasterizer(req.Precession),
 	}
-	spt := graph.NewShortestPathTree(GRAPH, GetClosestNode(start, GRAPH), req.Range, consumer)
+	spt := routing.NewShortestPathTree(GRAPH, GetClosestNode(start, GRAPH), req.Range, consumer)
 
 	fmt.Println("Start Caluclating shortest-path-tree from", start)
 	spt.CalcShortestPathTree()
