@@ -84,7 +84,7 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 		edge_attributes.Add(edge_attrib)
 		edge_weights.Add(edge_weight)
 		edge_geoms.Add(geo.CoordArray(osmedge.Nodes))
-		edge_index_mapping[i] = edges.Length()
+		edge_index_mapping[i] = edges.Length() - 1
 		if !osmedge.Oneway {
 			edge = Edge{
 				NodeA: int32(osmedge.NodeB),
@@ -563,6 +563,9 @@ func CalcEdgeWeights(edges *List[OSMEdge]) {
 		e.Weight = e.Length * 3.6 / float32(e.Templimit)
 		if e.Weight > 255 {
 			e.Weight = 255
+		}
+		if e.Weight < 1 {
+			e.Weight = 1
 		}
 		edges.Set(i, e)
 	}
