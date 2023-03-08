@@ -112,14 +112,14 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 			edge := edges[index]
 			if edge.NodeA == int32(id) {
 				edgeref := EdgeRef{
-					EdgeID:     int32(index),
-					IsReversed: false,
+					EdgeID: int32(index),
+					Type:   0,
 				}
 				edgerefs.Add(edgeref)
-			} else {
+			} else if edge.NodeB == int32(id) {
 				edgeref := EdgeRef{
-					EdgeID:     int32(index),
-					IsReversed: true,
+					EdgeID: int32(index),
+					Type:   1,
 				}
 				edgerefs.Add(edgeref)
 			}
@@ -129,14 +129,14 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 			edge = edges[index+1]
 			if edge.NodeA == int32(id) {
 				edgeref := EdgeRef{
-					EdgeID:     int32(index + 1),
-					IsReversed: false,
+					EdgeID: int32(index + 1),
+					Type:   0,
 				}
 				edgerefs.Add(edgeref)
 			} else if edge.NodeB == int32(id) {
 				edgeref := EdgeRef{
-					EdgeID:     int32(index + 1),
-					IsReversed: true,
+					EdgeID: int32(index + 1),
+					Type:   1,
 				}
 				edgerefs.Add(edgeref)
 			}
@@ -181,7 +181,7 @@ func StoreGraph(graph *Graph, filename string) {
 	for i := 0; i < edgerefcount; i++ {
 		edgeref := graph.edge_refs.Get(i)
 		binary.Write(&nodesbuffer, binary.LittleEndian, int32(edgeref.EdgeID))
-		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.IsReversed)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.Type)
 	}
 	c := 0
 	for i := 0; i < edgecount; i++ {
@@ -257,11 +257,11 @@ func LoadGraph(file string) IGraph {
 	for i := 0; i < int(edgerefcount); i++ {
 		var id int32
 		binary.Read(nodereader, binary.LittleEndian, &id)
-		var r bool
+		var r byte
 		binary.Read(nodereader, binary.LittleEndian, &r)
 		edge_refs.Add(EdgeRef{
-			EdgeID:     id,
-			IsReversed: r,
+			EdgeID: id,
+			Type:   r,
 		})
 	}
 

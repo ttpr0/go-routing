@@ -58,8 +58,15 @@ type Node struct {
 }
 
 type EdgeRef struct {
-	EdgeID     int32
-	IsReversed bool
+	EdgeID int32
+	Type   byte
+}
+
+func (self EdgeRef) IsReversed() bool {
+	return self.Type%2 == 1
+}
+func (self EdgeRef) IsShortcut() bool {
+	return self.Type >= 2
 }
 
 type NodeAttributes struct {
