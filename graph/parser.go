@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -22,9 +23,8 @@ func ParseGraph(pbf_file, out_file string) {
 	ParseOsm(pbf_file, &nodes, &edges, &index_mapping)
 	print("edges: ", edges.Length(), ", nodes: ", nodes.Length())
 	CalcEdgeWeights(&edges)
-	// graph := CreateGraph(&nodes, &edges)
-	// StoreGraph(graph, "./data/niedersachsen")
-	CreateGraphFile(out_file, &nodes, &edges)
+	graph := CreateGraph(&nodes, &edges)
+	StoreGraph(graph, out_file)
 }
 
 func ParseOsm(filename string, nodes *List[OSMNode], edges *List[OSMEdge], index_mapping *Dict[int64, int]) {
@@ -58,67 +58,284 @@ func ParseOsm(filename string, nodes *List[OSMNode], edges *List[OSMEdge], index
 	}
 }
 
-func CreateGraphFile(filename string, nodes *List[OSMNode], edges *List[OSMEdge]) {
-	graphbuffer := bytes.Buffer{}
-	geombuffer := bytes.Buffer{}
-	attribbuffer := bytes.Buffer{}
-	weightbuffer := bytes.Buffer{}
-	nodecount := nodes.Length()
-	binary.Write(&graphbuffer, binary.LittleEndian, int32(nodecount))
-	edgecount := edges.Length()
-	binary.Write(&graphbuffer, binary.LittleEndian, int32(edgecount))
-	c := 0
-	for i := 0; i < nodecount; i++ {
-		n := nodes.Get(i)
-		binary.Write(&attribbuffer, binary.LittleEndian, byte(n.Type))
-		binary.Write(&geombuffer, binary.LittleEndian, n.Point.Lon)
-		binary.Write(&geombuffer, binary.LittleEndian, n.Point.Lat)
-		ec := n.Edges.Length()
-		binary.Write(&graphbuffer, binary.LittleEndian, int32(c))
-		binary.Write(&graphbuffer, binary.LittleEndian, byte(ec))
-		c += ec * 4
+func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
+	nodes := NewList[Node](osmedges.Length())
+	node_attributes := NewList[NodeAttributes](osmnodes.Length())
+	edges := NewList[Edge](osmedges.Length() * 2)
+	edge_attributes := NewList[EdgeAttributes](osmedges.Length() * 2)
+	edgerefs := NewList[EdgeRef](osmedges.Length() * 2)
+	edge_weights := NewList[int32](osmedges.Length() * 2)
+	node_geoms := NewList[geo.Coord](osmnodes.Length())
+	edge_geoms := NewList[geo.CoordArray](osmedges.Length() * 2)
+
+	edge_index_mapping := NewDict[int, int](osmedges.Length())
+	for i, osmedge := range *osmedges {
+		edge := Edge{
+			NodeA: int32(osmedge.NodeA),
+			NodeB: int32(osmedge.NodeB),
+		}
+		edge_attrib := EdgeAttributes{
+			Type:     osmedge.Type,
+			Maxspeed: byte(osmedge.Templimit),
+			Length:   osmedge.Length,
+		}
+		edge_weight := int32(osmedge.Weight)
+		edges.Add(edge)
+		edge_attributes.Add(edge_attrib)
+		edge_weights.Add(edge_weight)
+		edge_geoms.Add(geo.CoordArray(osmedge.Nodes))
+		edge_index_mapping[i] = edges.Length()
+		if !osmedge.Oneway {
+			edge = Edge{
+				NodeA: int32(osmedge.NodeB),
+				NodeB: int32(osmedge.NodeA),
+			}
+			edge_attrib := EdgeAttributes{
+				Type:     osmedge.Type,
+				Maxspeed: byte(osmedge.Templimit),
+				Length:   osmedge.Length,
+			}
+			edge_weight := int32(osmedge.Weight)
+			edges.Add(edge)
+			edge_attributes.Add(edge_attrib)
+			edge_weights.Add(edge_weight)
+			edge_geoms.Add(geo.CoordArray(osmedge.Nodes))
+		}
 	}
-	c = 0
+
+	for id, osmnode := range *osmnodes {
+		node := Node{}
+		node_attrib := NodeAttributes{}
+		node.EdgeRefStart = int32(edgerefs.Length())
+		for _, edgeid := range osmnode.Edges {
+			index := edge_index_mapping[int(edgeid)]
+			edge := edges[index]
+			if edge.NodeA == int32(id) {
+				edgeref := EdgeRef{
+					EdgeID:     int32(index),
+					IsReversed: false,
+				}
+				edgerefs.Add(edgeref)
+			} else {
+				edgeref := EdgeRef{
+					EdgeID:     int32(index),
+					IsReversed: true,
+				}
+				edgerefs.Add(edgeref)
+			}
+			if index == edges.Length()-1 {
+				continue
+			}
+			edge = edges[index+1]
+			if edge.NodeA == int32(id) {
+				edgeref := EdgeRef{
+					EdgeID:     int32(index + 1),
+					IsReversed: false,
+				}
+				edgerefs.Add(edgeref)
+			} else if edge.NodeB == int32(id) {
+				edgeref := EdgeRef{
+					EdgeID:     int32(index + 1),
+					IsReversed: true,
+				}
+				edgerefs.Add(edgeref)
+			}
+		}
+		node.EdgeRefCount = int16(edgerefs.Length() - int(node.EdgeRefStart))
+		nodes.Add(node)
+		node_attributes.Add(node_attrib)
+		node_geoms.Add(osmnode.Point)
+	}
+
+	return &Graph{
+		nodes:           nodes,
+		node_attributes: node_attributes,
+		edge_refs:       edgerefs,
+		edges:           edges,
+		edge_attributes: edge_attributes,
+		geom:            &Geometry{node_geoms, edge_geoms},
+		weight:          &Weighting{edge_weights},
+	}
+}
+
+func StoreGraph(graph *Graph, filename string) {
+	nodesbuffer := bytes.Buffer{}
+	edgesbuffer := bytes.Buffer{}
+	geombuffer := bytes.Buffer{}
+	nodecount := graph.nodes.Length()
+	edgerefcount := graph.edge_refs.Length()
+	binary.Write(&nodesbuffer, binary.LittleEndian, int32(nodecount))
+	binary.Write(&nodesbuffer, binary.LittleEndian, int32(edgerefcount))
+	edgecount := graph.edges.Length()
+	binary.Write(&edgesbuffer, binary.LittleEndian, int32(edgecount))
+	for i := 0; i < nodecount; i++ {
+		node := graph.nodes.Get(i)
+		node_attrib := graph.node_attributes.Get(i)
+		point := graph.geom.GetNode(int32(i))
+		binary.Write(&nodesbuffer, binary.LittleEndian, node_attrib.Type)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node.EdgeRefStart)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node.EdgeRefCount)
+		binary.Write(&geombuffer, binary.LittleEndian, point.Lon)
+		binary.Write(&geombuffer, binary.LittleEndian, point.Lat)
+	}
+	for i := 0; i < edgerefcount; i++ {
+		edgeref := graph.edge_refs.Get(i)
+		binary.Write(&nodesbuffer, binary.LittleEndian, int32(edgeref.EdgeID))
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.IsReversed)
+	}
+	c := 0
 	for i := 0; i < edgecount; i++ {
-		e := edges.Get(i)
-		binary.Write(&graphbuffer, binary.LittleEndian, int32(e.NodeA))
-		binary.Write(&graphbuffer, binary.LittleEndian, int32(e.NodeB))
-		binary.Write(&weightbuffer, binary.LittleEndian, uint8(e.Weight))
-		binary.Write(&attribbuffer, binary.LittleEndian, byte(e.Type))
-		binary.Write(&attribbuffer, binary.LittleEndian, e.Length)
-		binary.Write(&attribbuffer, binary.LittleEndian, uint8(e.Templimit))
-		binary.Write(&attribbuffer, binary.LittleEndian, e.Oneway)
-		nc := e.Nodes.Length()
+		edge := graph.edges.Get(i)
+		edge_attrib := graph.edge_attributes.Get(i)
+		edge_weight := graph.weight.GetEdgeWeight(int32(i))
+		binary.Write(&edgesbuffer, binary.LittleEndian, int32(edge.NodeA))
+		binary.Write(&edgesbuffer, binary.LittleEndian, int32(edge.NodeB))
+		binary.Write(&edgesbuffer, binary.LittleEndian, uint8(edge_weight))
+		binary.Write(&edgesbuffer, binary.LittleEndian, byte(edge_attrib.Type))
+		binary.Write(&edgesbuffer, binary.LittleEndian, edge_attrib.Length)
+		binary.Write(&edgesbuffer, binary.LittleEndian, uint8(edge_attrib.Maxspeed))
+		nc := len(graph.geom.GetEdge(int32(i)))
 		binary.Write(&geombuffer, binary.LittleEndian, int32(c))
 		binary.Write(&geombuffer, binary.LittleEndian, uint8(nc))
 		c += nc * 8
 	}
-	for i := 0; i < nodecount; i++ {
-		n := nodes.Get(i)
-		for j := range n.Edges {
-			binary.Write(&graphbuffer, binary.LittleEndian, int32(n.Edges[j]))
-		}
-	}
 	for i := 0; i < edgecount; i++ {
-		e := edges.Get(i)
-		for j := range e.Nodes {
-			binary.Write(&geombuffer, binary.LittleEndian, e.Nodes[j].Lon)
-			binary.Write(&geombuffer, binary.LittleEndian, e.Nodes[j].Lat)
+		coords := graph.geom.GetEdge(int32(i))
+		for _, coord := range coords {
+			binary.Write(&geombuffer, binary.LittleEndian, coord.Lon)
+			binary.Write(&geombuffer, binary.LittleEndian, coord.Lat)
 		}
 	}
 
-	graphfile, _ := os.Create(filename + ".graph")
-	defer graphfile.Close()
-	graphfile.Write(graphbuffer.Bytes())
+	nodesfile, _ := os.Create(filename + "-nodes")
+	defer nodesfile.Close()
+	nodesfile.Write(nodesbuffer.Bytes())
+	edgesfile, _ := os.Create(filename + "-edges")
+	defer edgesfile.Close()
+	edgesfile.Write(edgesbuffer.Bytes())
 	geomfile, _ := os.Create(filename + "-geom")
 	defer geomfile.Close()
 	geomfile.Write(geombuffer.Bytes())
-	attribfile, _ := os.Create(filename + "-attrib")
-	defer attribfile.Close()
-	attribfile.Write(attribbuffer.Bytes())
-	weightfile, _ := os.Create(filename + "-weight")
-	defer weightfile.Close()
-	weightfile.Write(weightbuffer.Bytes())
+}
+
+func LoadGraph(file string) IGraph {
+	_, err := os.Stat(file + "-nodes")
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file + "-nodes")
+	}
+	_, err = os.Stat(file + "-edges")
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file + "-edges")
+	}
+	_, err = os.Stat(file + "-geom")
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file + "-geom")
+	}
+
+	nodedata, _ := os.ReadFile(file + "-nodes")
+	nodereader := bytes.NewReader(nodedata)
+	var nodecount int32
+	binary.Read(nodereader, binary.LittleEndian, &nodecount)
+	var edgerefcount int32
+	binary.Read(nodereader, binary.LittleEndian, &edgerefcount)
+	nodes := NewList[Node](int(nodecount))
+	node_attribs := NewList[NodeAttributes](int(nodecount))
+	edge_refs := NewList[EdgeRef](int(edgerefcount))
+	for i := 0; i < int(nodecount); i++ {
+		var t int8
+		binary.Read(nodereader, binary.LittleEndian, &t)
+		var s int32
+		binary.Read(nodereader, binary.LittleEndian, &s)
+		var c int16
+		binary.Read(nodereader, binary.LittleEndian, &c)
+		nodes.Add(Node{
+			EdgeRefStart: s,
+			EdgeRefCount: c,
+		})
+		node_attribs.Add(NodeAttributes{Type: t})
+	}
+	for i := 0; i < int(edgerefcount); i++ {
+		var id int32
+		binary.Read(nodereader, binary.LittleEndian, &id)
+		var r bool
+		binary.Read(nodereader, binary.LittleEndian, &r)
+		edge_refs.Add(EdgeRef{
+			EdgeID:     id,
+			IsReversed: r,
+		})
+	}
+
+	edgedata, _ := os.ReadFile(file + "-edges")
+	edgereader := bytes.NewReader(edgedata)
+	var edgecount int32
+	binary.Read(edgereader, binary.LittleEndian, &edgecount)
+	edges := NewList[Edge](int(edgecount))
+	edge_attribs := NewList[EdgeAttributes](int(edgecount))
+	edge_weights := NewList[int32](int(edgecount))
+	for i := 0; i < int(edgecount); i++ {
+		var a int32
+		binary.Read(edgereader, binary.LittleEndian, &a)
+		var b int32
+		binary.Read(edgereader, binary.LittleEndian, &b)
+		var w uint8
+		binary.Read(edgereader, binary.LittleEndian, &w)
+		var t byte
+		binary.Read(edgereader, binary.LittleEndian, &t)
+		var l float32
+		binary.Read(edgereader, binary.LittleEndian, &l)
+		var m uint8
+		binary.Read(edgereader, binary.LittleEndian, &m)
+		edges.Add(Edge{
+			NodeA: a,
+			NodeB: b,
+		})
+		edge_attribs.Add(EdgeAttributes{
+			Type:     RoadType(t),
+			Length:   l,
+			Maxspeed: m,
+		})
+		edge_weights.Add(int32(w))
+	}
+
+	geomdata, _ := os.ReadFile(file + "-geom")
+	startindex := nodecount*8 + edgecount*5
+	geomreader := bytes.NewReader(geomdata)
+	linereader := bytes.NewReader(geomdata[startindex:])
+	node_geoms := make([]geo.Coord, nodecount)
+	for i := 0; i < int(nodecount); i++ {
+		var lon float32
+		binary.Read(geomreader, binary.LittleEndian, &lon)
+		var lat float32
+		binary.Read(geomreader, binary.LittleEndian, &lat)
+		node_geoms[i] = geo.Coord{lon, lat}
+	}
+	edge_geoms := make([]geo.CoordArray, edgecount)
+	for i := 0; i < int(edgecount); i++ {
+		var s int32
+		binary.Read(geomreader, binary.LittleEndian, &s)
+		var c byte
+		binary.Read(geomreader, binary.LittleEndian, &c)
+		points := make([]geo.Coord, c)
+		for j := 0; j < int(c); j++ {
+			var lon float32
+			binary.Read(linereader, binary.LittleEndian, &lon)
+			var lat float32
+			binary.Read(linereader, binary.LittleEndian, &lat)
+			points[j].Lon = lon
+			points[j].Lat = lat
+		}
+		edge_geoms[i] = points
+	}
+
+	return &Graph{
+		nodes:           nodes,
+		node_attributes: node_attribs,
+		edge_refs:       edge_refs,
+		edges:           edges,
+		edge_attributes: edge_attribs,
+		geom:            &Geometry{node_geoms, edge_geoms},
+		weight:          &Weighting{edge_weights},
+	}
 }
 
 //*******************************************

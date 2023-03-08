@@ -60,7 +60,12 @@ func (self *AStar) CalcShortestPath() bool {
 		}
 		curr_flag.visited = true
 		edges := self.graph.GetAdjacentEdges(curr_id)
-		for _, edge_id := range edges {
+		for {
+			ref, ok := edges.Next()
+			if !ok {
+				break
+			}
+			edge_id := ref.EdgeID
 			edge := self.graph.GetEdge(edge_id)
 			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
@@ -97,7 +102,12 @@ func (self *AStar) Steps(count int, visitededges *util.List[geo.CoordArray]) boo
 		}
 		curr_flag.visited = true
 		edges := self.graph.GetAdjacentEdges(curr_id)
-		for _, edge_id := range edges {
+		for {
+			ref, ok := edges.Next()
+			if !ok {
+				break
+			}
+			edge_id := ref.EdgeID
 			edge := self.graph.GetEdge(edge_id)
 			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)

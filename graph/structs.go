@@ -37,6 +37,36 @@ const (
 )
 
 //*******************************************
+// graph structs
+//*******************************************
+
+type Edge struct {
+	NodeA int32
+	NodeB int32
+}
+
+type EdgeAttributes struct {
+	Type     RoadType
+	Length   float32
+	Maxspeed byte
+	Oneway   bool
+}
+
+type Node struct {
+	EdgeRefStart int32
+	EdgeRefCount int16
+}
+
+type EdgeRef struct {
+	EdgeID     int32
+	IsReversed bool
+}
+
+type NodeAttributes struct {
+	Type int8
+}
+
+//*******************************************
 // parser structs
 //*******************************************
 
