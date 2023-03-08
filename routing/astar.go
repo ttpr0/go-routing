@@ -135,7 +135,6 @@ func (self *AStar) GetShortestPath() Path {
 	curr_id := self.end_id
 	var edge int32
 	for {
-		path = append(path, curr_id)
 		if curr_id == self.start_id {
 			break
 		}

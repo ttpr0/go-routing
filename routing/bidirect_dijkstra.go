@@ -256,7 +256,6 @@ func (self *BidirectDijkstra) GetShortestPath() Path {
 	curr_id := self.mid_id
 	var edge int32
 	for {
-		path = append(path, curr_id)
 		if curr_id == self.start_id {
 			break
 		}
@@ -264,13 +263,11 @@ func (self *BidirectDijkstra) GetShortestPath() Path {
 		path = append(path, edge)
 		curr_id, _ = self.graph.GetOtherNode(edge, curr_id)
 	}
-	path = path[1:]
 	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
 		path[i], path[j] = path[j], path[i]
 	}
 	curr_id = self.mid_id
 	for {
-		path = append(path, curr_id)
 		if curr_id == self.end_id {
 			break
 		}
