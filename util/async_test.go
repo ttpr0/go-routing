@@ -34,7 +34,7 @@ func TestAwait(t *testing.T) {
 func TestAwaitList(t *testing.T) {
 	promises := NewList[Promise[int]](10)
 	for i := 0; i < 100; i++ {
-		index := 0
+		index := i
 		promises.Add(Async(func() int {
 			time.Sleep(time.Duration(rand.Intn(10) * 1000))
 			return index
