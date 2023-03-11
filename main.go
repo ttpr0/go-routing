@@ -5,14 +5,17 @@ import (
 	"net/http"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
 )
 
-var GRAPH graph.IGraph
+var GRAPH graph.ITiledGraph
+var MANAGER *routing.DistributedRoutingManager
 
 func main() {
 	fmt.Println("hello world")
 
-	GRAPH = graph.LoadGraph("./data/niedersachsen.graph")
+	GRAPH = graph.LoadTiledGraph("./data/niedersachsen")
+	MANAGER = routing.NewDistributedManager(GRAPH)
 
 	http.HandleFunc("/v0/routing", HandleRoutingRequest)
 	http.HandleFunc("/v0/routing/draw/create", HandleCreateContextRequest)

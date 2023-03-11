@@ -68,6 +68,9 @@ func (self EdgeRef) IsReversed() bool {
 func (self EdgeRef) IsShortcut() bool {
 	return self.Type >= 2
 }
+func (self EdgeRef) IsCrossBorder() bool {
+	return self.Type >= 10 && self.Type <= 11
+}
 
 type NodeAttributes struct {
 	Type int8

@@ -411,6 +411,34 @@ func LoadCHGraph(file string) ICHGraph {
 	}
 }
 
+func LoadTiledGraph(file string) ITiledGraph {
+	graph := LoadGraph(file).(*Graph)
+	_, err := os.Stat(file + "-tiles")
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file + "-level")
+	}
+	nodecount := graph.NodeCount()
+	tiledata, _ := os.ReadFile(file + "-tiles")
+	tilereader := bytes.NewReader(tiledata)
+	node_tiles := NewList[int16](int(nodecount))
+	for i := 0; i < int(nodecount); i++ {
+		var t int16
+		binary.Read(tilereader, binary.LittleEndian, &t)
+		node_tiles.Add(t)
+	}
+
+	return &TiledGraph{
+		nodes:           graph.nodes,
+		node_attributes: graph.node_attributes,
+		node_tiles:      node_tiles,
+		edge_refs:       graph.edge_refs,
+		edges:           graph.edges,
+		edge_attributes: graph.edge_attributes,
+		geom:            graph.geom,
+		weight:          graph.weight,
+	}
+}
+
 //*******************************************
 // osm handler methods
 //*******************************************
