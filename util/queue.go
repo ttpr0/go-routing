@@ -13,6 +13,7 @@ type Queue[T any] struct {
 	head   *_QueueItem[T]
 	tail   *_QueueItem[T]
 	length int
+	lock   sync.Mutex
 }
 
 // Creates and returns a new Queue
@@ -20,12 +21,10 @@ func NewQueue[T any]() Queue[T] {
 	return Queue[T]{}
 }
 
-var queue_lock sync.Mutex
-
 // Adds a new item to the queue
 func (self *Queue[T]) Push(value T) {
-	queue_lock.Lock()
-	defer queue_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 	if self.head == nil {
 		self.head = &_QueueItem[T]{
 			value: value,
@@ -50,8 +49,8 @@ func (self *Queue[T]) Pop() (T, bool) {
 		return i, false
 	}
 
-	queue_lock.Lock()
-	defer queue_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 
 	value := self.head.value
 	self.head = self.head.next

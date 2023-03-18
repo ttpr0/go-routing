@@ -15,6 +15,7 @@ type Deque[T any] struct {
 	head   *_DequeItem[T]
 	tail   *_DequeItem[T]
 	length int
+	lock   sync.Mutex
 }
 
 // creates and returns a new Deque
@@ -22,12 +23,10 @@ func NewDeque[T any]() Deque[T] {
 	return Deque[T]{}
 }
 
-var deque_lock sync.Mutex
-
 // push the value to the back of the deque
 func (self *Deque[T]) PushBack(value T) {
-	deque_lock.Lock()
-	defer deque_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 	if self.length == 0 {
 		item := &_DequeItem[T]{
 			value: value,
@@ -48,8 +47,8 @@ func (self *Deque[T]) PushBack(value T) {
 
 // push the value to the front of the deque
 func (self *Deque[T]) PushFront(value T) {
-	deque_lock.Lock()
-	defer deque_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 	if self.length == 0 {
 		item := &_DequeItem[T]{
 			value: value,
@@ -77,8 +76,8 @@ func (self *Deque[T]) PopBack() (T, bool) {
 		return i, false
 	}
 
-	deque_lock.Lock()
-	defer deque_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 
 	if self.length == 1 {
 		value := self.tail.value
@@ -104,8 +103,8 @@ func (self *Deque[T]) PopFront() (T, bool) {
 		return i, false
 	}
 
-	deque_lock.Lock()
-	defer deque_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 
 	if self.length == 1 {
 		value := self.head.value
@@ -164,8 +163,8 @@ func (self *Deque[T]) AddAt(index int, value T) bool {
 		return true
 	}
 
-	deque_lock.Lock()
-	defer deque_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 
 	curr := self.head
 	for i := 0; i < index; i++ {
@@ -197,8 +196,8 @@ func (self *Deque[T]) RemoveAt(index int) bool {
 		return ok
 	}
 
-	deque_lock.Lock()
-	defer deque_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 
 	curr := self.head
 	for i := 0; i < index; i++ {

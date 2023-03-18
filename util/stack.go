@@ -10,6 +10,7 @@ type _StackItem[T any] struct {
 type Stack[T any] struct {
 	tail   *_StackItem[T]
 	length int
+	lock   sync.Mutex
 }
 
 // Creates and returns a new Stack
@@ -17,12 +18,10 @@ func NewStack[T any]() Stack[T] {
 	return Stack[T]{}
 }
 
-var stack_lock sync.Mutex
-
 // Adds a new item to the stack
 func (self *Stack[T]) Push(value T) {
-	stack_lock.Lock()
-	defer stack_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 	if self.tail == nil {
 		self.tail = &_StackItem[T]{
 			value: value,
@@ -46,8 +45,8 @@ func (self *Stack[T]) Pop() (T, bool) {
 		return i, false
 	}
 
-	stack_lock.Lock()
-	defer stack_lock.Unlock()
+	self.lock.Lock()
+	defer self.lock.Unlock()
 
 	value := self.tail.value
 	self.tail = self.tail.prev
