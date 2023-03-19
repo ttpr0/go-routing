@@ -4,10 +4,7 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-type Coord struct {
-	Lon float32
-	Lat float32
-}
+type Coord [2]float32
 
 type CoordArray []Coord
 

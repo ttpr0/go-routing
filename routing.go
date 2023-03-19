@@ -58,7 +58,7 @@ func NewRoutingResponse(lines []geo.CoordArray, finished bool, key int) RoutingR
 			if !ok {
 				break
 			}
-			arr = append(arr, [2]float32{coord.Lon, coord.Lat})
+			arr = append(arr, coord)
 		}
 		obj.Geom["coordinates"] = arr
 		obj.Props["value"] = 0
@@ -76,8 +76,8 @@ func HandleRoutingRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(400)
 		return
 	}
-	start := geo.Coord{Lon: req.Start[0], Lat: req.Start[1]}
-	end := geo.Coord{Lon: req.End[0], Lat: req.End[1]}
+	start := geo.Coord{req.Start[0], req.Start[1]}
+	end := geo.Coord{req.End[0], req.End[1]}
 	var alg routing.IShortestPath
 	switch req.Alg {
 	case "Dijkstra":
@@ -120,8 +120,8 @@ func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(data, &req)
 
 	// process request
-	start := geo.Coord{Lon: req.Start[0], Lat: req.Start[1]}
-	end := geo.Coord{Lon: req.End[0], Lat: req.End[1]}
+	start := geo.Coord{req.Start[0], req.Start[1]}
+	end := geo.Coord{req.End[0], req.End[1]}
 	var alg routing.IShortestPath
 	switch req.Algorithm {
 	case "Dijkstra":

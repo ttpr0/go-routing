@@ -175,8 +175,8 @@ func StoreGraph(graph *Graph, filename string) {
 		binary.Write(&nodesbuffer, binary.LittleEndian, node_attrib.Type)
 		binary.Write(&nodesbuffer, binary.LittleEndian, node.EdgeRefStart)
 		binary.Write(&nodesbuffer, binary.LittleEndian, node.EdgeRefCount)
-		binary.Write(&geombuffer, binary.LittleEndian, point.Lon)
-		binary.Write(&geombuffer, binary.LittleEndian, point.Lat)
+		binary.Write(&geombuffer, binary.LittleEndian, point[0])
+		binary.Write(&geombuffer, binary.LittleEndian, point[1])
 	}
 	for i := 0; i < edgerefcount; i++ {
 		edgeref := graph.edge_refs.Get(i)
@@ -202,8 +202,8 @@ func StoreGraph(graph *Graph, filename string) {
 	for i := 0; i < edgecount; i++ {
 		coords := graph.geom.GetEdge(int32(i))
 		for _, coord := range coords {
-			binary.Write(&geombuffer, binary.LittleEndian, coord.Lon)
-			binary.Write(&geombuffer, binary.LittleEndian, coord.Lat)
+			binary.Write(&geombuffer, binary.LittleEndian, coord[0])
+			binary.Write(&geombuffer, binary.LittleEndian, coord[1])
 		}
 	}
 
@@ -321,8 +321,8 @@ func LoadGraph(file string) IGraph {
 			binary.Read(linereader, binary.LittleEndian, &lon)
 			var lat float32
 			binary.Read(linereader, binary.LittleEndian, &lat)
-			points[j].Lon = lon
-			points[j].Lat = lat
+			points[j][0] = lon
+			points[j][1] = lat
 		}
 		edge_geoms[i] = points
 	}
@@ -510,8 +510,8 @@ func NodeHandler(scanner *osmpbf.Scanner, osm_nodes *Dict[int64, TempNode], node
 				index_mapping.Set(id, i)
 				i += 1
 			}
-			on.Point.Lon = float32(object.Lon)
-			on.Point.Lat = float32(object.Lat)
+			on.Point[0] = float32(object.Lon)
+			on.Point[1] = float32(object.Lat)
 			osm_nodes.Set(id, on)
 		default:
 			continue
