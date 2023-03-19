@@ -9,7 +9,7 @@ import (
 )
 
 var GRAPH graph.ITiledGraph
-var MANAGER *routing.DistributedRoutingManager
+var MANAGER *routing.DistributedManager
 
 func main() {
 	fmt.Println("hello world")

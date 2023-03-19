@@ -415,8 +415,9 @@ func LoadTiledGraph(file string) ITiledGraph {
 	graph := LoadGraph(file).(*Graph)
 	_, err := os.Stat(file + "-tiles")
 	if errors.Is(err, os.ErrNotExist) {
-		panic("file not found: " + file + "-level")
+		panic("file not found: " + file + "-tiles")
 	}
+
 	nodecount := graph.NodeCount()
 	tiledata, _ := os.ReadFile(file + "-tiles")
 	tilereader := bytes.NewReader(tiledata)
