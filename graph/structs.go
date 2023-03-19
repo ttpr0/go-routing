@@ -71,6 +71,9 @@ func (self EdgeRef) IsShortcut() bool {
 func (self EdgeRef) IsCrossBorder() bool {
 	return self.Type >= 10 && self.Type <= 11
 }
+func (self EdgeRef) IsSkip() bool {
+	return self.Type >= 20 && self.Type <= 21
+}
 
 type NodeAttributes struct {
 	Type int8

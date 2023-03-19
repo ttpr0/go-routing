@@ -44,6 +44,7 @@ type DistributedRoutingRunner struct {
 
 	key        int
 	tile_id    int16
+	skip       bool
 	heap       SafePriorityQueue[int32, float64]
 	start_id   int32
 	end_id     int32
@@ -59,7 +60,7 @@ type DistributedRoutingRunner struct {
 	run_lock   sync.Mutex
 }
 
-func NewDistributedRoutingRunner(key int, handler IDistributedHandler, path_chan chan int32, tile_id int16, graph graph.ITiledGraph, start, end int32) *DistributedRoutingRunner {
+func NewDistributedRoutingRunner(key int, handler IDistributedHandler, path_chan chan int32, tile_id int16, skip bool, graph graph.ITiledGraph, start, end int32) *DistributedRoutingRunner {
 	d := DistributedRoutingRunner{
 		routing_chan:  NewBlockQueue[DD_RoutingRequest](),
 		retrivel_chan: make(chan int32),
@@ -70,6 +71,7 @@ func NewDistributedRoutingRunner(key int, handler IDistributedHandler, path_chan
 
 		key:        key,
 		tile_id:    tile_id,
+		skip:       skip,
 		start_id:   start,
 		end_id:     end,
 		graph:      graph,
@@ -195,6 +197,9 @@ func (self *DistributedRoutingRunner) RunRouting() {
 			if ref.IsReversed() {
 				continue
 			}
+			if self.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
+				continue
+			}
 			edge_id := ref.EdgeID
 			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
 			var other_flag flag_dd
@@ -300,7 +305,13 @@ func (self *DistributedHandler) AddRoutingRequest(request DD_RoutingRequest) {
 	} else if self.manager.IsStoped(request.key) {
 		return
 	} else {
-		runner := NewDistributedRoutingRunner(request.key, self, self.manager.GetPathChannel(request.key), self.tile_id, self.graph, request.start_id, request.end_id)
+		var skip bool
+		if self.graph.GetNodeTile(request.end_id) == self.tile_id || self.graph.GetNodeTile(request.start_id) == self.tile_id {
+			skip = false
+		} else {
+			skip = true
+		}
+		runner := NewDistributedRoutingRunner(request.key, self, self.manager.GetPathChannel(request.key), self.tile_id, skip, self.graph, request.start_id, request.end_id)
 		if self.max_lengths.ContainsKey(request.key) {
 			runner.max_length = self.max_lengths.Get(request.key)
 		}

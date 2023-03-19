@@ -672,3 +672,160 @@ func CalcEdgeWeights(edges *List[OSMEdge]) {
 		edges.Set(i, e)
 	}
 }
+
+//*******************************************
+// calc tiled-graph skip edges
+//*******************************************
+
+func PreprocessTiledGraph(filename string) {
+	graph := LoadTiledGraph(filename).(*TiledGraph)
+
+	tiles := NewDict[int16, bool](100)
+	for _, tile_id := range graph.node_tiles {
+		if tiles.ContainsKey(tile_id) {
+			continue
+		}
+		tiles[tile_id] = true
+	}
+
+	is_skip := make([]bool, graph.EdgeCount())
+	tile_count := tiles.Length()
+	c := 1
+	for tile_id, _ := range tiles {
+		fmt.Printf("tile %v: %v / %v \n", tile_id, c, tile_count)
+		fmt.Printf("tile %v: getting start nodes \n", tile_id)
+		start_nodes := GetStartNodes(graph, tile_id)
+		fmt.Printf("tile %v: calculating skip edges \n", tile_id)
+		CalcSkipEdges(graph, start_nodes, is_skip)
+		fmt.Printf("tile %v: finished \n", tile_id)
+		c += 1
+	}
+
+	StoreContraction(graph, is_skip, filename)
+}
+
+func GetStartNodes(graph *TiledGraph, tile_id int16) List[int32] {
+	list := NewList[int32](100)
+	for id, tile := range graph.node_tiles {
+		if tile != tile_id {
+			continue
+		}
+		iter := graph.GetAdjacentEdges(int32(id))
+		for {
+			ref, ok := iter.Next()
+			if !ok {
+				break
+			}
+			if ref.IsCrossBorder() && ref.IsReversed() {
+				list.Add(int32(id))
+				break
+			}
+		}
+	}
+	return list
+}
+
+func CalcSkipEdges(graph *TiledGraph, start_nodes List[int32], is_skip List[bool]) {
+	weight := graph.GetWeighting()
+
+	for _, start := range start_nodes {
+		heap := NewPriorityQueue[int32, int32](10)
+		flags := NewDict[int32, _Flag](10)
+		end_nodes := NewDict[int32, bool](100)
+
+		flags[start] = _Flag{pathlength: 0, visited: false, prevEdge: -1}
+		heap.Enqueue(start, 0)
+
+		for {
+			curr_id, ok := heap.Dequeue()
+			if !ok {
+				break
+			}
+			curr_flag := flags[curr_id]
+			if curr_flag.visited {
+				continue
+			}
+			curr_flag.visited = true
+			iter := graph.GetAdjacentEdges(curr_id)
+			for {
+				ref, ok := iter.Next()
+				if !ok {
+					break
+				}
+				if ref.IsReversed() || ref.IsSkip() {
+					continue
+				}
+				edge_id := ref.EdgeID
+				other_id, _ := graph.GetOtherNode(edge_id, curr_id)
+				var other_flag _Flag
+				if flags.ContainsKey(other_id) {
+					other_flag = flags[other_id]
+				} else {
+					other_flag = _Flag{pathlength: 10000000, visited: false, prevEdge: -1}
+				}
+				if other_flag.visited {
+					continue
+				}
+				weight := weight.GetEdgeWeight(edge_id)
+				newlength := curr_flag.pathlength + weight
+				if newlength < other_flag.pathlength {
+					other_flag.pathlength = newlength
+					other_flag.prevEdge = edge_id
+					if ref.IsCrossBorder() {
+						end_nodes[other_id] = true
+					} else {
+						heap.Enqueue(other_id, newlength)
+					}
+				}
+				flags[other_id] = other_flag
+			}
+			flags[curr_id] = curr_flag
+		}
+
+		for end, _ := range end_nodes {
+			curr_id := end
+			for {
+				if curr_id == start {
+					break
+				}
+				edge_id := flags[curr_id].prevEdge
+				is_skip[edge_id] = true
+				curr_id, _ = graph.GetOtherNode(edge_id, curr_id)
+			}
+		}
+	}
+}
+
+type _Flag struct {
+	pathlength int32
+	prevEdge   int32
+	visited    bool
+}
+
+func StoreContraction(graph *TiledGraph, is_skip List[bool], filename string) {
+	nodesbuffer := bytes.Buffer{}
+	nodecount := graph.nodes.Length()
+	edgerefcount := graph.edge_refs.Length()
+	binary.Write(&nodesbuffer, binary.LittleEndian, int32(nodecount))
+	binary.Write(&nodesbuffer, binary.LittleEndian, int32(edgerefcount))
+	for i := 0; i < nodecount; i++ {
+		node := graph.nodes.Get(i)
+		node_attrib := graph.node_attributes.Get(i)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node_attrib.Type)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node.EdgeRefStart)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node.EdgeRefCount)
+	}
+	for i := 0; i < edgerefcount; i++ {
+		edgeref := graph.edge_refs.Get(i)
+		binary.Write(&nodesbuffer, binary.LittleEndian, int32(edgeref.EdgeID))
+		if edgeref.IsCrossBorder() || !is_skip[edgeref.EdgeID] {
+			binary.Write(&nodesbuffer, binary.LittleEndian, byte(edgeref.Type))
+		} else {
+			binary.Write(&nodesbuffer, binary.LittleEndian, byte(edgeref.Type+20))
+		}
+	}
+
+	nodesfile, _ := os.Create(filename + "-nodes")
+	defer nodesfile.Close()
+	nodesfile.Write(nodesbuffer.Bytes())
+}
