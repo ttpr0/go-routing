@@ -124,7 +124,7 @@ if __name__ == "__main__":
                 poly = MultiPolygon(rings)
             polygons.append(Landkreis(poly, int(feature["properties"]["TileID"])))
 
-    graph: Graph = load_graph("data/niedersachsen")
+    graph: Graph = load_graph("data/default")
 
     print("finished loading graph and polygons")
 
@@ -150,4 +150,4 @@ if __name__ == "__main__":
         if node_a.tile != node_b.tile:
             edgeref.typ += 10
 
-    store_graph(graph, "data/niedersachsen")
+    store_graph(graph, "data/default")
