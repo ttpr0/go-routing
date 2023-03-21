@@ -212,6 +212,7 @@ func (self *Feature) UnmarshalJSON(data []byte) error {
 type Geometry interface {
 	Type() string
 	Envelope() Envelope
+	Contains(inner Geometry) bool
 }
 
 type Point struct {
@@ -238,6 +239,9 @@ func (self *Point) Envelope() Envelope {
 	}
 	return self.envelope
 }
+func (self *Point) Contains(inner Geometry) bool {
+	return false
+}
 
 type MultiPoint struct {
 	coordinates []Coord
@@ -262,6 +266,9 @@ func (self *MultiPoint) Envelope() Envelope {
 		self.envelope = CalcEnvelope(self)
 	}
 	return self.envelope
+}
+func (self *MultiPoint) Contains(inner Geometry) bool {
+	return false
 }
 
 type LineString struct {
@@ -288,6 +295,9 @@ func (self *LineString) Envelope() Envelope {
 	}
 	return self.envelope
 }
+func (self *LineString) Contains(inner Geometry) bool {
+	return false
+}
 
 type MultiLineString struct {
 	coordinates [][]Coord
@@ -312,6 +322,9 @@ func (self *MultiLineString) Envelope() Envelope {
 		self.envelope = CalcEnvelope(self)
 	}
 	return self.envelope
+}
+func (self *MultiLineString) Contains(inner Geometry) bool {
+	return false
 }
 
 type Polygon struct {
@@ -338,6 +351,18 @@ func (self *Polygon) Envelope() Envelope {
 	}
 	return self.envelope
 }
+func (self *Polygon) Contains(inner Geometry) bool {
+	if inner.Type() != "Point" {
+		return false
+	}
+	point := inner.(*Point)
+	envelope := self.Envelope()
+	if envelope.ContainsCoord(point.Coordinates()) {
+		return SimplePointInPolygon(point.Coordinates(), self.Coordinates())
+	} else {
+		return false
+	}
+}
 
 type MultiPolygon struct {
 	coordinates [][][]Coord
@@ -362,4 +387,21 @@ func (self *MultiPolygon) Envelope() Envelope {
 		self.envelope = CalcEnvelope(self)
 	}
 	return self.envelope
+}
+
+func (self *MultiPolygon) Contains(inner Geometry) bool {
+	if inner.Type() != "Point" {
+		return false
+	}
+	point := inner.(*Point)
+	envelope := self.Envelope()
+	if envelope.ContainsCoord(point.Coordinates()) {
+		for _, coords := range self.Coordinates() {
+			is_within := SimplePointInPolygon(point.Coordinates(), coords)
+			if is_within {
+				return true
+			}
+		}
+	}
+	return false
 }
