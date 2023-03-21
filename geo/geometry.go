@@ -11,8 +11,8 @@ type FeatureCollection struct {
 	features List[Feature]
 }
 
-func NewFeatureCollection(features List[Feature]) *FeatureCollection {
-	return &FeatureCollection{features: features}
+func NewFeatureCollection(features List[Feature]) FeatureCollection {
+	return FeatureCollection{features: features}
 }
 
 func (self *FeatureCollection) Features() []Feature {
@@ -50,8 +50,8 @@ type Feature struct {
 	properties Dict[string, any]
 }
 
-func NewFeature(geometry Geometry, properties Dict[string, any]) *Feature {
-	return &Feature{geometry: geometry, properties: properties}
+func NewFeature(geometry Geometry, properties Dict[string, any]) Feature {
+	return Feature{geometry: geometry, properties: properties}
 }
 
 func (self *Feature) Geometry() Geometry {
@@ -79,7 +79,7 @@ func (self *Feature) MarshalJSON() ([]byte, error) {
 	}
 	switch self.geometry.Type() {
 	case "Point":
-		point := self.geometry.(Point)
+		point := self.geometry.(*Point)
 		v.Geometry, _ = json.Marshal(struct {
 			Type        string `json:"type"`
 			Coordinates Coord  `json:"coordinates"`
@@ -88,7 +88,7 @@ func (self *Feature) MarshalJSON() ([]byte, error) {
 			Coordinates: point.coordinates,
 		})
 	case "MultiPoint":
-		point := self.geometry.(MultiPoint)
+		point := self.geometry.(*MultiPoint)
 		v.Geometry, _ = json.Marshal(struct {
 			Type        string  `json:"type"`
 			Coordinates []Coord `json:"coordinates"`
@@ -97,7 +97,7 @@ func (self *Feature) MarshalJSON() ([]byte, error) {
 			Coordinates: point.coordinates,
 		})
 	case "LineString":
-		point := self.geometry.(LineString)
+		point := self.geometry.(*LineString)
 		v.Geometry, _ = json.Marshal(struct {
 			Type        string  `json:"type"`
 			Coordinates []Coord `json:"coordinates"`
@@ -106,7 +106,7 @@ func (self *Feature) MarshalJSON() ([]byte, error) {
 			Coordinates: point.coordinates,
 		})
 	case "MultiLineString":
-		point := self.geometry.(MultiLineString)
+		point := self.geometry.(*MultiLineString)
 		v.Geometry, _ = json.Marshal(struct {
 			Type        string    `json:"type"`
 			Coordinates [][]Coord `json:"coordinates"`
@@ -115,7 +115,7 @@ func (self *Feature) MarshalJSON() ([]byte, error) {
 			Coordinates: point.coordinates,
 		})
 	case "Polygon":
-		point := self.geometry.(Polygon)
+		point := self.geometry.(*Polygon)
 		v.Geometry, _ = json.Marshal(struct {
 			Type        string    `json:"type"`
 			Coordinates [][]Coord `json:"coordinates"`
@@ -124,7 +124,7 @@ func (self *Feature) MarshalJSON() ([]byte, error) {
 			Coordinates: point.coordinates,
 		})
 	case "MultiPolygon":
-		point := self.geometry.(MultiPolygon)
+		point := self.geometry.(*MultiPolygon)
 		v.Geometry, _ = json.Marshal(struct {
 			Type        string      `json:"type"`
 			Coordinates [][][]Coord `json:"coordinates"`
@@ -156,7 +156,7 @@ func (self *Feature) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return errors.New("invalid point coordinates")
 		}
-		self.geometry = Point{
+		self.geometry = &Point{
 			coordinates: coords,
 		}
 	case "MultiPoint":
@@ -165,7 +165,7 @@ func (self *Feature) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return errors.New("invalid multipoint coordinates")
 		}
-		self.geometry = MultiPoint{
+		self.geometry = &MultiPoint{
 			coordinates: coords,
 		}
 	case "LineString":
@@ -174,7 +174,7 @@ func (self *Feature) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return errors.New("invalid linestring coordinates")
 		}
-		self.geometry = LineString{
+		self.geometry = &LineString{
 			coordinates: coords,
 		}
 	case "MultiLineString":
@@ -183,7 +183,7 @@ func (self *Feature) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return errors.New("invalid multilinestring coordinates")
 		}
-		self.geometry = MultiLineString{
+		self.geometry = &MultiLineString{
 			coordinates: coords,
 		}
 	case "Polygon":
@@ -192,7 +192,7 @@ func (self *Feature) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return errors.New("invalid polygon coordinates")
 		}
-		self.geometry = Polygon{
+		self.geometry = &Polygon{
 			coordinates: coords,
 		}
 	case "MultiPolygon":
@@ -201,7 +201,7 @@ func (self *Feature) UnmarshalJSON(data []byte) error {
 		if err != nil {
 			return errors.New("invalid multipolygon coordinates")
 		}
-		self.geometry = MultiPolygon{
+		self.geometry = &MultiPolygon{
 			coordinates: coords,
 		}
 	}
@@ -211,17 +211,19 @@ func (self *Feature) UnmarshalJSON(data []byte) error {
 
 type Geometry interface {
 	Type() string
+	Envelope() Envelope
 }
 
 type Point struct {
 	coordinates Coord
+	envelope    Envelope
 }
 
 func NewPoint(coords Coord) Point {
 	return Point{coordinates: coords}
 }
 
-func (self Point) Type() string {
+func (self *Point) Type() string {
 	return "Point"
 }
 func (self *Point) Coordinates() Coord {
@@ -230,16 +232,23 @@ func (self *Point) Coordinates() Coord {
 func (self *Point) SetCoordinates(coords Coord) {
 	self.coordinates = coords
 }
+func (self *Point) Envelope() Envelope {
+	if self.envelope == (Envelope{}) {
+		self.envelope = CalcEnvelope(self)
+	}
+	return self.envelope
+}
 
 type MultiPoint struct {
 	coordinates []Coord
+	envelope    Envelope
 }
 
 func NewMultiPoint(coords []Coord) MultiPoint {
 	return MultiPoint{coordinates: coords}
 }
 
-func (self MultiPoint) Type() string {
+func (self *MultiPoint) Type() string {
 	return "MultiPoint"
 }
 func (self *MultiPoint) Coordinates() []Coord {
@@ -248,16 +257,23 @@ func (self *MultiPoint) Coordinates() []Coord {
 func (self *MultiPoint) SetCoordinates(coords []Coord) {
 	self.coordinates = coords
 }
+func (self *MultiPoint) Envelope() Envelope {
+	if self.envelope == (Envelope{}) {
+		self.envelope = CalcEnvelope(self)
+	}
+	return self.envelope
+}
 
 type LineString struct {
 	coordinates []Coord
+	envelope    Envelope
 }
 
 func NewLineString(coords []Coord) LineString {
 	return LineString{coordinates: coords}
 }
 
-func (self LineString) Type() string {
+func (self *LineString) Type() string {
 	return "LineString"
 }
 func (self *LineString) Coordinates() []Coord {
@@ -266,16 +282,23 @@ func (self *LineString) Coordinates() []Coord {
 func (self *LineString) SetCoordinates(coords []Coord) {
 	self.coordinates = coords
 }
+func (self *LineString) Envelope() Envelope {
+	if self.envelope == (Envelope{}) {
+		self.envelope = CalcEnvelope(self)
+	}
+	return self.envelope
+}
 
 type MultiLineString struct {
 	coordinates [][]Coord
+	envelope    Envelope
 }
 
 func NewMultiLineString(coords [][]Coord) MultiLineString {
 	return MultiLineString{coordinates: coords}
 }
 
-func (self MultiLineString) Type() string {
+func (self *MultiLineString) Type() string {
 	return "MultiLineString"
 }
 func (self *MultiLineString) Coordinates() [][]Coord {
@@ -284,16 +307,23 @@ func (self *MultiLineString) Coordinates() [][]Coord {
 func (self *MultiLineString) SetCoordinates(coords [][]Coord) {
 	self.coordinates = coords
 }
+func (self *MultiLineString) Envelope() Envelope {
+	if self.envelope == (Envelope{}) {
+		self.envelope = CalcEnvelope(self)
+	}
+	return self.envelope
+}
 
 type Polygon struct {
 	coordinates [][]Coord
+	envelope    Envelope
 }
 
 func NewPolygon(coords [][]Coord) Polygon {
 	return Polygon{coordinates: coords}
 }
 
-func (self Polygon) Type() string {
+func (self *Polygon) Type() string {
 	return "Polygon"
 }
 func (self *Polygon) Coordinates() [][]Coord {
@@ -302,16 +332,23 @@ func (self *Polygon) Coordinates() [][]Coord {
 func (self *Polygon) SetCoordinates(coords [][]Coord) {
 	self.coordinates = coords
 }
+func (self *Polygon) Envelope() Envelope {
+	if self.envelope == (Envelope{}) {
+		self.envelope = CalcEnvelope(self)
+	}
+	return self.envelope
+}
 
 type MultiPolygon struct {
 	coordinates [][][]Coord
+	envelope    Envelope
 }
 
 func NewMultiPolygon(coords [][][]Coord) MultiPolygon {
 	return MultiPolygon{coordinates: coords}
 }
 
-func (self MultiPolygon) Type() string {
+func (self *MultiPolygon) Type() string {
 	return "MultiPolygon"
 }
 func (self *MultiPolygon) Coordinates() [][][]Coord {
@@ -319,4 +356,10 @@ func (self *MultiPolygon) Coordinates() [][][]Coord {
 }
 func (self *MultiPolygon) SetCoordinates(coords [][][]Coord) {
 	self.coordinates = coords
+}
+func (self *MultiPolygon) Envelope() Envelope {
+	if self.envelope == (Envelope{}) {
+		self.envelope = CalcEnvelope(self)
+	}
+	return self.envelope
 }
