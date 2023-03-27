@@ -12,7 +12,6 @@ type Block struct {
 func (self *Block) Take() {
 	self.take_lock.Lock()
 	defer self.take_lock.Unlock()
-	self.Release()
 	self.is_locked = true
 	<-self.channel
 }

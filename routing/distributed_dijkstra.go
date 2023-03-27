@@ -120,8 +120,8 @@ func (self *DistributedRoutingRunner) HandleRoutingRequest() {
 				self.is_idle = false
 			}
 		}
-		self.run_lock.Unlock()
 		self.block.Release()
+		self.run_lock.Unlock()
 	}
 }
 func (self *DistributedRoutingRunner) HandleRetrivalRequest() {

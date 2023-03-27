@@ -1,7 +1,6 @@
 package util
 
 import (
-	"fmt"
 	"sync"
 )
 
@@ -29,9 +28,6 @@ func (self *BlockQueue[T]) Pop() T {
 	defer self.read_lock.Unlock()
 	if self.queue.length <= 0 {
 		self.block.Take()
-	}
-	if self.queue.length == 0 {
-		fmt.Println(self.queue.Size())
 	}
 	value, _ := self.queue.Pop()
 	return value
