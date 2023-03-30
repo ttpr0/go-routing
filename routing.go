@@ -132,6 +132,8 @@ func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
 		alg = routing.NewBidirectDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	case "Bidirect-A*":
 		alg = routing.NewBidirectAStar(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+	case "Distributed-Dijkstra":
+		alg = routing.NewDistributedDijkstra(MANAGER, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	default:
 		alg = routing.NewDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	}
