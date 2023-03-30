@@ -20,9 +20,9 @@ type DD_RoutingRequest struct {
 }
 
 type flag_dd struct {
+	curr_node   int32
 	path_length float64
 	prev_edge   int32
-	visited     bool
 }
 
 type IDistributedRunner interface {
@@ -45,7 +45,7 @@ type DistributedRoutingRunner struct {
 	key        int
 	tile_id    int16
 	skip       bool
-	heap       SafePriorityQueue[int32, float64]
+	heap       SafePriorityQueue[flag_dd, float64]
 	start_id   int32
 	end_id     int32
 	graph      graph.ITiledGraph
@@ -79,19 +79,16 @@ func NewDistributedRoutingRunner(key int, handler IDistributedHandler, path_chan
 		weight:     graph.GetWeighting(),
 		finished:   false,
 		is_end:     false,
-		is_idle:    true,
 		block:      NewBlock(),
 		max_length: 10000000000,
-		run_lock:   sync.Mutex{},
 	}
 
 	flags := NewSafeDict[int32, flag_dd](100)
 	d.flags = flags
 
-	heap := NewSafePriorityQueue[int32, float64](100)
+	heap := NewSafePriorityQueue[flag_dd, float64](100)
 	d.heap = heap
 
-	go d.HandleRoutingRequest()
 	go d.HandleRetrivalRequest()
 	go d.HandleStopRequest()
 	go d.HandleExitRequest()
@@ -99,31 +96,6 @@ func NewDistributedRoutingRunner(key int, handler IDistributedHandler, path_chan
 	return &d
 }
 
-func (self *DistributedRoutingRunner) HandleRoutingRequest() {
-	for !self.finished {
-		request := self.routing_chan.Pop()
-		self.run_lock.Lock()
-		var flag flag_dd
-		if self.flags.ContainsKey(request.begin_id) {
-			flag = self.flags.Get(request.begin_id)
-		} else {
-			flag = flag_dd{path_length: 1000000, visited: false, prev_edge: -1}
-		}
-		if request.path_length < flag.path_length {
-			flag.prev_edge = request.prev_edge
-			flag.path_length = request.path_length
-			flag.visited = false
-			self.heap.Enqueue(request.begin_id, request.path_length)
-			self.flags.Set(request.begin_id, flag)
-			if self.is_idle {
-				self.handler.SetRunning(self.key)
-				self.is_idle = false
-			}
-		}
-		self.block.Release()
-		self.run_lock.Unlock()
-	}
-}
 func (self *DistributedRoutingRunner) HandleRetrivalRequest() {
 	for {
 		request, ok := <-self.retrivel_chan
@@ -161,33 +133,32 @@ func (self *DistributedRoutingRunner) HandleExitRequest() {
 	self.finished = true
 	close(self.retrivel_chan)
 }
+
 func (self *DistributedRoutingRunner) RunRouting() {
 	for !self.finished {
-		curr_id, ok := self.heap.Dequeue()
+		curr_flag, ok := self.heap.Dequeue()
 		if !ok {
-			if !self.is_idle && self.routing_chan.Size() == 0 {
 				self.handler.SetIdle(self.key)
-				self.is_idle = true
-			}
 			self.block.Take()
 			continue
 		}
-		self.run_lock.Lock()
-		curr_flag := self.flags.Get(curr_id)
 		if curr_flag.path_length > self.max_length {
-			self.run_lock.Unlock()
 			continue
 		}
+		curr_id := curr_flag.curr_node
+		if self.flags.ContainsKey(curr_id) {
+			temp_flag := self.flags.Get(curr_id)
+			if temp_flag.path_length < curr_flag.path_length {
+				continue
+			}
+		}
 		if curr_id == self.end_id {
+			fmt.Println("end found")
 			self.is_end = true
 			self.max_length = curr_flag.path_length
 			self.handler.SendStopRequest(self.key, curr_flag.path_length)
 		}
-		if curr_flag.visited {
-			self.run_lock.Unlock()
-			continue
-		}
-		curr_flag.visited = true
+		self.flags.Set(curr_id, curr_flag)
 		edges := self.graph.GetAdjacentEdges(curr_id)
 		for {
 			ref, ok := edges.Next()
@@ -201,17 +172,24 @@ func (self *DistributedRoutingRunner) RunRouting() {
 				continue
 			}
 			edge_id := ref.EdgeID
+			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			if new_length > self.max_length {
+				continue
+			}
 			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
 			var other_flag flag_dd
 			if self.flags.ContainsKey(other_id) {
 				other_flag = self.flags.Get(other_id)
 			} else {
-				other_flag = flag_dd{path_length: 1000000, visited: false, prev_edge: -1}
+				other_flag = flag_dd{curr_node: other_id, path_length: 1000000, prev_edge: -1}
 			}
-			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			if new_length < other_flag.path_length {
 			if new_length > self.max_length {
 				continue
 			}
+				other_flag.curr_node = other_id
+				other_flag.prev_edge = edge_id
+				other_flag.path_length = new_length
 			if ref.IsCrossBorder() {
 				request := DD_RoutingRequest{
 					key:         self.key,
@@ -222,18 +200,12 @@ func (self *DistributedRoutingRunner) RunRouting() {
 					prev_edge:   edge_id,
 				}
 				self.handler.SendRoutingRequest(request)
-				continue
+				} else {
+					self.heap.Enqueue(other_flag, new_length)
 			}
-			if new_length < other_flag.path_length {
-				other_flag.prev_edge = edge_id
-				other_flag.path_length = new_length
-				other_flag.visited = false
-				self.heap.Enqueue(other_id, new_length)
 			}
 			self.flags.Set(other_id, other_flag)
 		}
-		self.flags.Set(curr_id, curr_flag)
-		self.run_lock.Unlock()
 	}
 }
 
@@ -241,11 +213,18 @@ func (self *DistributedRoutingRunner) AddRoutingRequest(request DD_RoutingReques
 	if request.path_length > self.max_length {
 		return
 	}
-	if self.is_idle {
-		self.handler.SetRunning(self.key)
-		self.is_idle = false
+	if self.flags.ContainsKey(request.begin_id) {
+		flag := self.flags.Get(request.begin_id)
+		if request.path_length > flag.path_length {
+			return
+		}
 	}
-	self.routing_chan.Push(request)
+	flag := flag_dd{curr_node: request.begin_id, prev_edge: request.prev_edge, path_length: request.path_length}
+	self.heap.Enqueue(flag, request.path_length)
+	if self.block.IsTaken() {
+		self.handler.SetRunning(self.key)
+		self.block.Release()
+	}
 }
 func (self *DistributedRoutingRunner) AddRetrivelRequest(request int32) {
 	self.retrivel_chan <- request
@@ -317,6 +296,7 @@ func (self *DistributedHandler) AddRoutingRequest(request DD_RoutingRequest) {
 		}
 		self.runners.Set(request.key, runner)
 		runner.AddRoutingRequest(request)
+		self.SetRunning(request.key)
 		go runner.RunRouting()
 	}
 }
@@ -443,9 +423,8 @@ func (self *DistributedManager) AddRetrivelRequest(request Tuple[int, int32]) {
 	self.retrivel_chan <- request
 }
 func (self *DistributedManager) AddStopRequest(key int, path_length float64) {
-	req_count := self.req_count.Get(key)
-	run_count := self.run_count.Get(key)
-	if req_count == 0 && run_count == 1 {
+	if self.run_count.Get(key) == 1 && self.req_count.Get(key) == 0 {
+		fmt.Println("stoped1")
 		self.stop_chan <- key
 	}
 	for _, handler := range self.handlers {
@@ -457,10 +436,12 @@ func (self *DistributedManager) AddExitRequest(request int) {
 }
 
 func (self *DistributedManager) DecrementRunningCount(key int) {
+	self.run_lock.Lock()
+	fmt.Println(self.run_count.Get(key), self.req_count.Get(key))
 	if self.run_count.Get(key) == 1 && self.req_count.Get(key) == 0 {
+		fmt.Println("stoped2")
 		self.stop_chan <- key
 	}
-	self.run_lock.Lock()
 	self.run_count.Set(key, self.run_count.Get(key)-1)
 	self.run_lock.Unlock()
 }
@@ -471,6 +452,9 @@ func (self *DistributedManager) IncrementRunningCount(key int) {
 }
 func (self *DistributedManager) DecrementRequestCount(key int) {
 	self.req_lock.Lock()
+	if self.run_count.Get(key) == 0 && self.req_count.Get(key) == 1 {
+		self.stop_chan <- key
+	}
 	self.req_count.Set(key, self.req_count.Get(key)-1)
 	self.req_lock.Unlock()
 }
@@ -516,6 +500,9 @@ func (self *DistributedManager) HandleRetrivelRequest() {
 func (self *DistributedManager) HandleStopRequest() {
 	for {
 		request := <-self.stop_chan
+		if self.stoped.Get(request) {
+			continue
+		}
 		self.finished.Get(request) <- true
 		self.stoped.Set(request, true)
 		for _, handler := range self.handlers {
