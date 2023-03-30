@@ -17,6 +17,7 @@ type DD_RoutingRequest struct {
 	begin_id    int32
 	path_length float64
 	prev_edge   int32
+	draw        bool
 }
 
 type flag_dd struct {
@@ -40,11 +41,13 @@ type DistributedRoutingRunner struct {
 	stop_chan     chan bool
 	exit_chan     chan bool
 	path_chan     chan int32
+	edge_queue    *Queue[int32]
 	handler       IDistributedHandler
 
 	key        int
 	tile_id    int16
 	skip       bool
+	draw       bool
 	heap       SafePriorityQueue[flag_dd, float64]
 	start_id   int32
 	end_id     int32
@@ -54,24 +57,24 @@ type DistributedRoutingRunner struct {
 	flags      SafeDict[int32, flag_dd]
 	finished   bool
 	is_end     bool
-	is_idle    bool
 	block      *Block
 	max_length float64
-	run_lock   sync.Mutex
 }
 
-func NewDistributedRoutingRunner(key int, handler IDistributedHandler, path_chan chan int32, tile_id int16, skip bool, graph graph.ITiledGraph, start, end int32) *DistributedRoutingRunner {
+func NewDistributedRoutingRunner(key int, handler IDistributedHandler, path_chan chan int32, edge_queue *Queue[int32], tile_id int16, skip bool, draw bool, graph graph.ITiledGraph, start, end int32) *DistributedRoutingRunner {
 	d := DistributedRoutingRunner{
 		routing_chan:  NewBlockQueue[DD_RoutingRequest](),
 		retrivel_chan: make(chan int32),
 		stop_chan:     make(chan bool),
 		exit_chan:     make(chan bool),
 		path_chan:     path_chan,
+		edge_queue:    edge_queue,
 		handler:       handler,
 
 		key:        key,
 		tile_id:    tile_id,
 		skip:       skip,
+		draw:       draw,
 		start_id:   start,
 		end_id:     end,
 		graph:      graph,
@@ -138,7 +141,7 @@ func (self *DistributedRoutingRunner) RunRouting() {
 	for !self.finished {
 		curr_flag, ok := self.heap.Dequeue()
 		if !ok {
-				self.handler.SetIdle(self.key)
+			self.handler.SetIdle(self.key)
 			self.block.Take()
 			continue
 		}
@@ -184,25 +187,26 @@ func (self *DistributedRoutingRunner) RunRouting() {
 				other_flag = flag_dd{curr_node: other_id, path_length: 1000000, prev_edge: -1}
 			}
 			if new_length < other_flag.path_length {
-			if new_length > self.max_length {
-				continue
-			}
+				if self.draw {
+					self.edge_queue.Push(edge_id)
+				}
 				other_flag.curr_node = other_id
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
-			if ref.IsCrossBorder() {
-				request := DD_RoutingRequest{
-					key:         self.key,
-					start_id:    self.start_id,
-					end_id:      self.end_id,
-					begin_id:    other_id,
-					path_length: new_length,
-					prev_edge:   edge_id,
-				}
-				self.handler.SendRoutingRequest(request)
+				if ref.IsCrossBorder() {
+					request := DD_RoutingRequest{
+						key:         self.key,
+						start_id:    self.start_id,
+						end_id:      self.end_id,
+						begin_id:    other_id,
+						path_length: new_length,
+						prev_edge:   edge_id,
+						draw:        self.draw,
+					}
+					self.handler.SendRoutingRequest(request)
 				} else {
 					self.heap.Enqueue(other_flag, new_length)
-			}
+				}
 			}
 			self.flags.Set(other_id, other_flag)
 		}
@@ -290,7 +294,7 @@ func (self *DistributedHandler) AddRoutingRequest(request DD_RoutingRequest) {
 		} else {
 			skip = true
 		}
-		runner := NewDistributedRoutingRunner(request.key, self, self.manager.GetPathChannel(request.key), self.tile_id, skip, self.graph, request.start_id, request.end_id)
+		runner := NewDistributedRoutingRunner(request.key, self, self.manager.GetPathChannel(request.key), self.manager.GetEdgeQueue(request.key), self.tile_id, skip, request.draw, self.graph, request.start_id, request.end_id)
 		if self.max_lengths.ContainsKey(request.key) {
 			runner.max_length = self.max_lengths.Get(request.key)
 		}
@@ -350,19 +354,21 @@ type IDistributedManager interface {
 	DecrementRunningCount(key int)
 	IsStoped(key int) bool
 	GetPathChannel(key int) chan int32
+	GetEdgeQueue(key int) *Queue[int32]
 }
 
 type DistributedManager struct {
 	handlers Dict[int16, IDistributedHandler]
 	graph    graph.ITiledGraph
 
-	paths     SafeDict[int, chan int32]
-	finished  SafeDict[int, chan bool]
-	stoped    SafeDict[int, bool]
-	req_count SafeDict[int, int]
-	run_count SafeDict[int, int]
-	run_lock  sync.Mutex
-	req_lock  sync.Mutex
+	paths       SafeDict[int, chan int32]
+	finished    SafeDict[int, chan bool]
+	edge_queues SafeDict[int, *Queue[int32]]
+	stoped      SafeDict[int, bool]
+	req_count   SafeDict[int, int]
+	run_count   SafeDict[int, int]
+	run_lock    sync.Mutex
+	req_lock    sync.Mutex
 
 	routing_chan  *BlockQueue[DD_RoutingRequest]
 	retrivel_chan chan Tuple[int, int32]
@@ -378,6 +384,7 @@ func NewDistributedManager(graph graph.ITiledGraph) *DistributedManager {
 
 	paths := NewSafeDict[int, chan int32](10)
 	finished := NewSafeDict[int, chan bool](10)
+	edge_queues := NewSafeDict[int, *Queue[int32]](10)
 	stoped := NewSafeDict[int, bool](100)
 	req_count := NewSafeDict[int, int](10)
 	run_count := NewSafeDict[int, int](10)
@@ -389,13 +396,14 @@ func NewDistributedManager(graph graph.ITiledGraph) *DistributedManager {
 		handlers: handlers,
 		graph:    graph,
 
-		paths:     paths,
-		finished:  finished,
-		stoped:    stoped,
-		req_count: req_count,
-		run_count: run_count,
-		run_lock:  sync.Mutex{},
-		req_lock:  sync.Mutex{},
+		paths:       paths,
+		finished:    finished,
+		edge_queues: edge_queues,
+		stoped:      stoped,
+		req_count:   req_count,
+		run_count:   run_count,
+		run_lock:    sync.Mutex{},
+		req_lock:    sync.Mutex{},
 
 		routing_chan:  routing_chan,
 		retrivel_chan: retrivel_chan,
@@ -469,6 +477,9 @@ func (self *DistributedManager) IsStoped(key int) bool {
 }
 func (self *DistributedManager) GetPathChannel(key int) chan int32 {
 	return self.paths.Get(key)
+}
+func (self *DistributedManager) GetEdgeQueue(key int) *Queue[int32] {
+	return self.edge_queues.Get(key)
 }
 
 func (self *DistributedManager) HandleRoutingRequest() {
@@ -546,6 +557,36 @@ func (self *DistributedManager) RunRouting(start, end int32) int {
 	self.finished.Delete(key)
 	return key
 }
+func (self *DistributedManager) RunRoutingDraw(start, end int32) (int, *Queue[int32]) {
+	key := rand.Int()
+	for self.paths.ContainsKey(key) {
+		key = rand.Int()
+	}
+
+	path := make(chan int32)
+	finished := make(chan bool)
+	edge_queue := NewQueue[int32]()
+	self.paths.Set(key, path)
+	self.finished.Set(key, finished)
+	self.edge_queues.Set(key, &edge_queue)
+	self.run_count.Set(key, 0)
+	self.req_count.Set(key, 0)
+
+	request := DD_RoutingRequest{
+		key:         key,
+		start_id:    start,
+		end_id:      end,
+		begin_id:    start,
+		path_length: 0,
+		prev_edge:   -1,
+		draw:        true,
+	}
+	self.AddRoutingRequest(request)
+
+	<-self.finished.Get(key)
+	self.finished.Delete(key)
+	return key, &edge_queue
+}
 func (self *DistributedManager) GetRoutingPath(key int) List[int32] {
 	path := NewList[int32](10)
 
@@ -574,10 +615,13 @@ type DistributedDijkstra struct {
 	start_id int32
 	end_id   int32
 
-	key int
+	key        int
+	edges      List[int32]
+	edge_queue *Queue[int32]
 }
 
 func NewDistributedDijkstra(manager *DistributedManager, start, end int32) *DistributedDijkstra {
+	fmt.Println(start, end)
 	return &DistributedDijkstra{
 		manager:  manager,
 		start_id: start,
@@ -595,12 +639,25 @@ func (self *DistributedDijkstra) CalcShortestPath() bool {
 }
 
 func (self *DistributedDijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
-	key := self.manager.RunRouting(self.start_id, self.end_id)
-	self.key = key
-	return false
+	if self.edge_queue == nil {
+		key, queue := self.manager.RunRoutingDraw(self.start_id, self.end_id)
+		self.key = key
+		self.edge_queue = queue
+		self.edges = self.manager.GetRoutingPath(self.key)
+	}
+	for i := 0; i < count; i++ {
+		edge_id, ok := self.edge_queue.Pop()
+		if !ok {
+			return false
+		}
+		visitededges.Add(self.manager.graph.GetGeometry().GetEdge(edge_id))
+	}
+	return true
 }
 
 func (self *DistributedDijkstra) GetShortestPath() Path {
-	edges := self.manager.GetRoutingPath(self.key)
-	return NewPath(self.manager.graph, edges)
+	if self.edges == nil {
+		self.edges = self.manager.GetRoutingPath(self.key)
+	}
+	return NewPath(self.manager.graph, self.edges)
 }
