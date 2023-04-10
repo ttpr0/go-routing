@@ -90,6 +90,8 @@ func HandleRoutingRequest(w http.ResponseWriter, r *http.Request) {
 		alg = routing.NewBidirectAStar(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	case "Distributed-Dijkstra":
 		alg = routing.NewDistributedDijkstra(MANAGER, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+	case "BODijkstra":
+		alg = routing.NewBODijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	default:
 		alg = routing.NewDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	}
@@ -134,6 +136,8 @@ func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
 		alg = routing.NewBidirectAStar(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	case "Distributed-Dijkstra":
 		alg = routing.NewDistributedDijkstra(MANAGER, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+	case "BODijkstra":
+		alg = routing.NewBODijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	default:
 		alg = routing.NewDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	}
