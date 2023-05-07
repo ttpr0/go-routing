@@ -13,7 +13,7 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func ParseGraph(pbf_file, out_file string) {
+func ParseGraph(pbf_file string) *Graph {
 	nodes := NewList[OSMNode](10000)
 	edges := NewList[OSMEdge](10000)
 	index_mapping := NewDict[int64, int](10000)
@@ -21,7 +21,7 @@ func ParseGraph(pbf_file, out_file string) {
 	print("edges: ", edges.Length(), ", nodes: ", nodes.Length())
 	CalcEdgeWeights(&edges)
 	graph := CreateGraph(&nodes, &edges)
-	StoreGraph(graph, out_file)
+	return graph
 }
 
 func ParseOsm(filename string, nodes *List[OSMNode], edges *List[OSMEdge], index_mapping *Dict[int64, int]) {

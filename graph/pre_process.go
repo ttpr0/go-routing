@@ -25,6 +25,7 @@ func PreprocessTiledGraph(graph *Graph, features []geo.Feature) *TiledGraph {
 		edge_attributes: graph.edge_attributes,
 		geom:            graph.geom,
 		weight:          graph.weight,
+		index:           graph.index,
 	}
 
 	tiles := NewDict[int16, bool](100)

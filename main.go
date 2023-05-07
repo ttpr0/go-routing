@@ -14,7 +14,7 @@ var MANAGER *routing.DistributedManager
 func main() {
 	fmt.Println("hello world")
 
-	GRAPH = graph.LoadTiledGraph("./data/niedersachsen")
+	GRAPH = graph.LoadOrCreate("./data/niedersachsen.pbf", "./data/landkreise.json", "./data")
 	MANAGER = routing.NewDistributedManager(GRAPH)
 
 	http.HandleFunc("/v0/routing", HandleRoutingRequest)

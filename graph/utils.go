@@ -1,11 +1,38 @@
 package graph
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
+	"os"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
+
+func LoadOrCreate(osm_file string, partition_file string, graph_path string) ITiledGraph {
+	// check if graph files already exist
+	_, err1 := os.Stat(graph_path + "/default-nodes")
+	_, err2 := os.Stat(graph_path + "/default-edges")
+	_, err3 := os.Stat(graph_path + "/default-geom")
+	_, err4 := os.Stat(graph_path + "/default-tiles")
+	if errors.Is(err1, os.ErrNotExist) || errors.Is(err2, os.ErrNotExist) || errors.Is(err3, os.ErrNotExist) || errors.Is(err4, os.ErrNotExist) {
+		// create graph
+		g := ParseGraph(osm_file)
+
+		file_str, _ := os.ReadFile(partition_file)
+		collection := geo.FeatureCollection{}
+		_ = json.Unmarshal(file_str, &collection)
+
+		tg := PreprocessTiledGraph(g, collection.Features())
+
+		StoreTiledGraph(tg, graph_path+"/default")
+
+		return tg
+	} else {
+		return LoadTiledGraph(graph_path + "/default")
+	}
+}
 
 func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollection) {
 	geom := graph.GetGeometry()
