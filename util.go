@@ -7,7 +7,7 @@ import (
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 )
 
-func GetClosestNode(point geo.Coord, graph graph.IGraph) int32 {
+func GetClosestNode2(point geo.Coord, graph graph.IGraph) int32 {
 	distance := -1.0
 	id := 0
 	newdistance := 0.0
@@ -24,6 +24,12 @@ func GetClosestNode(point geo.Coord, graph graph.IGraph) int32 {
 		}
 	}
 	return int32(id)
+}
+
+func GetClosestNode(point geo.Coord, graph graph.IGraph) int32 {
+	index := graph.GetNodeIndex()
+	id, _ := index.GetClosest(point[:], 0.005)
+	return id
 }
 
 type GeoJSONFeature struct {

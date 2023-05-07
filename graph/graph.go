@@ -15,6 +15,7 @@ type IGraph interface {
 	IsNode(node int32) bool
 	GetNode(node int32) NodeAttributes
 	GetEdge(edge int32) EdgeAttributes
+	GetNodeIndex() KDTree[int32]
 }
 
 type Graph struct {
@@ -25,6 +26,7 @@ type Graph struct {
 	edge_attributes List[EdgeAttributes]
 	geom            IGeometry
 	weight          IWeighting
+	index           KDTree[int32]
 }
 
 func (self *Graph) GetGeometry() IGeometry {
@@ -72,6 +74,9 @@ func (self *Graph) GetNode(node int32) NodeAttributes {
 }
 func (self *Graph) GetEdge(edge int32) EdgeAttributes {
 	return self.edge_attributes[edge]
+}
+func (self *Graph) GetNodeIndex() KDTree[int32] {
+	return self.index
 }
 
 type EdgeRefIterator struct {

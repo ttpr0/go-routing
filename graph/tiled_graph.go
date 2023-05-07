@@ -17,6 +17,7 @@ type ITiledGraph interface {
 	IsNode(node int32) bool
 	GetNode(node int32) NodeAttributes
 	GetEdge(edge int32) EdgeAttributes
+	GetNodeIndex() KDTree[int32]
 }
 
 type TiledGraph struct {
@@ -28,6 +29,7 @@ type TiledGraph struct {
 	edge_attributes List[EdgeAttributes]
 	geom            IGeometry
 	weight          IWeighting
+	index           KDTree[int32]
 }
 
 func (self *TiledGraph) GetGeometry() IGeometry {
@@ -87,4 +89,7 @@ func (self *TiledGraph) GetNode(node int32) NodeAttributes {
 }
 func (self *TiledGraph) GetEdge(edge int32) EdgeAttributes {
 	return self.edge_attributes[edge]
+}
+func (self *TiledGraph) GetNodeIndex() KDTree[int32] {
+	return self.index
 }

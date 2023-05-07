@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
@@ -33,6 +34,7 @@ func LoadGraph(file string) IGraph {
 	edges, edge_attribs, edge_weights := _LoadEdges(file + "-edges")
 	edgecount := edges.Length()
 	node_geoms, edge_geoms := _LoadGeom(file+"-geom", nodecount, edgecount)
+	index := _BuildNodeIndex(node_geoms)
 
 	return &Graph{
 		nodes:           nodes,
@@ -42,6 +44,7 @@ func LoadGraph(file string) IGraph {
 		edge_attributes: edge_attribs,
 		geom:            &Geometry{node_geoms, edge_geoms},
 		weight:          &Weighting{edge_weights},
+		index:           index,
 	}
 }
 
@@ -53,6 +56,7 @@ func LoadCHGraph(file string) ICHGraph {
 	node_geoms, edge_geoms := _LoadGeom(file+"-geom", nodecount, edgecount)
 	levels := _LoadCHLevels(file+"-level", nodecount)
 	shortcuts, shortcut_weights := _LoadCHShortcuts(file + "-shortcut")
+	index := _BuildNodeIndex(node_geoms)
 
 	return &CHGraph{
 		nodes:           nodes,
@@ -65,6 +69,7 @@ func LoadCHGraph(file string) ICHGraph {
 		geom:            &Geometry{node_geoms, edge_geoms},
 		weight:          &Weighting{edge_weights},
 		sh_weight:       &Weighting{shortcut_weights},
+		index:           index,
 	}
 }
 
@@ -75,6 +80,9 @@ func LoadTiledGraph(file string) ITiledGraph {
 	edgecount := edges.Length()
 	node_geoms, edge_geoms := _LoadGeom(file+"-geom", nodecount, edgecount)
 	node_tiles := _LoadNodeTiles(file+"-tiles", nodecount)
+	fmt.Println("start buidling index")
+	index := _BuildNodeIndex(node_geoms)
+	fmt.Println("finished building index")
 
 	return &TiledGraph{
 		nodes:           nodes,
@@ -85,6 +93,7 @@ func LoadTiledGraph(file string) ITiledGraph {
 		edge_attributes: edge_attribs,
 		geom:            &Geometry{node_geoms, edge_geoms},
 		weight:          &Weighting{edge_weights},
+		index:           index,
 	}
 }
 
@@ -392,4 +401,17 @@ func _LoadCHShortcuts(file string) (List[Shortcut], List[int32]) {
 	}
 
 	return shortcuts, shortcut_weights
+}
+
+//*******************************************
+// build graph information
+//*******************************************
+
+func _BuildNodeIndex(node_geoms List[geo.Coord]) KDTree[int32] {
+	tree := NewKDTree[int32](2)
+	for i := 0; i < node_geoms.Length(); i++ {
+		geom := node_geoms[i]
+		tree.Insert(geom[:], int32(i))
+	}
+	return tree
 }
