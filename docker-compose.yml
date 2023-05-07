@@ -1,0 +1,11 @@
+version: '2.4'
+services:
+  oas-app:
+    container_name: go-routing
+    ports:
+      - "5002:5002"
+    user: "${UID:-0}:${GID:-0}"
+    build:
+      context: ./
+    volumes:
+      - ./data:/app/data
