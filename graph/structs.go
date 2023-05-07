@@ -66,7 +66,7 @@ func (self EdgeRef) IsReversed() bool {
 	return self.Type%2 == 1
 }
 func (self EdgeRef) IsShortcut() bool {
-	return self.Type >= 2
+	return self.Type == 2 || self.Type == 3
 }
 func (self EdgeRef) IsCrossBorder() bool {
 	return self.Type >= 10 && self.Type <= 11

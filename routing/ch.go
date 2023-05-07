@@ -20,16 +20,17 @@ type flag_ch struct {
 }
 
 type CH struct {
-	startheap PriorityQueue[int32, float64]
-	endheap   PriorityQueue[int32, float64]
-	mid_id    int32
-	start_id  int32
-	end_id    int32
-	graph     graph.ICHGraph
-	geom      graph.IGeometry
-	weight    graph.IWeighting
-	shweight  graph.IWeighting
-	flags     Dict[int32, flag_ch]
+	startheap   PriorityQueue[int32, float64]
+	endheap     PriorityQueue[int32, float64]
+	mid_id      int32
+	start_id    int32
+	end_id      int32
+	path_length float64
+	graph       graph.ICHGraph
+	geom        graph.IGeometry
+	weight      graph.IWeighting
+	shweight    graph.IWeighting
+	flags       Dict[int32, flag_ch]
 }
 
 func NewCH(graph graph.ICHGraph, start, end int32) *CH {
@@ -43,27 +44,37 @@ func NewCH(graph graph.ICHGraph, start, end int32) *CH {
 	endheap.Enqueue(end, 0)
 
 	ch := CH{
-		startheap: startheap,
-		endheap:   endheap,
-		mid_id:    -1,
-		start_id:  start,
-		end_id:    end,
-		graph:     graph,
-		geom:      graph.GetGeometry(),
-		weight:    graph.GetWeighting(),
-		shweight:  graph.GetShortcutWeighting(),
-		flags:     flags,
+		startheap:   startheap,
+		endheap:     endheap,
+		mid_id:      -1,
+		start_id:    start,
+		end_id:      end,
+		path_length: 100000000,
+		graph:       graph,
+		geom:        graph.GetGeometry(),
+		weight:      graph.GetWeighting(),
+		shweight:    graph.GetShortcutWeighting(),
+		flags:       flags,
 	}
 
 	return &ch
 }
 
 func (self *CH) CalcShortestPath() bool {
-	shortest := float64(100000000)
 	for {
 		if self.startheap.Len() == 0 && self.endheap.Len() == 0 {
 			break
 		}
+		if self.mid_id != -1 {
+			s_id, _ := self.startheap.Peek()
+			e_id, _ := self.endheap.Peek()
+			s_flag := self.flags[s_id]
+			e_flag := self.flags[e_id]
+			if s_flag.path_length1 >= self.path_length && e_flag.path_length2 >= self.path_length {
+				break
+			}
+		}
+
 		// from start
 		if self.startheap.Len() != 0 {
 			curr_id, _ := self.startheap.Dequeue()
@@ -72,6 +83,10 @@ func (self *CH) CalcShortestPath() bool {
 				continue
 			}
 			curr_flag.visited1 = true
+			if curr_flag.visited2 && self.path_length > (curr_flag.path_length1+curr_flag.path_length2) {
+				self.mid_id = curr_id
+				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
+			}
 			edges := self.graph.GetAdjacentShortcuts(curr_id)
 			for {
 				ref, ok := edges.Next()
@@ -97,9 +112,6 @@ func (self *CH) CalcShortestPath() bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				if other_flag.visited1 {
-					continue
-				}
 				var weight int32
 				if ref.IsShortcut() {
 					weight = self.shweight.GetEdgeWeight(edge_id)
@@ -107,23 +119,6 @@ func (self *CH) CalcShortestPath() bool {
 					weight = self.weight.GetEdgeWeight(edge_id)
 				}
 				new_length := curr_flag.path_length1 + float64(weight)
-				if other_flag.visited2 {
-					// shortest := new_length + other_flag.path_length2
-					// top1, ok1 := self.startheap.Peek()
-					// top2, ok2 := self.endheap.Peek()
-					// if ok1 && ok2 && float64(top1+top2) >= shortest {
-					// 	other_flag.prev_edge1 = edge_id
-					// 	other_flag.path_length1 = new_length
-					// 	other_flag.is_shortcut1 = ref.IsShortcut()
-					// 	self.flags[other_id] = other_flag
-					// 	self.mid_id = other_id
-					// 	return true
-					// }
-					if new_length+other_flag.path_length2 < shortest {
-						shortest = new_length + other_flag.path_length2
-						self.mid_id = other_id
-					}
-				}
 				if new_length < other_flag.path_length1 {
 					other_flag.path_length1 = new_length
 					other_flag.prev_edge1 = edge_id
@@ -135,9 +130,6 @@ func (self *CH) CalcShortestPath() bool {
 			self.flags[curr_id] = curr_flag
 		}
 
-		// if self.mid_id != -1 {
-		// 	break
-		// }
 		// from end
 		if self.endheap.Len() != 0 {
 			curr_id, _ := self.endheap.Dequeue()
@@ -146,13 +138,17 @@ func (self *CH) CalcShortestPath() bool {
 				continue
 			}
 			curr_flag.visited2 = true
+			if curr_flag.visited1 && self.path_length > (curr_flag.path_length1+curr_flag.path_length2) {
+				self.mid_id = curr_id
+				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
+			}
 			edges := self.graph.GetAdjacentShortcuts(curr_id)
 			for {
 				ref, ok := edges.Next()
 				if !ok {
 					break
 				}
-				if ref.IsReversed() {
+				if !ref.IsReversed() {
 					continue
 				}
 				edge_id := ref.EdgeID
@@ -171,9 +167,6 @@ func (self *CH) CalcShortestPath() bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				if other_flag.visited2 {
-					continue
-				}
 				var weight int32
 				if ref.IsShortcut() {
 					weight = self.shweight.GetEdgeWeight(edge_id)
@@ -181,23 +174,6 @@ func (self *CH) CalcShortestPath() bool {
 					weight = self.weight.GetEdgeWeight(edge_id)
 				}
 				new_length := curr_flag.path_length2 + float64(weight)
-				if other_flag.visited1 {
-					// shortest := new_length + other_flag.path_length1
-					// top1, ok1 := self.startheap.Peek()
-					// top2, ok2 := self.endheap.Peek()
-					// if ok1 && ok2 && float64(top1+top2) >= shortest {
-					// 	other_flag.prev_edge2 = edge_id
-					// 	other_flag.path_length2 = new_length
-					// 	other_flag.is_shortcut2 = ref.IsShortcut()
-					// 	self.flags[other_id] = other_flag
-					// 	self.mid_id = other_id
-					// 	return true
-					// }
-					if new_length+other_flag.path_length1 < shortest {
-						shortest = new_length + other_flag.path_length1
-						self.mid_id = other_id
-					}
-				}
 				if new_length < other_flag.path_length2 {
 					other_flag.path_length2 = new_length
 					other_flag.prev_edge2 = edge_id
@@ -224,8 +200,17 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 		}
 	}()
 	for c := 0; c < count; c++ {
-		if self.startheap.Len() == 0 && self.endheap.Len() == 0 || self.mid_id != -1 {
+		if self.startheap.Len() == 0 && self.endheap.Len() == 0 {
 			return false
+		}
+		if self.mid_id != -1 {
+			s_id, _ := self.startheap.Peek()
+			e_id, _ := self.endheap.Peek()
+			s_flag := self.flags[s_id]
+			e_flag := self.flags[e_id]
+			if s_flag.path_length1 >= self.path_length && e_flag.path_length2 >= self.path_length {
+				return false
+			}
 		}
 		// from start
 		if self.startheap.Len() != 0 {
@@ -235,6 +220,10 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				continue
 			}
 			curr_flag.visited1 = true
+			if curr_flag.visited2 && self.path_length > (curr_flag.path_length1+curr_flag.path_length2) {
+				self.mid_id = curr_id
+				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
+			}
 			shortcuts := self.graph.GetAdjacentShortcuts(curr_id)
 			for {
 				ref, ok := shortcuts.Next()
@@ -260,9 +249,6 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				if other_flag.visited1 {
-					continue
-				}
 				var weight int32
 				if ref.IsShortcut() {
 					weight = self.shweight.GetEdgeWeight(edge_id)
@@ -277,19 +263,6 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				}
 
 				new_length := curr_flag.path_length1 + float64(weight)
-				if other_flag.visited2 {
-					shortest := new_length + other_flag.path_length2
-					top1, ok1 := self.startheap.Peek()
-					top2, ok2 := self.endheap.Peek()
-					if ok1 && ok2 && float64(top1+top2) >= shortest {
-						other_flag.prev_edge1 = edge_id
-						other_flag.path_length1 = new_length
-						other_flag.is_shortcut1 = ref.IsShortcut()
-						self.flags[other_id] = other_flag
-						self.mid_id = other_id
-						return false
-					}
-				}
 				if new_length < other_flag.path_length1 {
 					other_flag.path_length1 = new_length
 					other_flag.prev_edge1 = edge_id
@@ -312,13 +285,17 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				continue
 			}
 			curr_flag.visited2 = true
+			if curr_flag.visited1 && self.path_length > (curr_flag.path_length1+curr_flag.path_length2) {
+				self.mid_id = curr_id
+				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
+			}
 			shortcuts := self.graph.GetAdjacentShortcuts(curr_id)
 			for {
 				ref, ok := shortcuts.Next()
 				if !ok {
 					break
 				}
-				if ref.IsReversed() {
+				if !ref.IsReversed() {
 					continue
 				}
 				edge_id := ref.EdgeID
@@ -337,9 +314,6 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				if other_flag.visited2 {
-					continue
-				}
 				var weight int32
 				if ref.IsShortcut() {
 					weight = self.shweight.GetEdgeWeight(edge_id)
@@ -352,19 +326,6 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 					edges.Add(edge_id)
 				}
 				new_length := curr_flag.path_length2 + float64(weight)
-				if other_flag.visited1 {
-					shortest := new_length + other_flag.path_length1
-					top1, ok1 := self.startheap.Peek()
-					top2, ok2 := self.endheap.Peek()
-					if ok1 && ok2 && float64(top1+top2) >= shortest {
-						other_flag.prev_edge2 = edge_id
-						other_flag.path_length2 = new_length
-						other_flag.is_shortcut2 = ref.IsShortcut()
-						self.flags[other_id] = other_flag
-						self.mid_id = other_id
-						return false
-					}
-				}
 				if new_length < other_flag.path_length2 {
 					other_flag.path_length2 = new_length
 					other_flag.prev_edge2 = edge_id
