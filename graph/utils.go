@@ -10,12 +10,12 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func LoadOrCreate(osm_file string, partition_file string, graph_path string) ITiledGraph {
+func LoadOrCreate(graph_path string, osm_file string, partition_file string) ITiledGraph {
 	// check if graph files already exist
-	_, err1 := os.Stat(graph_path + "/default-nodes")
-	_, err2 := os.Stat(graph_path + "/default-edges")
-	_, err3 := os.Stat(graph_path + "/default-geom")
-	_, err4 := os.Stat(graph_path + "/default-tiles")
+	_, err1 := os.Stat(graph_path + "-nodes")
+	_, err2 := os.Stat(graph_path + "-edges")
+	_, err3 := os.Stat(graph_path + "-geom")
+	_, err4 := os.Stat(graph_path + "-tiles")
 	if errors.Is(err1, os.ErrNotExist) || errors.Is(err2, os.ErrNotExist) || errors.Is(err3, os.ErrNotExist) || errors.Is(err4, os.ErrNotExist) {
 		// create graph
 		g := ParseGraph(osm_file)
@@ -23,14 +23,15 @@ func LoadOrCreate(osm_file string, partition_file string, graph_path string) ITi
 		file_str, _ := os.ReadFile(partition_file)
 		collection := geo.FeatureCollection{}
 		_ = json.Unmarshal(file_str, &collection)
+		g.index = _BuildNodeIndex(g.geom.GetAllNodes())
 
 		tg := PreprocessTiledGraph(g, collection.Features())
 
-		StoreTiledGraph(tg, graph_path+"/default")
+		StoreTiledGraph(tg, graph_path)
 
 		return tg
 	} else {
-		return LoadTiledGraph(graph_path + "/default")
+		return LoadTiledGraph(graph_path)
 	}
 }
 

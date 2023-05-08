@@ -14,7 +14,7 @@ var MANAGER *routing.DistributedManager
 func main() {
 	fmt.Println("hello world")
 
-	GRAPH = graph.LoadOrCreate("./data/niedersachsen.pbf", "./data/landkreise.json", "./data")
+	GRAPH = graph.LoadOrCreate("./data/default", "./data/niedersachsen.pbf", "./data/landkreise.json")
 	MANAGER = routing.NewDistributedManager(GRAPH)
 
 	http.HandleFunc("/v0/routing", HandleRoutingRequest)
@@ -22,4 +22,6 @@ func main() {
 	http.HandleFunc("/v0/routing/draw/step", HandleRoutingStepRequest)
 	http.HandleFunc("/v0/isoraster", HandleIsoRasterRequest)
 	http.HandleFunc("/v0/fca", HandleFCARequest)
+	http.ListenAndServe(":5002", nil)
+}
 }
