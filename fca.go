@@ -99,7 +99,11 @@ func HandleFCARequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for i, val := range access {
-		access[i] = val * 100 / max_val
+		if val == 0 {
+			access[i] = -9999
+		} else {
+			access[i] = val * 100 / max_val
+		}
 	}
 
 	resp := FCAResponse{Access: access}
