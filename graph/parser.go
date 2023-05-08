@@ -272,8 +272,11 @@ func WayHandler(scanner *osmpbf.Scanner, edges *List[OSMEdge], osm_nodes *Dict[i
 					templimit := tags.Get("maxspeed")
 					str_type := tags.Get("highway")
 					oneway := tags.Get("oneway")
+					track_type := tags.Get("tracktype")
+					surface := tags.Get("surface")
 					e.Type = GetType(str_type)
-					e.Templimit = GetTemplimit(templimit, e.Type)
+					// e.Templimit = GetTemplimit(templimit, e.Type)
+					e.Templimit = GetORSTravelSpeed(e.Type, templimit, track_type, surface)
 					e.Oneway = IsOneway(oneway, e.Type)
 					e.NodeA = index_mapping.Get(start)
 					e.NodeB = index_mapping.Get(curr)
@@ -386,4 +389,115 @@ func CalcEdgeWeights(edges *List[OSMEdge]) {
 		}
 		edges.Set(i, e)
 	}
+}
+
+func GetORSTravelSpeed(streettype RoadType, maxspeed string, tracktype string, surface string) int32 {
+	var speed int32
+
+	// check if maxspeed is set
+	if maxspeed != "" {
+		if maxspeed == "walk" {
+			speed = 10
+		} else if maxspeed == "none" {
+			speed = 110
+		} else {
+			t, err := strconv.Atoi(maxspeed)
+			if err != nil {
+				speed = 20
+			} else {
+				speed = int32(t)
+			}
+		}
+		speed = int32(0.9 * float32(speed))
+	}
+
+	// set defaults
+	if maxspeed == "" {
+		switch streettype {
+		case MOTORWAY:
+			speed = 100
+		case TRUNK:
+			speed = 85
+		case MOTORWAY_LINK, TRUNK_LINK:
+			speed = 60
+		case PRIMARY:
+			speed = 65
+		case SECONDARY:
+			speed = 60
+		case TERTIARY:
+			speed = 50
+		case PRIMARY_LINK, SECONDARY_LINK:
+			speed = 50
+		case TERTIARY_LINK:
+			speed = 40
+		case UNCLASSIFIED:
+			speed = 30
+		case RESIDENTIAL:
+			speed = 30
+		case LIVING_STREET:
+			speed = 10
+		case ROAD:
+			speed = 20
+		case TRACK:
+			if tracktype == "" {
+				speed = 15
+			} else {
+				switch tracktype {
+				case "grade1":
+					speed = 40
+				case "grade2":
+					speed = 30
+				case "grade3":
+					speed = 20
+				case "grade4":
+					speed = 15
+				case "grade5":
+					speed = 10
+				default:
+					speed = 15
+				}
+			}
+		default:
+			speed = 20
+		}
+	}
+
+	// check if surface is set
+	if surface != "" {
+		switch surface {
+		case "cement", "compacted":
+			if speed > 80 {
+				speed = 80
+			}
+		case "fine_gravel":
+			if speed > 60 {
+				speed = 60
+			}
+		case "paving_stones", "metal", "bricks":
+			if speed > 40 {
+				speed = 40
+			}
+		case "grass", "wood", "sett", "grass_paver", "gravel", "unpaved", "ground", "dirt", "pebblestone", "tartan":
+			if speed > 30 {
+				speed = 30
+			}
+		case "cobblestone", "clay":
+			if speed > 20 {
+				speed = 20
+			}
+		case "earth", "stone", "rocky", "sand":
+			if speed > 15 {
+				speed = 15
+			}
+		case "mud":
+			if speed > 10 {
+				speed = 10
+			}
+		}
+	}
+
+	if speed == 0 {
+		speed = 10
+	}
+	return speed
 }
