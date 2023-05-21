@@ -1,31 +1,36 @@
-package graph
+package routing
 
 import (
 	"fmt"
 
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-type flag_d struct {
+type flag_a struct {
 	path_length float64
 	prev_edge   int32
 	visited     bool
 }
 
-type Dijkstra struct {
-	heap     util.PriorityQueue[int32, float64]
-	start_id int32
-	end_id   int32
-	graph    IGraph
-	geom     IGeometry
-	weight   IWeighting
-	flags    []flag_d
+type AStar struct {
+	heap      util.PriorityQueue[int32, float64]
+	start_id  int32
+	end_id    int32
+	end_point geo.Coord
+	graph     graph.IGraph
+	geom      graph.IGeometry
+	weight    graph.IWeighting
+	flags     []flag_a
 }
 
-func NewDijkstra(graph IGraph, start, end int32) *Dijkstra {
-	d := Dijkstra{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+func NewAStar(graph graph.IGraph, start, end int32) *AStar {
+	d := AStar{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
 
-	flags := make([]flag_d, graph.NodeCount())
+	d.end_point = d.geom.GetNode(end)
+
+	flags := make([]flag_a, graph.NodeCount())
 	for i := 0; i < len(flags); i++ {
 		flags[i].path_length = 1000000000
 	}
@@ -39,7 +44,7 @@ func NewDijkstra(graph IGraph, start, end int32) *Dijkstra {
 	return &d
 }
 
-func (self *Dijkstra) CalcShortestPath() bool {
+func (self *AStar) CalcShortestPath() bool {
 	for {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -55,19 +60,27 @@ func (self *Dijkstra) CalcShortestPath() bool {
 		}
 		curr_flag.visited = true
 		edges := self.graph.GetAdjacentEdges(curr_id)
-		for _, edge_id := range edges {
-			edge := self.graph.GetEdge(edge_id)
-			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
-			//other := (*d.graph).GetNode(other_id)
-			other_flag := self.flags[other_id]
-			if other_flag.visited || (edge.Oneway && dir == BACKWARD) {
+		for {
+			ref, ok := edges.Next()
+			if !ok {
+				break
+			}
+			if ref.IsReversed() {
 				continue
 			}
+			edge_id := ref.EdgeID
+			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			//other := (*d.graph).GetNode(other_id)
+			other_flag := self.flags[other_id]
+			if other_flag.visited {
+				continue
+			}
+			lambda := geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
 			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
-				self.heap.Enqueue(other_id, new_length)
+				self.heap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
 		}
@@ -75,7 +88,7 @@ func (self *Dijkstra) CalcShortestPath() bool {
 	}
 }
 
-func (self *Dijkstra) Steps(count int, visitededges *util.List[CoordArray]) bool {
+func (self *AStar) Steps(count int, visitededges *util.List[geo.CoordArray]) bool {
 	for c := 0; c < count; c++ {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -91,20 +104,28 @@ func (self *Dijkstra) Steps(count int, visitededges *util.List[CoordArray]) bool
 		}
 		curr_flag.visited = true
 		edges := self.graph.GetAdjacentEdges(curr_id)
-		for _, edge_id := range edges {
-			edge := self.graph.GetEdge(edge_id)
-			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
+		for {
+			ref, ok := edges.Next()
+			if !ok {
+				break
+			}
+			if ref.IsReversed() {
+				continue
+			}
+			edge_id := ref.EdgeID
+			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-			if other_flag.visited || (edge.Oneway && dir == BACKWARD) {
+			if other_flag.visited {
 				continue
 			}
 			visitededges.Add(self.geom.GetEdge(edge_id))
+			lambda := geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
 			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
-				self.heap.Enqueue(other_id, new_length)
+				self.heap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
 		}
@@ -113,12 +134,11 @@ func (self *Dijkstra) Steps(count int, visitededges *util.List[CoordArray]) bool
 	return true
 }
 
-func (self *Dijkstra) GetShortestPath() Path {
+func (self *AStar) GetShortestPath() Path {
 	path := make([]int32, 0, 10)
 	curr_id := self.end_id
 	var edge int32
 	for {
-		path = append(path, curr_id)
 		if curr_id == self.start_id {
 			break
 		}

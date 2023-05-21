@@ -3,17 +3,18 @@ package main
 import (
 	"math"
 
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 )
 
-func GetClosestNode(point graph.Coord, graph graph.IGraph) int32 {
+func GetClosestNode2(point geo.Coord, graph graph.IGraph) int32 {
 	distance := -1.0
 	id := 0
 	newdistance := 0.0
 	geom := graph.GetGeometry()
 	for i := 0; i < len(geom.GetAllNodes()); i++ {
 		p := geom.GetNode(int32(i))
-		newdistance = math.Sqrt(math.Pow(float64(point.Lat)-float64(p.Lat), 2) + math.Pow(float64(point.Lon)-float64(p.Lon), 2))
+		newdistance = math.Sqrt(math.Pow(float64(point[1])-float64(p[1]), 2) + math.Pow(float64(point[0])-float64(p[0]), 2))
 		if distance == -1 {
 			distance = newdistance
 			id = i
@@ -23,6 +24,12 @@ func GetClosestNode(point graph.Coord, graph graph.IGraph) int32 {
 		}
 	}
 	return int32(id)
+}
+
+func GetClosestNode(point geo.Coord, graph graph.IGraph) int32 {
+	index := graph.GetNodeIndex()
+	id, _ := index.GetClosest(point[:], 0.005)
+	return id
 }
 
 type GeoJSONFeature struct {

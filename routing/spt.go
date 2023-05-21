@@ -1,11 +1,13 @@
-package graph
+package routing
 
 import (
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type ISPTConsumer interface {
-	ConsumePoint(point Coord, value int)
+	ConsumePoint(point geo.Coord, value int)
 }
 
 type flag_spt struct {
@@ -18,14 +20,14 @@ type ShortestPathTree struct {
 	heap     util.PriorityQueue[int32, float64]
 	start_id int32
 	max_val  int32
-	graph    IGraph
-	geom     IGeometry
-	weight   IWeighting
+	graph    graph.IGraph
+	geom     graph.IGeometry
+	weight   graph.IWeighting
 	flags    []flag_spt
 	consumer ISPTConsumer
 }
 
-func NewShortestPathTree(graph IGraph, start, max_val int32, consumer ISPTConsumer) *ShortestPathTree {
+func NewShortestPathTree(graph graph.IGraph, start, max_val int32, consumer ISPTConsumer) *ShortestPathTree {
 	d := ShortestPathTree{
 		graph:    graph,
 		start_id: start,
@@ -64,12 +66,17 @@ func (self *ShortestPathTree) CalcShortestPathTree() {
 		self.consumer.ConsumePoint(self.geom.GetNode(curr_id), int(curr_flag.path_length))
 		curr_flag.visited = true
 		edges := self.graph.GetAdjacentEdges(curr_id)
-		for _, edge_id := range edges {
+		for {
+			ref, ok := edges.Next()
+			if !ok {
+				break
+			}
+			edge_id := ref.EdgeID
 			edge := self.graph.GetEdge(edge_id)
 			other_id, dir := self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
-			if other_flag.visited || (edge.Oneway && dir == BACKWARD) {
+			if other_flag.visited || (edge.Oneway && dir == graph.BACKWARD) {
 				continue
 			}
 			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))

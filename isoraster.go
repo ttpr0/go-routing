@@ -6,7 +6,8 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
@@ -30,16 +31,16 @@ func NewIsoRasterResponse(nodes []*util.QuadNode[int], rasterizer IRasterizer) I
 		ul := rasterizer.IndexToPoint(nodes[i].X, nodes[i].Y)
 		lr := rasterizer.IndexToPoint(nodes[i].X+1, nodes[i].Y+1)
 		line := make([][2]float32, 5)
-		line[0][0] = ul.Lon
-		line[0][1] = ul.Lat
-		line[1][0] = lr.Lon
-		line[1][1] = ul.Lat
-		line[2][0] = lr.Lon
-		line[2][1] = lr.Lat
-		line[3][0] = ul.Lon
-		line[3][1] = lr.Lat
-		line[4][0] = ul.Lon
-		line[4][1] = ul.Lat
+		line[0][0] = ul[0]
+		line[0][1] = ul[1]
+		line[1][0] = lr[0]
+		line[1][1] = ul[1]
+		line[2][0] = lr[0]
+		line[2][1] = lr[1]
+		line[3][0] = ul[0]
+		line[3][1] = lr[1]
+		line[4][0] = ul[0]
+		line[4][1] = ul[1]
 		resp.Features[i] = NewGeoJSONFeature()
 		resp.Features[i].Geom["type"] = "Polygon"
 		resp.Features[i].Geom["coordinates"] = [][][2]float32{line}
@@ -54,7 +55,7 @@ func HandleIsoRasterRequest(w http.ResponseWriter, r *http.Request) {
 	req := IsoRasterRequest{}
 	json.Unmarshal(data, &req)
 
-	start := graph.Coord{req.Locations[0][0], req.Locations[0][1]}
+	start := geo.Coord{req.Locations[0][0], req.Locations[0][1]}
 	consumer := &SPTConsumer{
 		points: util.NewQuadTree(func(val1, val2 int) int {
 			if val1 < val2 {
@@ -65,7 +66,7 @@ func HandleIsoRasterRequest(w http.ResponseWriter, r *http.Request) {
 		}),
 		rasterizer: NewDefaultRasterizer(req.Precession),
 	}
-	spt := graph.NewShortestPathTree(GRAPH, GetClosestNode(start, GRAPH), req.Range, consumer)
+	spt := routing.NewShortestPathTree(GRAPH, GetClosestNode(start, GRAPH), req.Range, consumer)
 
 	fmt.Println("Start Caluclating shortest-path-tree from", start)
 	spt.CalcShortestPathTree()
@@ -82,19 +83,19 @@ type SPTConsumer struct {
 	rasterizer IRasterizer
 }
 
-func (self *SPTConsumer) ConsumePoint(point graph.Coord, value int) {
+func (self *SPTConsumer) ConsumePoint(point geo.Coord, value int) {
 	x, y := self.rasterizer.PointToIndex(point)
 	self.points.Insert(x, y, value)
 }
 
 type IProjection interface {
-	Proj(graph.Coord) graph.Coord
-	ReProj(graph.Coord) graph.Coord
+	Proj(geo.Coord) geo.Coord
+	ReProj(geo.Coord) geo.Coord
 }
 
 type IRasterizer interface {
-	PointToIndex(graph.Coord) (int32, int32)
-	IndexToPoint(int32, int32) graph.Coord
+	PointToIndex(geo.Coord) (int32, int32)
+	IndexToPoint(int32, int32) geo.Coord
 }
 
 type DefaultRasterizer struct {
@@ -109,28 +110,28 @@ func NewDefaultRasterizer(precession int32) *DefaultRasterizer {
 	}
 }
 
-func (self *DefaultRasterizer) PointToIndex(point graph.Coord) (int32, int32) {
+func (self *DefaultRasterizer) PointToIndex(point geo.Coord) (int32, int32) {
 	c := self.projection.Proj(point)
-	return int32(c.Lon * self.factor), int32(c.Lat * self.factor)
+	return int32(c[0] * self.factor), int32(c[1] * self.factor)
 }
-func (self *DefaultRasterizer) IndexToPoint(x, y int32) graph.Coord {
-	point := graph.Coord{float32(x) / self.factor, float32(y) / self.factor}
+func (self *DefaultRasterizer) IndexToPoint(x, y int32) geo.Coord {
+	point := geo.Coord{float32(x) / self.factor, float32(y) / self.factor}
 	return self.projection.ReProj(point)
 }
 
 type WebMercatorProjection struct{}
 
-func (self *WebMercatorProjection) Proj(point graph.Coord) graph.Coord {
+func (self *WebMercatorProjection) Proj(point geo.Coord) geo.Coord {
 	a := 6378137.0
-	c := graph.Coord{}
-	c.Lon = float32(a * float64(point.Lon) * math.Pi / 180)
-	c.Lat = float32(a * math.Log(math.Tan(math.Pi/4+float64(point.Lat)*math.Pi/360)))
+	c := geo.Coord{}
+	c[0] = float32(a * float64(point[0]) * math.Pi / 180)
+	c[1] = float32(a * math.Log(math.Tan(math.Pi/4+float64(point[1])*math.Pi/360)))
 	return c
 }
-func (self *WebMercatorProjection) ReProj(point graph.Coord) graph.Coord {
+func (self *WebMercatorProjection) ReProj(point geo.Coord) geo.Coord {
 	a := 6378137.0
-	c := graph.Coord{}
-	c.Lon = float32(float64(point.Lon) * 180 / (a * math.Pi))
-	c.Lat = float32(360 * (math.Atan(math.Exp(float64(point.Lat)/a)) - math.Pi/4) / math.Pi)
+	c := geo.Coord{}
+	c[0] = float32(float64(point[0]) * 180 / (a * math.Pi))
+	c[1] = float32(360 * (math.Atan(math.Exp(float64(point[1])/a)) - math.Pi/4) / math.Pi)
 	return c
 }
