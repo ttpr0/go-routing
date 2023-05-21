@@ -59,17 +59,14 @@ func (self *AStar) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited = true
-		edges := self.graph.GetAdjacentEdges(curr_id)
+		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
 			}
-			if ref.IsReversed() {
-				continue
-			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.NodeID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited {
@@ -103,17 +100,14 @@ func (self *AStar) Steps(count int, visitededges *util.List[geo.CoordArray]) boo
 			continue
 		}
 		curr_flag.visited = true
-		edges := self.graph.GetAdjacentEdges(curr_id)
+		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
 			}
-			if ref.IsReversed() {
-				continue
-			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.NodeID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited {

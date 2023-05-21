@@ -8,25 +8,25 @@ type IGraph interface {
 	GetGeometry() IGeometry
 	GetWeighting() IWeighting
 	GetOtherNode(edge, node int32) (int32, Direction)
-	GetAdjacentEdges(node int32) IIterator[EdgeRef]
+	GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef]
 	ForEachEdge(node int32, f func(int32))
 	NodeCount() int32
 	EdgeCount() int32
 	IsNode(node int32) bool
-	GetNode(node int32) NodeAttributes
-	GetEdge(edge int32) EdgeAttributes
+	GetNode(node int32) Node
+	GetEdge(edge int32) Edge
 	GetNodeIndex() KDTree[int32]
 }
 
 type Graph struct {
-	nodes           List[Node]
-	node_attributes List[NodeAttributes]
-	edge_refs       List[EdgeRef]
-	edges           List[Edge]
-	edge_attributes List[EdgeAttributes]
-	geom            IGeometry
-	weight          IWeighting
-	index           KDTree[int32]
+	node_refs     List[NodeRef]
+	nodes         List[Node]
+	fwd_edge_refs List[EdgeRef]
+	bwd_edge_refs List[EdgeRef]
+	edges         List[Edge]
+	geom          IGeometry
+	weight        IWeighting
+	index         KDTree[int32]
 }
 
 func (self *Graph) GetGeometry() IGeometry {
@@ -45,12 +45,20 @@ func (self *Graph) GetOtherNode(edge, node int32) (int32, Direction) {
 	}
 	return -1, 0
 }
-func (self *Graph) GetAdjacentEdges(node int32) IIterator[EdgeRef] {
-	n := self.nodes[node]
-	return &EdgeRefIterator{
-		state:     int(n.EdgeRefStart),
-		end:       int(n.EdgeRefStart) + int(n.EdgeRefCount),
-		edge_refs: &self.edge_refs,
+func (self *Graph) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
+	n := self.node_refs[node]
+	if direction == FORWARD {
+		return &EdgeRefIterator{
+			state:     int(n.EdgeRefFWDStart),
+			end:       int(n.EdgeRefFWDStart) + int(n.EdgeRefFWDCount),
+			edge_refs: &self.fwd_edge_refs,
+		}
+	} else {
+		return &EdgeRefIterator{
+			state:     int(n.EdgeRefBWDStart),
+			end:       int(n.EdgeRefBWDStart) + int(n.EdgeRefBWDCount),
+			edge_refs: &self.bwd_edge_refs,
+		}
 	}
 }
 func (self *Graph) ForEachEdge(node int32, f func(int32)) {
@@ -69,11 +77,11 @@ func (self *Graph) IsNode(node int32) bool {
 		return false
 	}
 }
-func (self *Graph) GetNode(node int32) NodeAttributes {
-	return self.node_attributes[node]
+func (self *Graph) GetNode(node int32) Node {
+	return self.nodes[node]
 }
-func (self *Graph) GetEdge(edge int32) EdgeAttributes {
-	return self.edge_attributes[edge]
+func (self *Graph) GetEdge(edge int32) Edge {
+	return self.edges[edge]
 }
 func (self *Graph) GetNodeIndex() KDTree[int32] {
 	return self.index

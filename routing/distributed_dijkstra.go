@@ -162,14 +162,11 @@ func (self *DistributedRoutingRunner) RunRouting() {
 			self.handler.SendStopRequest(self.key, curr_flag.path_length)
 		}
 		self.flags.Set(curr_id, curr_flag)
-		edges := self.graph.GetAdjacentEdges(curr_id)
+		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
-			}
-			if ref.IsReversed() {
-				continue
 			}
 			if self.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
 				continue

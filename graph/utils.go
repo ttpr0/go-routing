@@ -38,11 +38,8 @@ func LoadOrCreate(graph_path string, osm_file string, partition_file string) ITi
 func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollection) {
 	geom := graph.GetGeometry()
 	edge_types := make([]int16, int(graph.EdgeCount()))
-	for i := 0; i < graph.edge_refs.Length(); i++ {
-		edge_ref := graph.edge_refs[i]
-		if edge_ref.IsReversed() {
-			continue
-		}
+	for i := 0; i < graph.fwd_edge_refs.Length(); i++ {
+		edge_ref := graph.fwd_edge_refs[i]
 		edge_types[edge_ref.EdgeID] = int16(edge_ref.Type)
 	}
 
@@ -56,16 +53,16 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 	}
 
 	nodes := NewList[geo.Feature](int(graph.NodeCount()))
-	for i, node := range graph.nodes {
+	for i, node := range graph.node_refs {
 		if i%1000 == 0 {
 			fmt.Println("node ", i)
 		}
 		e := NewList[int32](3)
-		for j := 0; j < int(node.EdgeRefCount); j++ {
-			e.Add(graph.edge_refs[int(node.EdgeRefStart)+j].EdgeID)
+		for j := 0; j < int(node.EdgeRefFWDCount); j++ {
+			e.Add(graph.fwd_edge_refs[int(node.EdgeRefFWDStart)+j].EdgeID)
 		}
 		point := geo.NewPoint(geom.GetNode(int32(i)))
-		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.EdgeRefCount, "edges": e, "tile": graph.node_tiles[i]}))
+		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.EdgeRefFWDCount, "edges": e, "tile": graph.node_tiles[i]}))
 	}
 
 	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)

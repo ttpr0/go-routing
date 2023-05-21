@@ -59,14 +59,11 @@ func (self *ShortestPathTree2) CalcSPT() {
 		if curr_flag.PathLength > self.max_range {
 			return
 		}
-		edges := self.graph.GetAdjacentEdges(curr_id)
+		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
-			}
-			if ref.IsReversed() {
-				continue
 			}
 			edge_id := ref.EdgeID
 			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)

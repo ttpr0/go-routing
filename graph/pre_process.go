@@ -14,18 +14,19 @@ import (
 
 func PreprocessTiledGraph(graph *Graph, features []geo.Feature) *TiledGraph {
 	node_tiles := CalcNodeTiles(graph.geom, features)
-	edge_refs := UpdateCrossBorder(graph.edges, graph.edge_refs, node_tiles)
+	fwd_edge_refs := UpdateCrossBorder(graph.edges, graph.fwd_edge_refs, node_tiles)
+	bwd_edge_refs := UpdateCrossBorder(graph.edges, graph.bwd_edge_refs, node_tiles)
 
 	tiled_graph := &TiledGraph{
-		nodes:           graph.nodes,
-		node_attributes: graph.node_attributes,
-		node_tiles:      node_tiles,
-		edge_refs:       edge_refs,
-		edges:           graph.edges,
-		edge_attributes: graph.edge_attributes,
-		geom:            graph.geom,
-		weight:          graph.weight,
-		index:           graph.index,
+		node_refs:     graph.node_refs,
+		nodes:         graph.nodes,
+		node_tiles:    node_tiles,
+		fwd_edge_refs: fwd_edge_refs,
+		bwd_edge_refs: bwd_edge_refs,
+		edges:         graph.edges,
+		geom:          graph.geom,
+		weight:        graph.weight,
+		index:         graph.index,
 	}
 
 	tiles := NewDict[int16, bool](100)
@@ -48,8 +49,7 @@ func PreprocessTiledGraph(graph *Graph, features []geo.Feature) *TiledGraph {
 		fmt.Printf("tile %v: finished \n", tile_id)
 		c += 1
 	}
-	edge_refs = UpdateSkipEdges(tiled_graph, is_skip)
-	tiled_graph.edge_refs = edge_refs
+	UpdateSkipEdges(tiled_graph, is_skip)
 
 	return tiled_graph
 }
@@ -80,6 +80,7 @@ func CalcNodeTiles(geom IGeometry, features []geo.Feature) List[int16] {
 	return node_tiles
 }
 
+// sets type of cross border edges to 10
 func UpdateCrossBorder(edges List[Edge], edge_refs List[EdgeRef], node_tiles List[int16]) List[EdgeRef] {
 	for i := 0; i < edge_refs.Length(); i++ {
 		edge_ref := edge_refs[i]
@@ -102,13 +103,13 @@ func GetStartNodes(graph *TiledGraph, tile_id int16) List[int32] {
 		if tile != tile_id {
 			continue
 		}
-		iter := graph.GetAdjacentEdges(int32(id))
+		iter := graph.GetAdjacentEdges(int32(id), BACKWARD)
 		for {
 			ref, ok := iter.Next()
 			if !ok {
 				break
 			}
-			if ref.IsCrossBorder() && ref.IsReversed() {
+			if ref.IsCrossBorder() {
 				list.Add(int32(id))
 				break
 			}
@@ -138,13 +139,13 @@ func CalcSkipEdges(graph *TiledGraph, start_nodes List[int32], is_skip []bool) {
 				continue
 			}
 			curr_flag.visited = true
-			iter := graph.GetAdjacentEdges(curr_id)
+			iter := graph.GetAdjacentEdges(curr_id, FORWARD)
 			for {
 				ref, ok := iter.Next()
 				if !ok {
 					break
 				}
-				if ref.IsReversed() || ref.IsSkip() {
+				if ref.IsSkip() {
 					continue
 				}
 				edge_id := ref.EdgeID
@@ -194,14 +195,22 @@ type _Flag struct {
 	visited    bool
 }
 
-func UpdateSkipEdges(graph *TiledGraph, is_skip []bool) List[EdgeRef] {
-	edgerefcount := graph.edge_refs.Length()
+// sets the type of skip edges to 20
+func UpdateSkipEdges(graph *TiledGraph, is_skip []bool) {
+	edgerefcount := graph.fwd_edge_refs.Length()
 	for i := 0; i < edgerefcount; i++ {
-		edgeref := graph.edge_refs.Get(i)
+		edgeref := graph.fwd_edge_refs.Get(i)
 		if !edgeref.IsCrossBorder() && is_skip[edgeref.EdgeID] {
 			edgeref.Type += 20
 		}
-		graph.edge_refs.Set(i, edgeref)
+		graph.fwd_edge_refs.Set(i, edgeref)
 	}
-	return graph.edge_refs
+	edgerefcount = graph.bwd_edge_refs.Length()
+	for i := 0; i < edgerefcount; i++ {
+		edgeref := graph.bwd_edge_refs.Get(i)
+		if !edgeref.IsCrossBorder() && is_skip[edgeref.EdgeID] {
+			edgeref.Type += 20
+		}
+		graph.bwd_edge_refs.Set(i, edgeref)
+	}
 }

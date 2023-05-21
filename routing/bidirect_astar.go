@@ -68,14 +68,11 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited1 = true
-		edges := self.graph.GetAdjacentEdges(curr_id)
+		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
-			}
-			if ref.IsReversed() {
-				continue
 			}
 			edge_id := ref.EdgeID
 			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
@@ -121,14 +118,11 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited2 = true
-		edges = self.graph.GetAdjacentEdges(curr_id)
+		edges = self.graph.GetAdjacentEdges(curr_id, graph.BACKWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
-			}
-			if !ref.IsReversed() {
-				continue
 			}
 			edge_id := ref.EdgeID
 			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
@@ -181,14 +175,11 @@ func (self *BidirectAStar) Steps(count int, visitededges *util.List[geo.CoordArr
 			return false
 		}
 		curr_flag.visited1 = true
-		edges := self.graph.GetAdjacentEdges(curr_id)
+		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
-			}
-			if ref.IsReversed() {
-				continue
 			}
 			edge_id := ref.EdgeID
 			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
@@ -234,14 +225,11 @@ func (self *BidirectAStar) Steps(count int, visitededges *util.List[geo.CoordArr
 			return false
 		}
 		curr_flag.visited2 = true
-		edges = self.graph.GetAdjacentEdges(curr_id)
+		edges = self.graph.GetAdjacentEdges(curr_id, graph.BACKWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
-			}
-			if !ref.IsReversed() {
-				continue
 			}
 			edge_id := ref.EdgeID
 			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)

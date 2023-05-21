@@ -41,11 +41,8 @@ const (
 //*******************************************
 
 type Edge struct {
-	NodeA int32
-	NodeB int32
-}
-
-type EdgeAttributes struct {
+	NodeA    int32
+	NodeB    int32
 	Type     RoadType
 	Length   float32
 	Maxspeed byte
@@ -53,18 +50,29 @@ type EdgeAttributes struct {
 }
 
 type Node struct {
-	EdgeRefStart int32
-	EdgeRefCount int16
+	Type int8
+}
+
+type Shortcut struct {
+	NodeA int32
+	NodeB int32
+	Edges [2]Tuple[int32, byte]
+}
+
+type NodeRef struct {
+	EdgeRefFWDStart int32
+	EdgeRefFWDCount int16
+	EdgeRefBWDStart int32
+	EdgeRefBWDCount int16
 }
 
 type EdgeRef struct {
 	EdgeID int32
 	Type   byte
+	NodeID int32
+	Weight int32
 }
 
-func (self EdgeRef) IsReversed() bool {
-	return self.Type%2 == 1
-}
 func (self EdgeRef) IsShortcut() bool {
 	return self.Type == 2 || self.Type == 3
 }
@@ -73,16 +81,6 @@ func (self EdgeRef) IsCrossBorder() bool {
 }
 func (self EdgeRef) IsSkip() bool {
 	return self.Type >= 20 && self.Type <= 21
-}
-
-type NodeAttributes struct {
-	Type int8
-}
-
-type Shortcut struct {
-	NodeA int32
-	NodeB int32
-	Edges [2]EdgeRef
 }
 
 //*******************************************

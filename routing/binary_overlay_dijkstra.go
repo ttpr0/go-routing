@@ -58,14 +58,11 @@ func (self *BODijkstra) CalcShortestPath() bool {
 		}
 		curr_flag.visited = true
 		self.flags.Set(curr_id, curr_flag)
-		edges := self.graph.GetAdjacentEdges(curr_id)
+		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
-			}
-			if ref.IsReversed() {
-				continue
 			}
 			if curr_flag.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
 				continue
@@ -122,14 +119,11 @@ func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) boo
 		}
 		curr_flag.visited = true
 		self.flags.Set(curr_id, curr_flag)
-		edges := self.graph.GetAdjacentEdges(curr_id)
+		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
-			}
-			if ref.IsReversed() {
-				continue
 			}
 			if curr_flag.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
 				continue

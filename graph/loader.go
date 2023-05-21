@@ -16,42 +16,42 @@ import (
 //*******************************************
 
 func StoreGraph(graph *Graph, filename string) {
-	_StoreNodes(graph.nodes, graph.node_attributes, graph.edge_refs, filename+"-nodes")
-	_StoreEdges(graph.edges, graph.edge_attributes, graph.weight, filename+"-edges")
+	_StoreNodes(graph.nodes, graph.node_refs, graph.fwd_edge_refs, graph.bwd_edge_refs, filename+"-nodes")
+	_StoreEdges(graph.edges, graph.weight, filename+"-edges")
 	_StoreGeom(graph.geom, filename+"-geom")
 }
 
 func StoreTiledGraph(graph *TiledGraph, filename string) {
-	_StoreNodes(graph.nodes, graph.node_attributes, graph.edge_refs, filename+"-nodes")
-	_StoreEdges(graph.edges, graph.edge_attributes, graph.weight, filename+"-edges")
+	_StoreNodes(graph.nodes, graph.node_refs, graph.fwd_edge_refs, graph.bwd_edge_refs, filename+"-nodes")
+	_StoreEdges(graph.edges, graph.weight, filename+"-edges")
 	_StoreGeom(graph.geom, filename+"-geom")
 	_StoreNodeTiles(graph.node_tiles, filename+"-tiles")
 }
 
 func LoadGraph(file string) IGraph {
-	nodes, node_attribs, edge_refs := _LoadNodes(file + "-nodes")
+	nodes, node_refs, fwd_edge_refs, bwd_edge_refs := _LoadNodes(file + "-nodes")
 	nodecount := nodes.Length()
-	edges, edge_attribs, edge_weights := _LoadEdges(file + "-edges")
+	edges, edge_weights := _LoadEdges(file + "-edges")
 	edgecount := edges.Length()
 	node_geoms, edge_geoms := _LoadGeom(file+"-geom", nodecount, edgecount)
 	index := _BuildNodeIndex(node_geoms)
 
 	return &Graph{
-		nodes:           nodes,
-		node_attributes: node_attribs,
-		edge_refs:       edge_refs,
-		edges:           edges,
-		edge_attributes: edge_attribs,
-		geom:            &Geometry{node_geoms, edge_geoms},
-		weight:          &Weighting{edge_weights},
-		index:           index,
+		node_refs:     node_refs,
+		nodes:         nodes,
+		fwd_edge_refs: fwd_edge_refs,
+		bwd_edge_refs: bwd_edge_refs,
+		edges:         edges,
+		geom:          &Geometry{node_geoms, edge_geoms},
+		weight:        &Weighting{edge_weights},
+		index:         index,
 	}
 }
 
 func LoadCHGraph(file string) ICHGraph {
-	nodes, node_attribs, edge_refs := _LoadNodes(file + "-nodes")
+	nodes, node_refs, fwd_edge_refs, bwd_edge_refs := _LoadNodes(file + "-nodes")
 	nodecount := nodes.Length()
-	edges, edge_attribs, edge_weights := _LoadEdges(file + "-edges")
+	edges, edge_weights := _LoadEdges(file + "-edges")
 	edgecount := edges.Length()
 	node_geoms, edge_geoms := _LoadGeom(file+"-geom", nodecount, edgecount)
 	levels := _LoadCHLevels(file+"-level", nodecount)
@@ -59,24 +59,24 @@ func LoadCHGraph(file string) ICHGraph {
 	index := _BuildNodeIndex(node_geoms)
 
 	return &CHGraph{
-		nodes:           nodes,
-		node_attributes: node_attribs,
-		node_levels:     levels,
-		edge_refs:       edge_refs,
-		edges:           edges,
-		edge_attributes: edge_attribs,
-		shortcuts:       shortcuts,
-		geom:            &Geometry{node_geoms, edge_geoms},
-		weight:          &Weighting{edge_weights},
-		sh_weight:       &Weighting{shortcut_weights},
-		index:           index,
+		node_refs:     node_refs,
+		nodes:         nodes,
+		node_levels:   levels,
+		fwd_edge_refs: fwd_edge_refs,
+		bwd_edge_refs: bwd_edge_refs,
+		edges:         edges,
+		shortcuts:     shortcuts,
+		geom:          &Geometry{node_geoms, edge_geoms},
+		weight:        &Weighting{edge_weights},
+		sh_weight:     &Weighting{shortcut_weights},
+		index:         index,
 	}
 }
 
 func LoadTiledGraph(file string) ITiledGraph {
-	nodes, node_attribs, edge_refs := _LoadNodes(file + "-nodes")
+	nodes, node_refs, fwd_edge_refs, bwd_edge_refs := _LoadNodes(file + "-nodes")
 	nodecount := nodes.Length()
-	edges, edge_attribs, edge_weights := _LoadEdges(file + "-edges")
+	edges, edge_weights := _LoadEdges(file + "-edges")
 	edgecount := edges.Length()
 	node_geoms, edge_geoms := _LoadGeom(file+"-geom", nodecount, edgecount)
 	node_tiles := _LoadNodeTiles(file+"-tiles", nodecount)
@@ -85,15 +85,15 @@ func LoadTiledGraph(file string) ITiledGraph {
 	fmt.Println("finished building index")
 
 	return &TiledGraph{
-		nodes:           nodes,
-		node_attributes: node_attribs,
-		node_tiles:      node_tiles,
-		edge_refs:       edge_refs,
-		edges:           edges,
-		edge_attributes: edge_attribs,
-		geom:            &Geometry{node_geoms, edge_geoms},
-		weight:          &Weighting{edge_weights},
-		index:           index,
+		node_refs:     node_refs,
+		nodes:         nodes,
+		node_tiles:    node_tiles,
+		fwd_edge_refs: fwd_edge_refs,
+		bwd_edge_refs: bwd_edge_refs,
+		edges:         edges,
+		geom:          &Geometry{node_geoms, edge_geoms},
+		weight:        &Weighting{edge_weights},
+		index:         index,
 	}
 }
 
@@ -101,25 +101,38 @@ func LoadTiledGraph(file string) ITiledGraph {
 // store graph information
 //*******************************************
 
-func _StoreNodes(nodes List[Node], node_attributes List[NodeAttributes], edge_refs List[EdgeRef], filename string) {
+func _StoreNodes(nodes List[Node], node_refs List[NodeRef], fwd_edge_refs List[EdgeRef], bwd_edge_refs List[EdgeRef], filename string) {
 	nodesbuffer := bytes.Buffer{}
 
 	nodecount := nodes.Length()
-	edgerefcount := edge_refs.Length()
+	fwd_edgerefcount := fwd_edge_refs.Length()
+	bwd_edgerefcount := bwd_edge_refs.Length()
 	binary.Write(&nodesbuffer, binary.LittleEndian, int32(nodecount))
-	binary.Write(&nodesbuffer, binary.LittleEndian, int32(edgerefcount))
+	binary.Write(&nodesbuffer, binary.LittleEndian, int32(fwd_edgerefcount))
+	binary.Write(&nodesbuffer, binary.LittleEndian, int32(bwd_edgerefcount))
 
 	for i := 0; i < nodecount; i++ {
 		node := nodes.Get(i)
-		node_attrib := node_attributes.Get(i)
-		binary.Write(&nodesbuffer, binary.LittleEndian, node_attrib.Type)
-		binary.Write(&nodesbuffer, binary.LittleEndian, node.EdgeRefStart)
-		binary.Write(&nodesbuffer, binary.LittleEndian, node.EdgeRefCount)
+		node_ref := node_refs.Get(i)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node.Type)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node_ref.EdgeRefFWDStart)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node_ref.EdgeRefFWDCount)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node_ref.EdgeRefBWDStart)
+		binary.Write(&nodesbuffer, binary.LittleEndian, node_ref.EdgeRefBWDCount)
 	}
-	for i := 0; i < edgerefcount; i++ {
-		edgeref := edge_refs.Get(i)
-		binary.Write(&nodesbuffer, binary.LittleEndian, int32(edgeref.EdgeID))
+	for i := 0; i < fwd_edgerefcount; i++ {
+		edgeref := fwd_edge_refs.Get(i)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.EdgeID)
 		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.Type)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.NodeID)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.Weight)
+	}
+	for i := 0; i < bwd_edgerefcount; i++ {
+		edgeref := bwd_edge_refs.Get(i)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.EdgeID)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.Type)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.NodeID)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.Weight)
 	}
 
 	nodesfile, _ := os.Create(filename)
@@ -127,7 +140,7 @@ func _StoreNodes(nodes List[Node], node_attributes List[NodeAttributes], edge_re
 	nodesfile.Write(nodesbuffer.Bytes())
 }
 
-func _StoreEdges(edges List[Edge], edge_attributes List[EdgeAttributes], weight IWeighting, filename string) {
+func _StoreEdges(edges List[Edge], weight IWeighting, filename string) {
 	edgesbuffer := bytes.Buffer{}
 
 	edgecount := edges.Length()
@@ -135,14 +148,13 @@ func _StoreEdges(edges List[Edge], edge_attributes List[EdgeAttributes], weight 
 
 	for i := 0; i < edgecount; i++ {
 		edge := edges.Get(i)
-		edge_attrib := edge_attributes.Get(i)
 		edge_weight := weight.GetEdgeWeight(int32(i))
 		binary.Write(&edgesbuffer, binary.LittleEndian, int32(edge.NodeA))
 		binary.Write(&edgesbuffer, binary.LittleEndian, int32(edge.NodeB))
 		binary.Write(&edgesbuffer, binary.LittleEndian, uint8(edge_weight))
-		binary.Write(&edgesbuffer, binary.LittleEndian, byte(edge_attrib.Type))
-		binary.Write(&edgesbuffer, binary.LittleEndian, edge_attrib.Length)
-		binary.Write(&edgesbuffer, binary.LittleEndian, uint8(edge_attrib.Maxspeed))
+		binary.Write(&edgesbuffer, binary.LittleEndian, byte(edge.Type))
+		binary.Write(&edgesbuffer, binary.LittleEndian, edge.Length)
+		binary.Write(&edgesbuffer, binary.LittleEndian, uint8(edge.Maxspeed))
 	}
 
 	edgesfile, _ := os.Create(filename)
@@ -197,7 +209,7 @@ func _StoreNodeTiles(node_tiles List[int16], filename string) {
 // load graph information
 //*******************************************
 
-func _LoadNodes(file string) (List[Node], List[NodeAttributes], List[EdgeRef]) {
+func _LoadNodes(file string) (List[Node], List[NodeRef], List[EdgeRef], List[EdgeRef]) {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -207,39 +219,72 @@ func _LoadNodes(file string) (List[Node], List[NodeAttributes], List[EdgeRef]) {
 	nodereader := bytes.NewReader(nodedata)
 	var nodecount int32
 	binary.Read(nodereader, binary.LittleEndian, &nodecount)
-	var edgerefcount int32
-	binary.Read(nodereader, binary.LittleEndian, &edgerefcount)
+	var fwd_edgerefcount int32
+	binary.Read(nodereader, binary.LittleEndian, &fwd_edgerefcount)
+	var bwd_edgerefcount int32
+	binary.Read(nodereader, binary.LittleEndian, &bwd_edgerefcount)
 	nodes := NewList[Node](int(nodecount))
-	node_attribs := NewList[NodeAttributes](int(nodecount))
-	edge_refs := NewList[EdgeRef](int(edgerefcount))
+	node_refs := NewList[NodeRef](int(nodecount))
+	fwd_edge_refs := NewList[EdgeRef](int(fwd_edgerefcount))
+	bwd_edge_refs := NewList[EdgeRef](int(bwd_edgerefcount))
 	for i := 0; i < int(nodecount); i++ {
 		var t int8
 		binary.Read(nodereader, binary.LittleEndian, &t)
-		var s int32
-		binary.Read(nodereader, binary.LittleEndian, &s)
-		var c int16
-		binary.Read(nodereader, binary.LittleEndian, &c)
+		var s1 int32
+		binary.Read(nodereader, binary.LittleEndian, &s1)
+		var c1 int16
+		binary.Read(nodereader, binary.LittleEndian, &c1)
+		var s2 int32
+		binary.Read(nodereader, binary.LittleEndian, &s2)
+		var c2 int16
+		binary.Read(nodereader, binary.LittleEndian, &c2)
 		nodes.Add(Node{
-			EdgeRefStart: s,
-			EdgeRefCount: c,
+			Type: t,
 		})
-		node_attribs.Add(NodeAttributes{Type: t})
+		node_refs.Add(NodeRef{
+			EdgeRefFWDStart: s1,
+			EdgeRefFWDCount: c1,
+			EdgeRefBWDStart: s2,
+			EdgeRefBWDCount: c2,
+		})
 	}
-	for i := 0; i < int(edgerefcount); i++ {
+	for i := 0; i < int(fwd_edgerefcount); i++ {
 		var id int32
 		binary.Read(nodereader, binary.LittleEndian, &id)
-		var r byte
-		binary.Read(nodereader, binary.LittleEndian, &r)
-		edge_refs.Add(EdgeRef{
+		var t byte
+		binary.Read(nodereader, binary.LittleEndian, &t)
+		var nid int32
+		binary.Read(nodereader, binary.LittleEndian, &nid)
+		var w int32
+		binary.Read(nodereader, binary.LittleEndian, &w)
+		fwd_edge_refs.Add(EdgeRef{
 			EdgeID: id,
-			Type:   r,
+			Type:   t,
+			NodeID: nid,
+			Weight: w,
+		})
+	}
+	for i := 0; i < int(bwd_edgerefcount); i++ {
+		var id int32
+		binary.Read(nodereader, binary.LittleEndian, &id)
+		var t byte
+		binary.Read(nodereader, binary.LittleEndian, &t)
+		var nid int32
+		binary.Read(nodereader, binary.LittleEndian, &nid)
+		var w int32
+		binary.Read(nodereader, binary.LittleEndian, &w)
+		bwd_edge_refs.Add(EdgeRef{
+			EdgeID: id,
+			Type:   t,
+			NodeID: nid,
+			Weight: w,
 		})
 	}
 
-	return nodes, node_attribs, edge_refs
+	return nodes, node_refs, fwd_edge_refs, bwd_edge_refs
 }
 
-func _LoadEdges(file string) (List[Edge], List[EdgeAttributes], List[int32]) {
+func _LoadEdges(file string) (List[Edge], List[int32]) {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -250,7 +295,6 @@ func _LoadEdges(file string) (List[Edge], List[EdgeAttributes], List[int32]) {
 	var edgecount int32
 	binary.Read(edgereader, binary.LittleEndian, &edgecount)
 	edges := NewList[Edge](int(edgecount))
-	edge_attribs := NewList[EdgeAttributes](int(edgecount))
 	edge_weights := NewList[int32](int(edgecount))
 	for i := 0; i < int(edgecount); i++ {
 		var a int32
@@ -266,10 +310,8 @@ func _LoadEdges(file string) (List[Edge], List[EdgeAttributes], List[int32]) {
 		var m uint8
 		binary.Read(edgereader, binary.LittleEndian, &m)
 		edges.Add(Edge{
-			NodeA: a,
-			NodeB: b,
-		})
-		edge_attribs.Add(EdgeAttributes{
+			NodeA:    a,
+			NodeB:    b,
 			Type:     RoadType(t),
 			Length:   l,
 			Maxspeed: m,
@@ -277,7 +319,7 @@ func _LoadEdges(file string) (List[Edge], List[EdgeAttributes], List[int32]) {
 		edge_weights.Add(int32(w))
 	}
 
-	return edges, edge_attribs, edge_weights
+	return edges, edge_weights
 }
 
 func _LoadGeom(file string, nodecount, edgecount int) ([]geo.Coord, []geo.CoordArray) {
@@ -377,7 +419,7 @@ func _LoadCHShortcuts(file string) (List[Shortcut], List[int32]) {
 		shortcut := Shortcut{
 			NodeA: node_a,
 			NodeB: node_b,
-			Edges: [2]EdgeRef{},
+			Edges: [2]Tuple[int32, byte]{},
 		}
 		for j := 0; j < 2; j++ {
 			var id int32
@@ -385,15 +427,9 @@ func _LoadCHShortcuts(file string) (List[Shortcut], List[int32]) {
 			var is bool
 			binary.Read(shortcutreader, binary.LittleEndian, &is)
 			if is {
-				shortcut.Edges[j] = EdgeRef{
-					EdgeID: id,
-					Type:   2,
-				}
+				shortcut.Edges[j] = MakeTuple(id, byte(2))
 			} else {
-				shortcut.Edges[j] = EdgeRef{
-					EdgeID: id,
-					Type:   0,
-				}
+				shortcut.Edges[j] = MakeTuple(id, byte(0))
 			}
 		}
 		shortcuts.Add(shortcut)

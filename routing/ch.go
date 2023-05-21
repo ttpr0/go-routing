@@ -87,14 +87,11 @@ func (self *CH) CalcShortestPath() bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			edges := self.graph.GetAdjacentShortcuts(curr_id)
+			edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 			for {
 				ref, ok := edges.Next()
 				if !ok {
 					break
-				}
-				if ref.IsReversed() {
-					continue
 				}
 				edge_id := ref.EdgeID
 				var other_id int32
@@ -142,14 +139,11 @@ func (self *CH) CalcShortestPath() bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			edges := self.graph.GetAdjacentShortcuts(curr_id)
+			edges := self.graph.GetAdjacentEdges(curr_id, graph.BACKWARD)
 			for {
 				ref, ok := edges.Next()
 				if !ok {
 					break
-				}
-				if !ref.IsReversed() {
-					continue
 				}
 				edge_id := ref.EdgeID
 				var other_id int32
@@ -224,14 +218,11 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			shortcuts := self.graph.GetAdjacentShortcuts(curr_id)
+			shortcuts := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
 			for {
 				ref, ok := shortcuts.Next()
 				if !ok {
 					break
-				}
-				if ref.IsReversed() {
-					continue
 				}
 				edge_id := ref.EdgeID
 				var other_id int32
@@ -289,14 +280,11 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			shortcuts := self.graph.GetAdjacentShortcuts(curr_id)
+			shortcuts := self.graph.GetAdjacentEdges(curr_id, graph.BACKWARD)
 			for {
 				ref, ok := shortcuts.Next()
 				if !ok {
 					break
-				}
-				if !ref.IsReversed() {
-					continue
 				}
 				edge_id := ref.EdgeID
 				var other_id int32
