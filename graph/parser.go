@@ -110,6 +110,18 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 					Weight: edge_weights[index],
 				}
 				fwd_edge_refs.Add(edgeref)
+				if index < edges.Length()-1 {
+					edge = edges[index+1]
+					if edge.NodeB == int32(id) {
+						edgeref := EdgeRef{
+							EdgeID: int32(index + 1),
+							Type:   0,
+							NodeID: edge.NodeA,
+							Weight: edge_weights[index+1],
+						}
+						bwd_edge_refs.Add(edgeref)
+					}
+				}
 			} else if edge.NodeB == int32(id) {
 				edgeref := EdgeRef{
 					EdgeID: int32(index),
@@ -118,27 +130,18 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 					Weight: edge_weights[index],
 				}
 				bwd_edge_refs.Add(edgeref)
-			}
-			if index == edges.Length()-1 {
-				continue
-			}
-			edge = edges[index+1]
-			if edge.NodeA == int32(id) {
-				edgeref := EdgeRef{
-					EdgeID: int32(index),
-					Type:   0,
-					NodeID: edge.NodeB,
-					Weight: edge_weights[index],
+				if index < edges.Length()-1 {
+					edge = edges[index+1]
+					if edge.NodeA == int32(id) {
+						edgeref := EdgeRef{
+							EdgeID: int32(index + 1),
+							Type:   0,
+							NodeID: edge.NodeB,
+							Weight: edge_weights[index+1],
+						}
+						fwd_edge_refs.Add(edgeref)
+					}
 				}
-				fwd_edge_refs.Add(edgeref)
-			} else if edge.NodeB == int32(id) {
-				edgeref := EdgeRef{
-					EdgeID: int32(index),
-					Type:   1,
-					NodeID: edge.NodeA,
-					Weight: edge_weights[index],
-				}
-				bwd_edge_refs.Add(edgeref)
 			}
 		}
 		node_ref.EdgeRefFWDCount = int16(fwd_edge_refs.Length() - int(node_ref.EdgeRefFWDStart))

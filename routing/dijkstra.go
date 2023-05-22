@@ -62,8 +62,12 @@ func (self *Dijkstra) CalcShortestPath() bool {
 			if !ok {
 				break
 			}
+			if ref.IsShortcut() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.NodeID
+			other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited {
@@ -125,6 +129,7 @@ func (self *Dijkstra) Steps(count int, visitededges *util.List[geo.CoordArray]) 
 
 func (self *Dijkstra) GetShortestPath() Path {
 	path := make([]int32, 0, 10)
+	length := int32(self.flags[self.end_id].path_length)
 	curr_id := self.end_id
 	var edge int32
 	for {
@@ -138,6 +143,6 @@ func (self *Dijkstra) GetShortestPath() Path {
 	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
 		path[i], path[j] = path[j], path[i]
 	}
-	fmt.Println("count:", len(path))
+	fmt.Println("length:", length)
 	return NewPath(self.graph, path)
 }

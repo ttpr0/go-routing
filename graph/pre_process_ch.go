@@ -7,6 +7,290 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
+//*******************************************
+// dynamic graph structs
+//*******************************************
+
+type DynamicNodeRef struct {
+	FWDEdgeRefs List[EdgeRef]
+	BWDEdgeRefs List[EdgeRef]
+}
+
+//*******************************************
+// transform to/from dynamic graph
+//*******************************************
+
+func TransformToDynamicGraph(g *Graph) *DynamicGraph {
+	node_refs := NewList[DynamicNodeRef](g.node_refs.Length())
+	node_levels := NewList[int16](g.node_refs.Length())
+	for i := 0; i < g.nodes.Length(); i++ {
+		fwd_refs := NewList[EdgeRef](4)
+		bwd_refs := NewList[EdgeRef](4)
+		fwd_edges := g.GetAdjacentEdges(int32(i), FORWARD)
+		for {
+			ref, ok := fwd_edges.Next()
+			if !ok {
+				break
+			}
+			fwd_refs.Add(ref)
+		}
+		bwd_edges := g.GetAdjacentEdges(int32(i), BACKWARD)
+		for {
+			ref, ok := bwd_edges.Next()
+			if !ok {
+				break
+			}
+			bwd_refs.Add(ref)
+		}
+
+		node_refs.Add(DynamicNodeRef{
+			FWDEdgeRefs: fwd_refs,
+			BWDEdgeRefs: bwd_refs,
+		})
+		node_levels.Add(0)
+	}
+
+	dg := DynamicGraph{
+		node_refs:   node_refs,
+		nodes:       g.nodes,
+		node_levels: node_levels,
+		edges:       g.edges,
+		shortcuts:   NewList[Shortcut](100),
+		geom:        g.geom,
+		weight:      g.weight.(*Weighting).EdgeWeight,
+		sh_weight:   NewList[int32](100),
+		index:       g.index,
+	}
+
+	return &dg
+}
+
+func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
+	node_refs := NewList[NodeRef](dg.node_refs.Length())
+	fwd_edge_refs := NewList[EdgeRef](dg.EdgeCount())
+	bwd_edge_refs := NewList[EdgeRef](dg.EdgeCount())
+
+	fwd_start := 0
+	bwd_start := 0
+	for i := 0; i < dg.nodes.Length(); i++ {
+		fwd_count := 0
+		bwd_count := 0
+
+		fwd_refs := dg.node_refs[i].FWDEdgeRefs
+		bwd_refs := dg.node_refs[i].BWDEdgeRefs
+
+		for _, ref := range fwd_refs {
+			fwd_edge_refs.Add(ref)
+			fwd_count += 1
+		}
+		for _, ref := range bwd_refs {
+			bwd_edge_refs.Add(ref)
+			bwd_count += 1
+		}
+
+		node_refs.Add(NodeRef{
+			EdgeRefFWDStart: int32(fwd_start),
+			EdgeRefFWDCount: int16(fwd_count),
+			EdgeRefBWDStart: int32(bwd_start),
+			EdgeRefBWDCount: int16(bwd_count),
+		})
+		fwd_start += fwd_count
+		bwd_start += bwd_count
+	}
+
+	g := CHGraph{
+		node_refs:     node_refs,
+		nodes:         dg.nodes,
+		node_levels:   dg.node_levels,
+		fwd_edge_refs: fwd_edge_refs,
+		bwd_edge_refs: bwd_edge_refs,
+		edges:         dg.edges,
+		shortcuts:     dg.shortcuts,
+		geom:          dg.geom,
+		weight:        &Weighting{dg.weight},
+		sh_weight:     &Weighting{dg.sh_weight},
+		index:         dg.index,
+	}
+
+	return &g
+}
+
+//*******************************************
+// dynamic graph
+//*******************************************
+
+type DynamicGraph struct {
+	node_refs   List[DynamicNodeRef]
+	nodes       List[Node]
+	node_levels List[int16]
+	edges       List[Edge]
+	shortcuts   List[Shortcut]
+	geom        IGeometry
+	weight      List[int32]
+	sh_weight   List[int32]
+	index       KDTree[int32]
+}
+
+func (self *DynamicGraph) GetGeometry() IGeometry {
+	return self.geom
+}
+func (self *DynamicGraph) GetOtherNode(edge, node int32, is_shortcut bool) (int32, Direction) {
+	if is_shortcut {
+		e := self.shortcuts[edge]
+		if node == e.NodeA {
+			return e.NodeB, FORWARD
+		}
+		if node == e.NodeB {
+			return e.NodeA, BACKWARD
+		}
+		return -1, 0
+	} else {
+		e := self.edges[edge]
+		if node == e.NodeA {
+			return e.NodeB, FORWARD
+		}
+		if node == e.NodeB {
+			return e.NodeA, BACKWARD
+		}
+		return -1, 0
+	}
+}
+func (self *DynamicGraph) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
+	n := self.node_refs[node]
+	if direction == FORWARD {
+		return &EdgeRefIterator{
+			state:     0,
+			end:       len(n.FWDEdgeRefs),
+			edge_refs: &n.FWDEdgeRefs,
+		}
+	} else {
+		return &EdgeRefIterator{
+			state:     0,
+			end:       len(n.BWDEdgeRefs),
+			edge_refs: &n.BWDEdgeRefs,
+		}
+	}
+}
+func (self *DynamicGraph) NodeCount() int {
+	return len(self.nodes)
+}
+func (self *DynamicGraph) EdgeCount() int {
+	return len(self.edges)
+}
+func (self *DynamicGraph) IsNode(node int32) bool {
+	if node < int32(len(self.nodes)) {
+		return true
+	} else {
+		return false
+	}
+}
+func (self *DynamicGraph) GetNode(node int32) Node {
+	return self.nodes[node]
+}
+func (self *DynamicGraph) GetEdge(edge int32) Edge {
+	return self.edges[edge]
+}
+func (self *DynamicGraph) GetShortcut(id int32) Shortcut {
+	return self.shortcuts[id]
+}
+func (self *DynamicGraph) GetNodeIndex() KDTree[int32] {
+	return self.index
+}
+
+func (self *DynamicGraph) GetWeight(id int32, is_shortcut bool) int32 {
+	if is_shortcut {
+		return self.sh_weight[id]
+	} else {
+		return self.weight[id]
+	}
+}
+func (self *DynamicGraph) SetWeight(id int32, is_shortcut bool, weight int32) {
+	if is_shortcut {
+		self.sh_weight[id] = weight
+	} else {
+		self.weight[id] = weight
+	}
+}
+
+func (self *DynamicGraph) GetNeigbours(id int32, min_level int16) ([]int32, []int32) {
+	in_neigbours := NewList[int32](4)
+	out_neigbours := NewList[int32](4)
+	node := self.node_refs[id]
+	for _, ref := range node.FWDEdgeRefs {
+		other_id := ref.NodeID
+		if other_id == id || Contains(out_neigbours, other_id) {
+			continue
+		}
+		if self.node_levels[other_id] < min_level {
+			continue
+		}
+		out_neigbours.Add(other_id)
+	}
+	for _, ref := range node.BWDEdgeRefs {
+		other_id := ref.NodeID
+		if other_id == id || Contains(in_neigbours, other_id) {
+			continue
+		}
+		if self.node_levels[other_id] < min_level {
+			continue
+		}
+		in_neigbours.Add(other_id)
+	}
+	return in_neigbours, out_neigbours
+}
+func (self *DynamicGraph) GetNodeLevel(id int32) int16 {
+	return self.node_levels[id]
+}
+func (self *DynamicGraph) SetNodeLevel(id int32, level int16) {
+	self.node_levels[id] = level
+}
+func (self *DynamicGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int32, byte]) {
+	if node_a == node_b {
+		return
+	}
+
+	weight := int32(0)
+	weight += self.GetWeight(edges[0].A, edges[0].B == 2 || edges[0].B == 3)
+	weight += self.GetWeight(edges[1].A, edges[1].B == 2 || edges[1].B == 3)
+	shortcut := Shortcut{
+		NodeA: node_a,
+		NodeB: node_b,
+		Edges: edges,
+	}
+	shc_id := self.shortcuts.Length()
+	self.sh_weight.Add(weight)
+	self.shortcuts.Add(shortcut)
+
+	node := self.node_refs[node_a]
+	node.FWDEdgeRefs.Add(EdgeRef{
+		EdgeID: int32(shc_id),
+		Type:   2,
+		NodeID: node_b,
+		Weight: weight,
+	})
+	self.node_refs[node_a] = node
+	node = self.node_refs[node_b]
+	node.BWDEdgeRefs.Add(EdgeRef{
+		EdgeID: int32(shc_id),
+		Type:   3,
+		NodeID: node_a,
+		Weight: weight,
+	})
+	self.node_refs[node_b] = node
+}
+func (self *DynamicGraph) GetWeightBetween(from, to int32) int32 {
+	for _, ref := range self.node_refs[from].FWDEdgeRefs {
+		if ref.NodeID == to {
+			return ref.Weight
+		}
+	}
+	return -1
+}
+
+//*******************************************
+// preprocess ch
+//*******************************************
+
 func CalcContraction(graph *DynamicGraph) {
 	fmt.Println("started contracting graph")
 	// initialize graph
@@ -63,9 +347,6 @@ func CalcContraction(graph *DynamicGraph) {
 			in_neigbours, out_neigbours := graph.GetNeigbours(node_id, level)
 			for i := 0; i < len(in_neigbours); i++ {
 				for j := 0; j < len(out_neigbours); j++ {
-					if i == j {
-						continue
-					}
 					from := in_neigbours[i]
 					to := out_neigbours[j]
 					if from == to {
@@ -192,27 +473,9 @@ func CalcShortcut(graph *DynamicGraph, start, end, contract int32, level int16) 
 	}
 }
 
-type Flag struct {
-	pathlength int32
-	prevEdge   int32
-	visited    bool
-}
-
 type FlagSH struct {
 	pathlength int32
 	prevEdge   int32
 	isShortcut bool
 	visited    bool
-}
-
-type FlagCH struct {
-	pathlength1 int32
-	prevEdge1   int32
-	isShortcut1 bool
-	visited1    bool
-
-	pathlength2 int32
-	prevEdge2   int32
-	isShortcut2 bool
-	visited2    bool
 }

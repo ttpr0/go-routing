@@ -28,6 +28,40 @@ func StoreTiledGraph(graph *TiledGraph, filename string) {
 	_StoreNodeTiles(graph.node_tiles, filename+"-tiles")
 }
 
+func StoreCHGraph(graph *CHGraph, filename string) {
+	_StoreNodes(graph.nodes, graph.node_refs, graph.fwd_edge_refs, graph.bwd_edge_refs, filename+"-nodes")
+	_StoreEdges(graph.edges, graph.weight, filename+"-edges")
+	_StoreGeom(graph.geom, filename+"-geom")
+
+	shcbuffer := bytes.Buffer{}
+	lvlbuffer := bytes.Buffer{}
+	nodecount := graph.nodes.Length()
+	shortcutcount := graph.shortcuts.Length()
+	binary.Write(&shcbuffer, binary.LittleEndian, int32(shortcutcount))
+
+	for i := 0; i < shortcutcount; i++ {
+		shortcut := graph.shortcuts.Get(i)
+		weight := graph.sh_weight.GetEdgeWeight(int32(i))
+		binary.Write(&shcbuffer, binary.LittleEndian, int32(shortcut.NodeA))
+		binary.Write(&shcbuffer, binary.LittleEndian, int32(shortcut.NodeB))
+		binary.Write(&shcbuffer, binary.LittleEndian, uint32(weight))
+		for _, edge := range shortcut.Edges {
+			binary.Write(&shcbuffer, binary.LittleEndian, edge.A)
+			binary.Write(&shcbuffer, binary.LittleEndian, edge.B == 2 || edge.B == 3)
+		}
+	}
+	for i := 0; i < nodecount; i++ {
+		binary.Write(&lvlbuffer, binary.LittleEndian, graph.GetNodeLevel(int32(i)))
+	}
+
+	shcfile, _ := os.Create(filename + "-shortcut")
+	defer shcfile.Close()
+	shcfile.Write(shcbuffer.Bytes())
+	lvlfile, _ := os.Create(filename + "-level")
+	defer lvlfile.Close()
+	lvlfile.Write(lvlbuffer.Bytes())
+}
+
 func LoadGraph(file string) IGraph {
 	nodes, node_refs, fwd_edge_refs, bwd_edge_refs := _LoadNodes(file + "-nodes")
 	nodecount := nodes.Length()
@@ -56,9 +90,7 @@ func LoadCHGraph(file string) ICHGraph {
 	node_geoms, edge_geoms := _LoadGeom(file+"-geom", nodecount, edgecount)
 	levels := _LoadCHLevels(file+"-level", nodecount)
 	shortcuts, shortcut_weights := _LoadCHShortcuts(file + "-shortcut")
-	index := _BuildNodeIndex(node_geoms)
-
-	return &CHGraph{
+	chg := &CHGraph{
 		node_refs:     node_refs,
 		nodes:         nodes,
 		node_levels:   levels,
@@ -69,8 +101,10 @@ func LoadCHGraph(file string) ICHGraph {
 		geom:          &Geometry{node_geoms, edge_geoms},
 		weight:        &Weighting{edge_weights},
 		sh_weight:     &Weighting{shortcut_weights},
-		index:         index,
 	}
+	SortNodesByLevel(chg)
+	chg.index = _BuildNodeIndex(chg.geom.GetAllNodes())
+	return chg
 }
 
 func LoadTiledGraph(file string) ITiledGraph {

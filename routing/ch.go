@@ -94,12 +94,12 @@ func (self *CH) CalcShortestPath() bool {
 					break
 				}
 				edge_id := ref.EdgeID
-				var other_id int32
-				if ref.IsShortcut() {
-					other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
-				} else {
-					other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
-				}
+				other_id := ref.NodeID
+				// if ref.IsShortcut() {
+				// 	other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
+				// } else {
+				// 	other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
+				// }
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
 					continue
 				}
@@ -146,12 +146,12 @@ func (self *CH) CalcShortestPath() bool {
 					break
 				}
 				edge_id := ref.EdgeID
-				var other_id int32
-				if ref.IsShortcut() {
-					other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
-				} else {
-					other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
-				}
+				other_id := ref.NodeID
+				// if ref.IsShortcut() {
+				// 	other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
+				// } else {
+				// 	other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
+				// }
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
 					continue
 				}
@@ -330,6 +330,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 
 func (self *CH) GetShortestPath() Path {
 	path := NewList[int32](10)
+	length := int32(self.flags[self.mid_id].path_length1 + self.flags[self.mid_id].path_length2)
 	curr_id := self.mid_id
 	for {
 		if curr_id == self.start_id {
@@ -361,6 +362,6 @@ func (self *CH) GetShortestPath() Path {
 			curr_id, _ = self.graph.GetOtherNode(curr_flag.prev_edge2, curr_id)
 		}
 	}
-	fmt.Println("count:", len(path))
+	fmt.Println("length:", length)
 	return NewPath(self.graph, path)
 }
