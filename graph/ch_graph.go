@@ -19,7 +19,7 @@ type ICHGraph interface {
 	IsNode(node int32) bool
 	GetNode(node int32) Node
 	GetEdge(edge int32) Edge
-	GetShortcut(shortcut int32) Shortcut
+	GetShortcut(shortcut int32) CHShortcut
 	GetEdgesFromShortcut(edges *List[int32], shortcut_id int32, reversed bool)
 	GetNodeIndex() KDTree[int32]
 }
@@ -31,7 +31,7 @@ type CHGraph struct {
 	fwd_edge_refs List[EdgeRef]
 	bwd_edge_refs List[EdgeRef]
 	edges         List[Edge]
-	shortcuts     List[Shortcut]
+	shortcuts     List[CHShortcut]
 	geom          IGeometry
 	weight        IWeighting
 	sh_weight     IWeighting
@@ -125,7 +125,7 @@ func (self *CHGraph) GetEdge(edge int32) Edge {
 	return self.edges[edge]
 }
 
-func (self *CHGraph) GetShortcut(shortcut int32) Shortcut {
+func (self *CHGraph) GetShortcut(shortcut int32) CHShortcut {
 	return self.shortcuts[shortcut]
 }
 

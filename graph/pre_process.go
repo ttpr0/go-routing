@@ -84,12 +84,12 @@ func CalcNodeTiles(geom IGeometry, features []geo.Feature) List[int16] {
 func UpdateCrossBorder(edges List[Edge], edge_refs List[EdgeRef], node_tiles List[int16]) List[EdgeRef] {
 	for i := 0; i < edge_refs.Length(); i++ {
 		edge_ref := edge_refs[i]
-		if edge_ref.Type != 0 && edge_ref.Type != 1 {
+		if edge_ref._Type != 0 {
 			continue
 		}
 		edge := edges[edge_ref.EdgeID]
 		if node_tiles[edge.NodeA] != node_tiles[edge.NodeB] {
-			edge_ref.Type += 10
+			edge_ref._Type = 10
 			edge_refs.Set(i, edge_ref)
 		}
 	}
@@ -201,7 +201,7 @@ func UpdateSkipEdges(graph *TiledGraph, is_skip []bool) {
 	for i := 0; i < edgerefcount; i++ {
 		edgeref := graph.fwd_edge_refs.Get(i)
 		if !edgeref.IsCrossBorder() && is_skip[edgeref.EdgeID] {
-			edgeref.Type += 20
+			edgeref._Type = 20
 		}
 		graph.fwd_edge_refs.Set(i, edgeref)
 	}
@@ -209,7 +209,7 @@ func UpdateSkipEdges(graph *TiledGraph, is_skip []bool) {
 	for i := 0; i < edgerefcount; i++ {
 		edgeref := graph.bwd_edge_refs.Get(i)
 		if !edgeref.IsCrossBorder() && is_skip[edgeref.EdgeID] {
-			edgeref.Type += 20
+			edgeref._Type = 20
 		}
 		graph.bwd_edge_refs.Set(i, edgeref)
 	}

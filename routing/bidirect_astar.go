@@ -3,7 +3,7 @@ package routing
 import (
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type flag_ba struct {
@@ -18,8 +18,8 @@ type flag_ba struct {
 }
 
 type BidirectAStar struct {
-	startheap   util.PriorityQueue[int32, float64]
-	endheap     util.PriorityQueue[int32, float64]
+	startheap   PriorityQueue[int32, float64]
+	endheap     PriorityQueue[int32, float64]
 	mid_id      int32
 	start_id    int32
 	end_id      int32
@@ -46,10 +46,10 @@ func NewBidirectAStar(graph graph.IGraph, start, end int32) *BidirectAStar {
 	flags[end].path_length2 = 0
 	d.flags = flags
 
-	startheap := util.NewPriorityQueue[int32, float64](100)
+	startheap := NewPriorityQueue[int32, float64](100)
 	startheap.Enqueue(d.start_id, 0)
 	d.startheap = startheap
-	endheap := util.NewPriorityQueue[int32, float64](100)
+	endheap := NewPriorityQueue[int32, float64](100)
 	endheap.Enqueue(d.end_id, 0)
 	d.endheap = endheap
 
@@ -74,8 +74,11 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited1 {
@@ -124,8 +127,11 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited2 {
@@ -161,7 +167,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 	return true
 }
 
-func (self *BidirectAStar) Steps(count int, visitededges *util.List[geo.CoordArray]) bool {
+func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
 	for c := 0; c < count; c++ {
 		curr_id, _ := self.startheap.Dequeue()
@@ -181,8 +187,11 @@ func (self *BidirectAStar) Steps(count int, visitededges *util.List[geo.CoordArr
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited1 {
@@ -231,8 +240,11 @@ func (self *BidirectAStar) Steps(count int, visitededges *util.List[geo.CoordArr
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited2 {

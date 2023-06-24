@@ -5,7 +5,7 @@ import (
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type flag_d struct {
@@ -15,7 +15,7 @@ type flag_d struct {
 }
 
 type Dijkstra struct {
-	heap     util.PriorityQueue[int32, float64]
+	heap     PriorityQueue[int32, float64]
 	start_id int32
 	end_id   int32
 	graph    graph.IGraph
@@ -34,7 +34,7 @@ func NewDijkstra(graph graph.IGraph, start, end int32) *Dijkstra {
 	flags[start].path_length = 0
 	d.flags = flags
 
-	heap := util.NewPriorityQueue[int32, float64](100)
+	heap := NewPriorityQueue[int32, float64](100)
 	heap.Enqueue(d.start_id, 0)
 	d.heap = heap
 
@@ -62,12 +62,11 @@ func (self *Dijkstra) CalcShortestPath() bool {
 			if !ok {
 				break
 			}
-			if ref.IsShortcut() {
+			if !ref.IsEdge() {
 				continue
 			}
 			edge_id := ref.EdgeID
-			other_id := ref.NodeID
-			other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited {
@@ -85,7 +84,7 @@ func (self *Dijkstra) CalcShortestPath() bool {
 	}
 }
 
-func (self *Dijkstra) Steps(count int, visitededges *util.List[geo.CoordArray]) bool {
+func (self *Dijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 	for c := 0; c < count; c++ {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -106,8 +105,11 @@ func (self *Dijkstra) Steps(count int, visitededges *util.List[geo.CoordArray]) 
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited {

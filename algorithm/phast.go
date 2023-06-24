@@ -39,7 +39,7 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 				break
 			}
 			edge_id := ref.EdgeID
-			other_id := ref.NodeID
+			other_id := ref.OtherID
 			if g.GetNodeLevel(other_id) <= g.GetNodeLevel(curr_id) {
 				continue
 			}
@@ -66,7 +66,7 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 			if !ok {
 				break
 			}
-			other_id := ref.NodeID
+			other_id := ref.OtherID
 			if g.GetNodeLevel(other_id) >= g.GetNodeLevel(int32(i)) {
 				continue
 			}

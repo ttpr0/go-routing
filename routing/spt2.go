@@ -65,8 +65,11 @@ func (self *ShortestPathTree2) CalcSPT() {
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.Visited {

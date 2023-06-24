@@ -3,7 +3,7 @@ package routing
 import (
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type Path struct {
@@ -24,7 +24,7 @@ func (self *Path) GetGeometry() []geo.CoordArray {
 	}
 	return self.lines
 }
-func (self *Path) EdgeIterator() util.IIterator[int32] {
+func (self *Path) EdgeIterator() IIterator[int32] {
 	return &EdgeIterator{&self.path, 0}
 }
 

@@ -94,7 +94,7 @@ func (self *CH) CalcShortestPath() bool {
 					break
 				}
 				edge_id := ref.EdgeID
-				other_id := ref.NodeID
+				other_id := ref.OtherID
 				// if ref.IsShortcut() {
 				// 	other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
 				// } else {
@@ -146,7 +146,7 @@ func (self *CH) CalcShortestPath() bool {
 					break
 				}
 				edge_id := ref.EdgeID
-				other_id := ref.NodeID
+				other_id := ref.OtherID
 				// if ref.IsShortcut() {
 				// 	other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
 				// } else {

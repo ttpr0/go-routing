@@ -168,6 +168,9 @@ func (self *DistributedRoutingRunner) RunRouting() {
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			if self.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
 				continue
 			}
@@ -176,7 +179,7 @@ func (self *DistributedRoutingRunner) RunRouting() {
 			if new_length > self.max_length {
 				continue
 			}
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			var other_flag flag_dd
 			if self.flags.ContainsKey(other_id) {
 				other_flag = self.flags.Get(other_id)

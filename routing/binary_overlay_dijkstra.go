@@ -64,11 +64,14 @@ func (self *BODijkstra) CalcShortestPath() bool {
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			if curr_flag.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
 				continue
 			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			var other_flag _FlagBOD
 			if self.flags.ContainsKey(other_id) {
 				other_flag = self.flags.Get(other_id)
@@ -125,11 +128,14 @@ func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) boo
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			if curr_flag.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
 				continue
 			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			var other_flag _FlagBOD
 			if self.flags.ContainsKey(other_id) {
 				other_flag = self.flags.Get(other_id)

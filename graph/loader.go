@@ -157,15 +157,15 @@ func _StoreNodes(nodes List[Node], node_refs List[NodeRef], fwd_edge_refs List[E
 	for i := 0; i < fwd_edgerefcount; i++ {
 		edgeref := fwd_edge_refs.Get(i)
 		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.EdgeID)
-		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.Type)
-		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.NodeID)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref._Type)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.OtherID)
 		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.Weight)
 	}
 	for i := 0; i < bwd_edgerefcount; i++ {
 		edgeref := bwd_edge_refs.Get(i)
 		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.EdgeID)
-		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.Type)
-		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.NodeID)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref._Type)
+		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.OtherID)
 		binary.Write(&nodesbuffer, binary.LittleEndian, edgeref.Weight)
 	}
 
@@ -292,10 +292,10 @@ func _LoadNodes(file string) (List[Node], List[NodeRef], List[EdgeRef], List[Edg
 		var w int32
 		binary.Read(nodereader, binary.LittleEndian, &w)
 		fwd_edge_refs.Add(EdgeRef{
-			EdgeID: id,
-			Type:   t,
-			NodeID: nid,
-			Weight: w,
+			EdgeID:  id,
+			_Type:   t,
+			OtherID: nid,
+			Weight:  w,
 		})
 	}
 	for i := 0; i < int(bwd_edgerefcount); i++ {
@@ -308,10 +308,10 @@ func _LoadNodes(file string) (List[Node], List[NodeRef], List[EdgeRef], List[Edg
 		var w int32
 		binary.Read(nodereader, binary.LittleEndian, &w)
 		bwd_edge_refs.Add(EdgeRef{
-			EdgeID: id,
-			Type:   t,
-			NodeID: nid,
-			Weight: w,
+			EdgeID:  id,
+			_Type:   t,
+			OtherID: nid,
+			Weight:  w,
 		})
 	}
 
@@ -431,7 +431,7 @@ func _LoadCHLevels(file string, nodecount int) List[int16] {
 	return levels
 }
 
-func _LoadCHShortcuts(file string) (List[Shortcut], List[int32]) {
+func _LoadCHShortcuts(file string) (List[CHShortcut], List[int32]) {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -441,7 +441,7 @@ func _LoadCHShortcuts(file string) (List[Shortcut], List[int32]) {
 	shortcutreader := bytes.NewReader(shortcutdata)
 	var shortcutcount int32
 	binary.Read(shortcutreader, binary.LittleEndian, &shortcutcount)
-	shortcuts := NewList[Shortcut](int(shortcutcount))
+	shortcuts := NewList[CHShortcut](int(shortcutcount))
 	shortcut_weights := NewList[int32](int(shortcutcount))
 	for i := 0; i < int(shortcutcount); i++ {
 		var node_a int32
@@ -450,7 +450,7 @@ func _LoadCHShortcuts(file string) (List[Shortcut], List[int32]) {
 		binary.Read(shortcutreader, binary.LittleEndian, &node_b)
 		var weight uint32
 		binary.Read(shortcutreader, binary.LittleEndian, &weight)
-		shortcut := Shortcut{
+		shortcut := CHShortcut{
 			NodeA: node_a,
 			NodeB: node_b,
 			Edges: [2]Tuple[int32, byte]{},

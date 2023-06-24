@@ -41,7 +41,7 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 	edge_types := make([]int16, int(graph.EdgeCount()))
 	for i := 0; i < graph.fwd_edge_refs.Length(); i++ {
 		edge_ref := graph.fwd_edge_refs[i]
-		edge_types[edge_ref.EdgeID] = int16(edge_ref.Type)
+		edge_types[edge_ref.EdgeID] = int16(edge_ref._Type)
 	}
 
 	edges := NewList[geo.Feature](int(graph.EdgeCount()))
@@ -84,7 +84,7 @@ func CheckGraph(g IGraph) {
 			if edge.NodeA != int32(i) {
 				fmt.Println("error 81")
 			}
-			if edge.NodeB != ref.NodeID {
+			if edge.NodeB != ref.OtherID {
 				fmt.Println("error 84")
 			}
 		}
@@ -101,7 +101,7 @@ func CheckGraph(g IGraph) {
 			if edge.NodeB != int32(i) {
 				fmt.Println("error 95")
 			}
-			if edge.NodeA != ref.NodeID {
+			if edge.NodeA != ref.OtherID {
 				fmt.Println("error 98")
 			}
 		}
@@ -128,7 +128,7 @@ func SortNodesByLevel(g *CHGraph) {
 	bwd_edge_refs := NewList[EdgeRef](g.bwd_edge_refs.Length())
 	node_geom := NewList[geo.Coord](g.nodes.Length())
 	edges := NewList[Edge](g.edges.Length())
-	shortcuts := NewList[Shortcut](g.shortcuts.Length())
+	shortcuts := NewList[CHShortcut](g.shortcuts.Length())
 
 	fwd_start := 0
 	bwd_start := 0
@@ -142,7 +142,7 @@ func SortNodesByLevel(g *CHGraph) {
 			if !ok {
 				break
 			}
-			ref.NodeID = rev_indices[ref.NodeID]
+			ref.OtherID = rev_indices[ref.OtherID]
 			fwd_edge_refs.Add(ref)
 			fwd_count += 1
 		}
@@ -154,7 +154,7 @@ func SortNodesByLevel(g *CHGraph) {
 			if !ok {
 				break
 			}
-			ref.NodeID = rev_indices[ref.NodeID]
+			ref.OtherID = rev_indices[ref.OtherID]
 			bwd_edge_refs.Add(ref)
 			bwd_count += 1
 		}

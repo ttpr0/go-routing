@@ -41,7 +41,7 @@ func CalcBreathFirstSearch(g graph.IGraph, start int32) {
 			if ref.IsShortcut() {
 				continue
 			}
-			other_id := ref.NodeID
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := flags[other_id]
 			if other_flag.visited {

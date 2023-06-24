@@ -5,7 +5,7 @@ import (
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type flag_a struct {
@@ -15,7 +15,7 @@ type flag_a struct {
 }
 
 type AStar struct {
-	heap      util.PriorityQueue[int32, float64]
+	heap      PriorityQueue[int32, float64]
 	start_id  int32
 	end_id    int32
 	end_point geo.Coord
@@ -37,7 +37,7 @@ func NewAStar(graph graph.IGraph, start, end int32) *AStar {
 	flags[start].path_length = 0
 	d.flags = flags
 
-	heap := util.NewPriorityQueue[int32, float64](100)
+	heap := NewPriorityQueue[int32, float64](100)
 	heap.Enqueue(d.start_id, 0)
 	d.heap = heap
 
@@ -65,8 +65,11 @@ func (self *AStar) CalcShortestPath() bool {
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			other_id := ref.NodeID
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited {
@@ -85,7 +88,7 @@ func (self *AStar) CalcShortestPath() bool {
 	}
 }
 
-func (self *AStar) Steps(count int, visitededges *util.List[geo.CoordArray]) bool {
+func (self *AStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 	for c := 0; c < count; c++ {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -106,8 +109,11 @@ func (self *AStar) Steps(count int, visitededges *util.List[geo.CoordArray]) boo
 			if !ok {
 				break
 			}
+			if !ref.IsEdge() {
+				continue
+			}
 			edge_id := ref.EdgeID
-			other_id := ref.NodeID
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited {

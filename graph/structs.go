@@ -53,7 +53,7 @@ type Node struct {
 	Type int8
 }
 
-type Shortcut struct {
+type CHShortcut struct {
 	NodeA int32
 	NodeB int32
 	Edges [2]Tuple[int32, byte]
@@ -67,20 +67,26 @@ type NodeRef struct {
 }
 
 type EdgeRef struct {
-	EdgeID int32
-	Type   byte
-	NodeID int32
-	Weight int32
+	EdgeID  int32
+	_Type   byte
+	OtherID int32
+	Weight  int32
 }
 
-func (self EdgeRef) IsShortcut() bool {
-	return self.Type == 2 || self.Type == 3
+func (self EdgeRef) IsEdge() bool {
+	return self._Type < 100
 }
 func (self EdgeRef) IsCrossBorder() bool {
-	return self.Type >= 10 && self.Type <= 11
+	return self._Type == 10
 }
 func (self EdgeRef) IsSkip() bool {
-	return self.Type >= 20 && self.Type <= 21
+	return self._Type == 20
+}
+func (self EdgeRef) IsShortcut() bool {
+	return self._Type >= 100
+}
+func (self EdgeRef) IsCHShortcut() bool {
+	return self._Type == 100
 }
 
 //*******************************************

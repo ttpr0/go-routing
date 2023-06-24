@@ -55,7 +55,7 @@ func TransformToDynamicGraph(g *Graph) *DynamicGraph {
 		nodes:       g.nodes,
 		node_levels: node_levels,
 		edges:       g.edges,
-		shortcuts:   NewList[Shortcut](100),
+		shortcuts:   NewList[CHShortcut](100),
 		geom:        g.geom,
 		weight:      g.weight.(*Weighting).EdgeWeight,
 		sh_weight:   NewList[int32](100),
@@ -124,7 +124,7 @@ type DynamicGraph struct {
 	nodes       List[Node]
 	node_levels List[int16]
 	edges       List[Edge]
-	shortcuts   List[Shortcut]
+	shortcuts   List[CHShortcut]
 	geom        IGeometry
 	weight      List[int32]
 	sh_weight   List[int32]
@@ -190,7 +190,7 @@ func (self *DynamicGraph) GetNode(node int32) Node {
 func (self *DynamicGraph) GetEdge(edge int32) Edge {
 	return self.edges[edge]
 }
-func (self *DynamicGraph) GetShortcut(id int32) Shortcut {
+func (self *DynamicGraph) GetShortcut(id int32) CHShortcut {
 	return self.shortcuts[id]
 }
 func (self *DynamicGraph) GetNodeIndex() KDTree[int32] {
@@ -217,7 +217,7 @@ func (self *DynamicGraph) GetNeigbours(id int32, min_level int16) ([]int32, []in
 	out_neigbours := NewList[int32](4)
 	node := self.node_refs[id]
 	for _, ref := range node.FWDEdgeRefs {
-		other_id := ref.NodeID
+		other_id := ref.OtherID
 		if other_id == id || Contains(out_neigbours, other_id) {
 			continue
 		}
@@ -227,7 +227,7 @@ func (self *DynamicGraph) GetNeigbours(id int32, min_level int16) ([]int32, []in
 		out_neigbours.Add(other_id)
 	}
 	for _, ref := range node.BWDEdgeRefs {
-		other_id := ref.NodeID
+		other_id := ref.OtherID
 		if other_id == id || Contains(in_neigbours, other_id) {
 			continue
 		}
@@ -252,7 +252,7 @@ func (self *DynamicGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int32
 	weight := int32(0)
 	weight += self.GetWeight(edges[0].A, edges[0].B == 2 || edges[0].B == 3)
 	weight += self.GetWeight(edges[1].A, edges[1].B == 2 || edges[1].B == 3)
-	shortcut := Shortcut{
+	shortcut := CHShortcut{
 		NodeA: node_a,
 		NodeB: node_b,
 		Edges: edges,
@@ -263,24 +263,24 @@ func (self *DynamicGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int32
 
 	node := self.node_refs[node_a]
 	node.FWDEdgeRefs.Add(EdgeRef{
-		EdgeID: int32(shc_id),
-		Type:   2,
-		NodeID: node_b,
-		Weight: weight,
+		EdgeID:  int32(shc_id),
+		_Type:   100,
+		OtherID: node_b,
+		Weight:  weight,
 	})
 	self.node_refs[node_a] = node
 	node = self.node_refs[node_b]
 	node.BWDEdgeRefs.Add(EdgeRef{
-		EdgeID: int32(shc_id),
-		Type:   3,
-		NodeID: node_a,
-		Weight: weight,
+		EdgeID:  int32(shc_id),
+		_Type:   100,
+		OtherID: node_a,
+		Weight:  weight,
 	})
 	self.node_refs[node_b] = node
 }
 func (self *DynamicGraph) GetWeightBetween(from, to int32) int32 {
 	for _, ref := range self.node_refs[from].FWDEdgeRefs {
-		if ref.NodeID == to {
+		if ref.OtherID == to {
 			return ref.Weight
 		}
 	}
@@ -419,7 +419,7 @@ func CalcShortcut(graph *DynamicGraph, start, end, contract int32, level int16) 
 				break
 			}
 			edge_id := ref.EdgeID
-			other_id := ref.NodeID
+			other_id := ref.OtherID
 			if graph.GetNodeLevel(other_id) < level {
 				continue
 			}

@@ -3,7 +3,7 @@ package routing
 import (
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type ISPTConsumer interface {
@@ -17,7 +17,7 @@ type flag_spt struct {
 }
 
 type ShortestPathTree struct {
-	heap     util.PriorityQueue[int32, float64]
+	heap     PriorityQueue[int32, float64]
 	start_id int32
 	max_val  int32
 	graph    graph.IGraph
@@ -43,7 +43,7 @@ func NewShortestPathTree(graph graph.IGraph, start, max_val int32, consumer ISPT
 	flags[start].path_length = 0
 	d.flags = flags
 
-	heap := util.NewPriorityQueue[int32, float64](100)
+	heap := NewPriorityQueue[int32, float64](100)
 	heap.Enqueue(d.start_id, 0)
 	d.heap = heap
 
@@ -70,6 +70,9 @@ func (self *ShortestPathTree) CalcShortestPathTree() {
 			ref, ok := edges.Next()
 			if !ok {
 				break
+			}
+			if !ref.IsEdge() {
+				continue
 			}
 			edge_id := ref.EdgeID
 			edge := self.graph.GetEdge(edge_id)
