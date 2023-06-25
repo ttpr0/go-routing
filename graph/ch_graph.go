@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
@@ -22,6 +23,7 @@ type ICHGraph interface {
 	GetShortcut(shortcut int32) CHShortcut
 	GetEdgesFromShortcut(edges *List[int32], shortcut_id int32, reversed bool)
 	GetNodeIndex() KDTree[int32]
+	GetClosestNode(point geo.Coord) (int32, bool)
 }
 
 type CHGraph struct {
@@ -161,4 +163,7 @@ func (self *CHGraph) GetEdgesFromShortcut(edges *List[int32], shortcut_id int32,
 }
 func (self *CHGraph) GetNodeIndex() KDTree[int32] {
 	return self.index
+}
+func (self *CHGraph) GetClosestNode(point geo.Coord) (int32, bool) {
+	return self.index.GetClosest(point[:], 0.005)
 }

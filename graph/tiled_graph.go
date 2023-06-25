@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
@@ -18,6 +19,7 @@ type ITiledGraph interface {
 	GetNode(node int32) Node
 	GetEdge(edge int32) Edge
 	GetNodeIndex() KDTree[int32]
+	GetClosestNode(point geo.Coord) (int32, bool)
 }
 
 type TiledGraph struct {
@@ -100,4 +102,7 @@ func (self *TiledGraph) GetEdge(edge int32) Edge {
 }
 func (self *TiledGraph) GetNodeIndex() KDTree[int32] {
 	return self.index
+}
+func (self *TiledGraph) GetClosestNode(point geo.Coord) (int32, bool) {
+	return self.index.GetClosest(point[:], 0.005)
 }
