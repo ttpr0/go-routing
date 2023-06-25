@@ -214,3 +214,144 @@ func UpdateSkipEdges(graph *TiledGraph, is_skip []bool) {
 		graph.bwd_edge_refs.Set(i, edgeref)
 	}
 }
+
+//*******************************************
+// preprocess tiled-graph 2
+//*******************************************
+
+func TransformToTiled2(graph *TiledGraph) *TiledGraph2 {
+	tiles := GetTiles(graph)
+	border_nodes := NewDict[int16, Array[int32]](len(tiles))
+	interior_nodes := NewDict[int16, Array[int32]](len(tiles))
+	border_range_map := NewDict[int16, Dict[int32, Array[float32]]](len(tiles))
+	for _, tile := range tiles {
+		b_nodes, i_nodes := GetBorderNodes(graph, tile)
+		border_nodes[tile] = b_nodes
+		interior_nodes[tile] = i_nodes
+		range_map := NewDict[int32, Array[float32]](len(b_nodes))
+		flags := NewDict[int32, _Flag](100)
+		for _, b_node := range b_nodes {
+			flags.Clear()
+			CalcFullSPT(graph, b_node, flags)
+			ranges := NewArray[float32](len(i_nodes))
+			for i, i_node := range i_nodes {
+				if flags.ContainsKey(i_node) {
+					flag := flags[i_node]
+					ranges[i] = float32(flag.pathlength)
+				} else {
+					ranges[i] = 1000000
+				}
+			}
+		}
+		border_range_map[tile] = range_map
+	}
+
+	return &TiledGraph2{
+		node_refs:        graph.node_refs,
+		nodes:            graph.nodes,
+		node_tiles:       graph.node_tiles,
+		fwd_edge_refs:    graph.fwd_edge_refs,
+		bwd_edge_refs:    graph.bwd_edge_refs,
+		edges:            graph.edges,
+		geom:             graph.geom,
+		weight:           graph.weight,
+		index:            graph.index,
+		border_nodes:     border_nodes,
+		interior_nodes:   interior_nodes,
+		border_range_map: border_range_map,
+	}
+}
+
+func GetTiles(graph *TiledGraph) List[int16] {
+	tile_dict := NewDict[int16, bool](100)
+	for _, tile_id := range graph.node_tiles {
+		if tile_dict.ContainsKey(tile_id) {
+			continue
+		}
+		tile_dict[tile_id] = true
+	}
+	tiles := NewList[int16](len(tile_dict))
+	for tile, _ := range tile_dict {
+		tiles.Add(tile)
+	}
+	return tiles
+}
+
+// computes border and interior nodes of graph tile
+func GetBorderNodes(graph *TiledGraph, tile_id int16) (Array[int32], Array[int32]) {
+	border := NewList[int32](100)
+	interior := NewList[int32](100)
+	for id, tile := range graph.node_tiles {
+		if tile != tile_id {
+			continue
+		}
+		iter := graph.GetAdjacentEdges(int32(id), BACKWARD)
+		is_border := false
+		for {
+			ref, ok := iter.Next()
+			if !ok {
+				break
+			}
+			if ref.IsCrossBorder() {
+				border.Add(int32(id))
+				is_border = true
+				break
+			}
+		}
+		if !is_border {
+			interior.Add(int32(id))
+		}
+	}
+	return Array[int32](border), Array[int32](interior)
+}
+
+func CalcFullSPT(graph *TiledGraph, start int32, flags Dict[int32, _Flag]) {
+	weight := graph.GetWeighting()
+
+	heap := NewPriorityQueue[int32, int32](10)
+
+	flags[start] = _Flag{pathlength: 0, visited: false, prevEdge: -1}
+	heap.Enqueue(start, 0)
+
+	for {
+		curr_id, ok := heap.Dequeue()
+		if !ok {
+			break
+		}
+		curr_flag := flags[curr_id]
+		if curr_flag.visited {
+			continue
+		}
+		curr_flag.visited = true
+		iter := graph.GetAdjacentEdges(curr_id, FORWARD)
+		for {
+			ref, ok := iter.Next()
+			if !ok {
+				break
+			}
+			if !ref.IsEdge() || ref.IsCrossBorder() {
+				continue
+			}
+			edge_id := ref.EdgeID
+			other_id := ref.OtherID
+			var other_flag _Flag
+			if flags.ContainsKey(other_id) {
+				other_flag = flags[other_id]
+			} else {
+				other_flag = _Flag{pathlength: 10000000, visited: false, prevEdge: -1}
+			}
+			if other_flag.visited {
+				continue
+			}
+			weight := weight.GetEdgeWeight(edge_id)
+			newlength := curr_flag.pathlength + weight
+			if newlength < other_flag.pathlength {
+				other_flag.pathlength = newlength
+				other_flag.prevEdge = edge_id
+				heap.Enqueue(other_id, newlength)
+			}
+			flags[other_id] = other_flag
+		}
+		flags[curr_id] = curr_flag
+	}
+}

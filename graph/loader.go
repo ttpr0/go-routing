@@ -28,6 +28,14 @@ func StoreTiledGraph(graph *TiledGraph, filename string) {
 	_StoreNodeTiles(graph.node_tiles, filename+"-tiles")
 }
 
+func StoreTiledGraph2(graph *TiledGraph2, filename string) {
+	_StoreNodes(graph.nodes, graph.node_refs, graph.fwd_edge_refs, graph.bwd_edge_refs, filename+"-nodes")
+	_StoreEdges(graph.edges, graph.weight, filename+"-edges")
+	_StoreGeom(graph.geom, filename+"-geom")
+	_StoreNodeTiles(graph.node_tiles, filename+"-tiles")
+	_StoreTileRanges(graph.border_nodes, graph.interior_nodes, graph.border_range_map, filename+"-tileranges")
+}
+
 func StoreCHGraph(graph *CHGraph, filename string) {
 	_StoreNodes(graph.nodes, graph.node_refs, graph.fwd_edge_refs, graph.bwd_edge_refs, filename+"-nodes")
 	_StoreEdges(graph.edges, graph.weight, filename+"-edges")
@@ -128,6 +136,34 @@ func LoadTiledGraph(file string) ITiledGraph {
 		geom:          &Geometry{node_geoms, edge_geoms},
 		weight:        &Weighting{edge_weights},
 		index:         index,
+	}
+}
+
+func LoadTiledGraph2(file string) ITiledGraph2 {
+	nodes, node_refs, fwd_edge_refs, bwd_edge_refs := _LoadNodes(file + "-nodes")
+	nodecount := nodes.Length()
+	edges, edge_weights := _LoadEdges(file + "-edges")
+	edgecount := edges.Length()
+	node_geoms, edge_geoms := _LoadGeom(file+"-geom", nodecount, edgecount)
+	node_tiles := _LoadNodeTiles(file+"-tiles", nodecount)
+	fmt.Println("start buidling index")
+	index := _BuildNodeIndex(node_geoms)
+	fmt.Println("finished building index")
+	border_nodes, interior_nodes, border_range_map := _LoadTileRanges(file + "tileranges")
+
+	return &TiledGraph2{
+		node_refs:        node_refs,
+		nodes:            nodes,
+		node_tiles:       node_tiles,
+		fwd_edge_refs:    fwd_edge_refs,
+		bwd_edge_refs:    bwd_edge_refs,
+		edges:            edges,
+		geom:             &Geometry{node_geoms, edge_geoms},
+		weight:           &Weighting{edge_weights},
+		index:            index,
+		border_nodes:     border_nodes,
+		interior_nodes:   interior_nodes,
+		border_range_map: border_range_map,
 	}
 }
 
@@ -237,6 +273,37 @@ func _StoreNodeTiles(node_tiles List[int16], filename string) {
 	tilesfile, _ := os.Create(filename)
 	defer tilesfile.Close()
 	tilesfile.Write(tilesbuffer.Bytes())
+}
+
+func _StoreTileRanges(border_nodes Dict[int16, Array[int32]], interior_nodes Dict[int16, Array[int32]], border_range_map Dict[int16, Dict[int32, Array[float32]]], filename string) {
+	tilebuffer := bytes.Buffer{}
+
+	tilecount := len(border_nodes)
+	binary.Write(&tilebuffer, binary.LittleEndian, int32(tilecount))
+
+	for tile, b_nodes := range border_nodes {
+		binary.Write(&tilebuffer, binary.LittleEndian, tile)
+		binary.Write(&tilebuffer, binary.LittleEndian, int32(len(b_nodes)))
+		for _, node := range b_nodes {
+			binary.Write(&tilebuffer, binary.LittleEndian, node)
+		}
+		i_nodes := interior_nodes[tile]
+		binary.Write(&tilebuffer, binary.LittleEndian, int32(len(i_nodes)))
+		for _, node := range i_nodes {
+			binary.Write(&tilebuffer, binary.LittleEndian, node)
+		}
+		range_map := border_range_map[tile]
+		for _, node := range b_nodes {
+			ranges := range_map[node]
+			for _, dist := range ranges {
+				binary.Write(&tilebuffer, binary.LittleEndian, dist)
+			}
+		}
+	}
+
+	rangesfile, _ := os.Create(filename)
+	defer rangesfile.Close()
+	rangesfile.Write(tilebuffer.Bytes())
 }
 
 //*******************************************
@@ -411,6 +478,58 @@ func _LoadNodeTiles(file string, nodecount int) List[int16] {
 	}
 
 	return node_tiles
+}
+
+func _LoadTileRanges(file string) (Dict[int16, Array[int32]], Dict[int16, Array[int32]], Dict[int16, Dict[int32, Array[float32]]]) {
+	_, err := os.Stat(file)
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file)
+	}
+
+	tiledata, _ := os.ReadFile(file)
+	tilereader := bytes.NewReader(tiledata)
+	var tilecount int32
+	binary.Read(tilereader, binary.LittleEndian, &tilecount)
+
+	border_nodes := NewDict[int16, Array[int32]](100)
+	interior_nodes := NewDict[int16, Array[int32]](100)
+	border_range_map := NewDict[int16, Dict[int32, Array[float32]]](100)
+
+	for i := 0; i < int(tilecount); i++ {
+		var tile int16
+		binary.Read(tilereader, binary.LittleEndian, &tile)
+		var b_node_count int32
+		binary.Read(tilereader, binary.LittleEndian, &b_node_count)
+		b_nodes := NewArray[int32](int(b_node_count))
+		for j := 0; j < int(b_node_count); j++ {
+			var node int32
+			binary.Read(tilereader, binary.LittleEndian, &node)
+			b_nodes[j] = node
+		}
+		border_nodes[tile] = b_nodes
+		var i_node_count int32
+		binary.Read(tilereader, binary.LittleEndian, &i_node_count)
+		i_nodes := NewArray[int32](int(i_node_count))
+		for j := 0; j < int(i_node_count); j++ {
+			var node int32
+			binary.Read(tilereader, binary.LittleEndian, &node)
+			i_nodes[j] = node
+		}
+		interior_nodes[tile] = i_nodes
+		range_map := NewDict[int32, Array[float32]](int(b_node_count))
+		for _, b_node := range b_nodes {
+			ranges := NewArray[float32](int(i_node_count))
+			for j, _ := range i_nodes {
+				var dist float32
+				binary.Read(tilereader, binary.LittleEndian, &dist)
+				ranges[j] = dist
+			}
+			range_map[b_node] = ranges
+		}
+		border_range_map[tile] = range_map
+	}
+
+	return border_nodes, interior_nodes, border_range_map
 }
 
 func _LoadCHLevels(file string, nodecount int) List[int16] {
