@@ -30,7 +30,7 @@ func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, supply_locs, demand_locs [][2]
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
 		go func() {
-			spt := routing.NewSPT2(g)
+			spt := routing.NewSPT3(g)
 			for {
 				if len(facility_chan) == 0 {
 					break
@@ -42,14 +42,14 @@ func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, supply_locs, demand_locs [][2]
 				if !ok {
 					continue
 				}
-				active_tiles := NewDict[int16, bool](10)
 				spt.Init(id, float64(max_range))
 				spt.CalcSPT()
 				flags := spt.GetSPT()
-				active_tiles[-1] = true
+				active_tiles := spt.GetActiveTiles()
 
 				for tile, _ := range active_tiles {
 					for _, border_node := range g.GetBorderNodes(tile) {
+						b_range := float32(flags[border_node].PathLength)
 						iter := g.GetTileRanges(tile, border_node)
 						for {
 							item, ok := iter.Next()
@@ -61,8 +61,13 @@ func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, supply_locs, demand_locs [][2]
 								continue
 							}
 							dist := item.B
+							if dist == 1000000 {
+								continue
+							}
 							flag := flags[node]
-							flag.PathLength = float64(dist)
+							if flag.PathLength > float64(b_range+dist) {
+								flag.PathLength = float64(b_range + dist)
+							}
 							flag.Visited = true
 							flags[node] = flag
 						}

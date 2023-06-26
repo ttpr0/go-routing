@@ -149,7 +149,7 @@ func LoadTiledGraph2(file string) ITiledGraph2 {
 	fmt.Println("start buidling index")
 	index := _BuildNodeIndex(node_geoms)
 	fmt.Println("finished building index")
-	border_nodes, interior_nodes, border_range_map := _LoadTileRanges(file + "tileranges")
+	border_nodes, interior_nodes, border_range_map := _LoadTileRanges(file + "-tileranges")
 
 	return &TiledGraph2{
 		node_refs:        node_refs,

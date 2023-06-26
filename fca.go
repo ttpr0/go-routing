@@ -15,6 +15,7 @@ type FCARequest struct {
 	FacilityLocations   [][2]float32 `json:"facility_locations"`
 	FacilityCapacities  []float32    `json:"facility_capacities"`
 	MaxRange            float64      `json:"max_range"`
+	Mode                string       `json:"mode"`
 }
 
 type FCAResponse struct {
@@ -29,7 +30,14 @@ func HandleFCARequest(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err.Error())
 	}
 
-	res := access.CalcEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
+	var res []float32
+	if req.Mode == "tiled" {
+		fmt.Println("run tiled fca")
+		res = access.CalcTiledEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
+	} else {
+		fmt.Println("run default fca")
+		res = access.CalcEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
+	}
 
 	resp := FCAResponse{Access: res}
 	data, _ = json.Marshal(resp)

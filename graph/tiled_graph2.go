@@ -131,6 +131,8 @@ func (self *BorderRangeIterator) Next() (Tuple[int32, float32], bool) {
 		var t Tuple[int32, float32]
 		return t, false
 	}
+	node := self.nodes[self.state]
+	dist := self.ranges[self.state]
 	self.state += 1
-	return MakeTuple(self.nodes[self.state], self.ranges[self.state]), true
+	return MakeTuple(node, dist), true
 }

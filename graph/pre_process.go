@@ -224,7 +224,8 @@ func TransformToTiled2(graph *TiledGraph) *TiledGraph2 {
 	border_nodes := NewDict[int16, Array[int32]](len(tiles))
 	interior_nodes := NewDict[int16, Array[int32]](len(tiles))
 	border_range_map := NewDict[int16, Dict[int32, Array[float32]]](len(tiles))
-	for _, tile := range tiles {
+	for index, tile := range tiles {
+		fmt.Println("Process Tile:", index, "/", len(tiles))
 		b_nodes, i_nodes := GetBorderNodes(graph, tile)
 		border_nodes[tile] = b_nodes
 		interior_nodes[tile] = i_nodes
@@ -242,6 +243,7 @@ func TransformToTiled2(graph *TiledGraph) *TiledGraph2 {
 					ranges[i] = 1000000
 				}
 			}
+			range_map[b_node] = ranges
 		}
 		border_range_map[tile] = range_map
 	}
