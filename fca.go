@@ -33,7 +33,10 @@ func HandleFCARequest(w http.ResponseWriter, r *http.Request) {
 	var res []float32
 	if req.Mode == "tiled" {
 		fmt.Println("run tiled fca")
-		res = access.CalcTiledEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
+		res = access.CalcEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
+	} else if req.Mode == "ch" {
+		fmt.Println("run ch fca")
+		res = access.CalcRPHASTEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
 	} else {
 		fmt.Println("run default fca")
 		res = access.CalcEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
