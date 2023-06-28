@@ -116,9 +116,18 @@ func SortNodesByLevel(g *CHGraph) {
 	sort.SliceStable(indices, func(i, j int) bool {
 		return indices[i].B > indices[j].B
 	})
-	rev_indices := NewArray[int32](int(g.NodeCount()))
-	for i := 0; i < int(g.NodeCount()); i++ {
-		rev_indices[indices[i].A] = int32(i)
+	order := NewArray[int32](len(indices))
+	for i, index := range indices {
+		order[i] = index.A
+	}
+
+	ReorderNodes(g, order)
+}
+
+func ReorderNodes(g *CHGraph, order Array[int32]) {
+	mapping := NewArray[int32](len(order))
+	for new_id, id := range order {
+		mapping[int(id)] = int32(new_id)
 	}
 
 	node_refs := NewList[NodeRef](g.node_refs.Length())
@@ -127,14 +136,10 @@ func SortNodesByLevel(g *CHGraph) {
 	fwd_edge_refs := NewList[EdgeRef](g.fwd_edge_refs.Length())
 	bwd_edge_refs := NewList[EdgeRef](g.bwd_edge_refs.Length())
 	node_geom := NewList[geo.Coord](g.nodes.Length())
-	edges := NewList[Edge](g.edges.Length())
-	shortcuts := NewList[CHShortcut](g.shortcuts.Length())
 
 	fwd_start := 0
 	bwd_start := 0
-	for i := 0; i < g.nodes.Length(); i++ {
-		index := indices[i].A
-
+	for _, index := range order {
 		fwd_count := 0
 		fwd_edges := g.GetAdjacentEdges(index, FORWARD)
 		for {
@@ -142,7 +147,7 @@ func SortNodesByLevel(g *CHGraph) {
 			if !ok {
 				break
 			}
-			ref.OtherID = rev_indices[ref.OtherID]
+			ref.OtherID = mapping[ref.OtherID]
 			fwd_edge_refs.Add(ref)
 			fwd_count += 1
 		}
@@ -154,7 +159,7 @@ func SortNodesByLevel(g *CHGraph) {
 			if !ok {
 				break
 			}
-			ref.OtherID = rev_indices[ref.OtherID]
+			ref.OtherID = mapping[ref.OtherID]
 			bwd_edge_refs.Add(ref)
 			bwd_count += 1
 		}
@@ -172,15 +177,16 @@ func SortNodesByLevel(g *CHGraph) {
 		fwd_start += fwd_count
 		bwd_start += bwd_count
 	}
-	for _, edge := range g.edges {
-		edge.NodeA = rev_indices[edge.NodeA]
-		edge.NodeB = rev_indices[edge.NodeB]
-		edges.Add(edge)
+
+	for i, edge := range g.edges {
+		edge.NodeA = mapping[edge.NodeA]
+		edge.NodeB = mapping[edge.NodeB]
+		g.edges[i] = edge
 	}
-	for _, shc := range g.shortcuts {
-		shc.NodeA = rev_indices[shc.NodeA]
-		shc.NodeB = rev_indices[shc.NodeB]
-		shortcuts.Add(shc)
+	for i, shc := range g.shortcuts {
+		shc.NodeA = mapping[shc.NodeA]
+		shc.NodeB = mapping[shc.NodeB]
+		g.shortcuts[i] = shc
 	}
 
 	g.node_refs = node_refs
@@ -188,8 +194,6 @@ func SortNodesByLevel(g *CHGraph) {
 	g.node_levels = node_levels
 	g.fwd_edge_refs = fwd_edge_refs
 	g.bwd_edge_refs = bwd_edge_refs
-	g.edges = edges
-	g.shortcuts = shortcuts
 	geom := g.geom.(*Geometry)
 	geom.NodeGeometry = node_geom
 	g.geom = geom
