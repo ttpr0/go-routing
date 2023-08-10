@@ -10,10 +10,10 @@ import (
 
 func CalcRPHASTEnhanced2SFCA(g graph.ICHGraph, supply_locs, demand_locs [][2]float32, supply_weights, demand_weights []float32, max_range float32) []float32 {
 	node_queue := NewQueue[int32]()
-
+	index := g.GetIndex()
 	population_nodes := NewArray[int32](len(demand_locs))
 	for i, loc := range demand_locs {
-		id, ok := g.GetClosestNode(loc)
+		id, ok := index.GetClosestNode(loc)
 		if ok {
 			population_nodes[i] = id
 			node_queue.Push(id)
@@ -26,6 +26,7 @@ func CalcRPHASTEnhanced2SFCA(g graph.ICHGraph, supply_locs, demand_locs [][2]flo
 		facility_chan <- MakeTuple(facility, supply_weights[i])
 	}
 
+	explorer := g.GetDefaultExplorer()
 	graph_subset := NewArray[bool](int(g.NodeCount()))
 	for {
 		if node_queue.Size() == 0 {
@@ -37,7 +38,7 @@ func CalcRPHASTEnhanced2SFCA(g graph.ICHGraph, supply_locs, demand_locs [][2]flo
 		}
 		graph_subset[node] = true
 		node_level := g.GetNodeLevel(node)
-		edges := g.GetAdjacentEdges(node, graph.BACKWARD)
+		edges := explorer.GetAdjacentEdges(node, graph.BACKWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -66,7 +67,7 @@ func CalcRPHASTEnhanced2SFCA(g graph.ICHGraph, supply_locs, demand_locs [][2]flo
 				temp := <-facility_chan
 				facility := temp.A
 				weight := temp.B
-				id, ok := g.GetClosestNode(facility)
+				id, ok := index.GetClosestNode(facility)
 				if !ok {
 					continue
 				}

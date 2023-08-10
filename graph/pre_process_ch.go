@@ -21,12 +21,14 @@ type DynamicNodeRef struct {
 //*******************************************
 
 func TransformToDynamicGraph(g *Graph) *DynamicGraph {
-	node_refs := NewList[DynamicNodeRef](g.node_refs.Length())
-	node_levels := NewList[int16](g.node_refs.Length())
-	for i := 0; i < g.nodes.Length(); i++ {
+	node_refs := NewList[DynamicNodeRef](g.topology.node_refs.Length())
+	node_levels := NewList[int16](g.topology.node_refs.Length())
+
+	explorer := g.GetDefaultExplorer()
+	for i := 0; i < g.nodes.NodeCount(); i++ {
 		fwd_refs := NewList[EdgeRef](4)
 		bwd_refs := NewList[EdgeRef](4)
-		fwd_edges := g.GetAdjacentEdges(int32(i), FORWARD)
+		fwd_edges := explorer.GetAdjacentEdges(int32(i), FORWARD)
 		for {
 			ref, ok := fwd_edges.Next()
 			if !ok {
@@ -34,7 +36,7 @@ func TransformToDynamicGraph(g *Graph) *DynamicGraph {
 			}
 			fwd_refs.Add(ref)
 		}
-		bwd_edges := g.GetAdjacentEdges(int32(i), BACKWARD)
+		bwd_edges := explorer.GetAdjacentEdges(int32(i), BACKWARD)
 		for {
 			ref, ok := bwd_edges.Next()
 			if !ok {
@@ -52,12 +54,12 @@ func TransformToDynamicGraph(g *Graph) *DynamicGraph {
 
 	dg := DynamicGraph{
 		node_refs:   node_refs,
-		nodes:       g.nodes,
-		node_levels: node_levels,
-		edges:       g.edges,
+		nodes:       g.nodes.nodes,
+		node_levels: Array[int16](node_levels),
+		edges:       g.edges.edges,
 		shortcuts:   NewList[CHShortcut](100),
-		geom:        g.geom,
-		weight:      g.weight.(*Weighting).EdgeWeight,
+		geom:        &g.geom,
+		weight:      g.weight.edge_weights,
 		sh_weight:   NewList[int32](100),
 		index:       g.index,
 	}
@@ -99,17 +101,15 @@ func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 	}
 
 	g := CHGraph{
-		node_refs:     node_refs,
-		nodes:         dg.nodes,
-		node_levels:   dg.node_levels,
-		fwd_edge_refs: fwd_edge_refs,
-		bwd_edge_refs: bwd_edge_refs,
-		edges:         dg.edges,
-		shortcuts:     dg.shortcuts,
-		geom:          dg.geom,
-		weight:        &Weighting{dg.weight},
-		sh_weight:     &Weighting{dg.sh_weight},
-		index:         dg.index,
+		nodes:       NodeStore{nodes: dg.nodes},
+		edges:       EdgeStore{edges: dg.edges},
+		topology:    TopologyStore{node_refs: node_refs, fwd_edge_refs: fwd_edge_refs, bwd_edge_refs: bwd_edge_refs},
+		shortcuts:   CHShortcutStore{Array[CHShortcut](dg.shortcuts)},
+		node_levels: CHLevelStore{dg.node_levels},
+		geom:        *dg.geom.(*GeometryStore),
+		weight:      DefaultWeighting{dg.weight},
+		sh_weight:   DefaultWeighting{dg.sh_weight},
+		index:       dg.index,
 	}
 
 	return &g
@@ -121,9 +121,9 @@ func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 
 type DynamicGraph struct {
 	node_refs   List[DynamicNodeRef]
-	nodes       List[Node]
-	node_levels List[int16]
-	edges       List[Edge]
+	nodes       Array[Node]
+	node_levels Array[int16]
+	edges       Array[Edge]
 	shortcuts   List[CHShortcut]
 	geom        IGeometry
 	weight      List[int32]
@@ -161,13 +161,13 @@ func (self *DynamicGraph) GetAdjacentEdges(node int32, direction Direction) IIte
 		return &EdgeRefIterator{
 			state:     0,
 			end:       len(n.FWDEdgeRefs),
-			edge_refs: &n.FWDEdgeRefs,
+			edge_refs: Array[EdgeRef](n.FWDEdgeRefs),
 		}
 	} else {
 		return &EdgeRefIterator{
 			state:     0,
 			end:       len(n.BWDEdgeRefs),
-			edge_refs: &n.BWDEdgeRefs,
+			edge_refs: Array[EdgeRef](n.BWDEdgeRefs),
 		}
 	}
 }
@@ -266,7 +266,6 @@ func (self *DynamicGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int32
 		EdgeID:  int32(shc_id),
 		_Type:   100,
 		OtherID: node_b,
-		Weight:  weight,
 	})
 	self.node_refs[node_a] = node
 	node = self.node_refs[node_b]
@@ -274,14 +273,13 @@ func (self *DynamicGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int32
 		EdgeID:  int32(shc_id),
 		_Type:   100,
 		OtherID: node_a,
-		Weight:  weight,
 	})
 	self.node_refs[node_b] = node
 }
 func (self *DynamicGraph) GetWeightBetween(from, to int32) int32 {
 	for _, ref := range self.node_refs[from].FWDEdgeRefs {
 		if ref.OtherID == to {
-			return ref.Weight
+			return self.sh_weight[int(ref.EdgeID)]
 		}
 	}
 	return -1

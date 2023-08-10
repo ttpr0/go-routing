@@ -9,9 +9,10 @@ import (
 )
 
 func CalcEnhanced2SFCA(g graph.IGraph, supply_locs, demand_locs [][2]float32, supply_weights, demand_weights []float32, max_range float32) []float32 {
+	index := g.GetIndex()
 	population_nodes := NewArray[int32](len(demand_locs))
 	for i, loc := range demand_locs {
-		id, ok := g.GetClosestNode(loc)
+		id, ok := index.GetClosestNode(loc)
 		if ok {
 			population_nodes[i] = id
 		} else {
@@ -36,7 +37,7 @@ func CalcEnhanced2SFCA(g graph.IGraph, supply_locs, demand_locs [][2]float32, su
 				temp := <-facility_chan
 				facility := temp.A
 				weight := temp.B
-				id, ok := g.GetClosestNode(facility)
+				id, ok := index.GetClosestNode(facility)
 				if !ok {
 					continue
 				}

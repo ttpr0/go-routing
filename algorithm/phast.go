@@ -12,6 +12,8 @@ type _FlagPH struct {
 }
 
 func CalcPHAST(g graph.ICHGraph, start int32) {
+	weight := g.GetWeighting()
+
 	flags := make([]_FlagPH, g.NodeCount())
 	for i := 0; i < len(flags); i++ {
 		flags[i].path_length = 1000000000
@@ -20,6 +22,8 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 
 	heap := NewPriorityQueue[int32, int32](100)
 	heap.Enqueue(start, 0)
+
+	explorer := g.GetDefaultExplorer()
 
 	for {
 		curr_id, ok := heap.Dequeue()
@@ -32,7 +36,7 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 			continue
 		}
 		curr_flag.visited = true
-		edges := g.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -47,7 +51,7 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 			if other_flag.visited {
 				continue
 			}
-			new_length := curr_flag.path_length + ref.Weight
+			new_length := curr_flag.path_length + weight.GetEdgeWeight(ref.EdgeID)
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
@@ -60,7 +64,7 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 
 	for i := 0; i < len(flags); i++ {
 		curr_len := flags[i].path_length
-		edges := g.GetAdjacentEdges(int32(i), graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(int32(i), graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -71,8 +75,8 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 				continue
 			}
 			other_flag := flags[other_id]
-			if other_flag.path_length > (curr_len + ref.Weight) {
-				other_flag.path_length = curr_len + ref.Weight
+			if other_flag.path_length > (curr_len + weight.GetEdgeWeight(ref.EdgeID)) {
+				other_flag.path_length = curr_len + weight.GetEdgeWeight(ref.EdgeID)
 				flags[other_id] = other_flag
 			}
 		}

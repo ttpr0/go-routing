@@ -27,8 +27,8 @@ func GetClosestNode2(point geo.Coord, graph graph.IGraph) int32 {
 }
 
 func GetClosestNode(point geo.Coord, graph graph.IGraph) int32 {
-	index := graph.GetNodeIndex()
-	id, _ := index.GetClosest(point[:], 0.005)
+	index := graph.GetIndex()
+	id, _ := index.GetClosestNode(point)
 	return id
 }
 

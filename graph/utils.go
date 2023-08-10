@@ -24,9 +24,10 @@ func LoadOrCreate(graph_path string, osm_file string, partition_file string) ITi
 		file_str, _ := os.ReadFile(partition_file)
 		collection := geo.FeatureCollection{}
 		_ = json.Unmarshal(file_str, &collection)
-		g.index = _BuildNodeIndex(g.geom.GetAllNodes())
+		g.index = BuildNodeIndex(g.geom.GetAllNodes())
 
-		tg := PreprocessTiledGraph(g, collection.Features())
+		tiles := CalcNodeTiles(g.GetGeometry(), collection.Features())
+		tg := PreprocessTiledGraph(g, tiles)
 
 		StoreTiledGraph(tg, graph_path)
 
@@ -36,16 +37,26 @@ func LoadOrCreate(graph_path string, osm_file string, partition_file string) ITi
 	}
 }
 
+func BuildNodeIndex(node_geoms List[geo.Coord]) KDTree[int32] {
+	tree := NewKDTree[int32](2)
+	for i := 0; i < node_geoms.Length(); i++ {
+		geom := node_geoms[i]
+		tree.Insert(geom[:], int32(i))
+	}
+	return tree
+}
+
 func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollection) {
 	geom := graph.GetGeometry()
 	edge_types := make([]int16, int(graph.EdgeCount()))
-	for i := 0; i < graph.fwd_edge_refs.Length(); i++ {
-		edge_ref := graph.fwd_edge_refs[i]
+	for i := 0; i < graph.topology.fwd_edge_refs.Length(); i++ {
+		edge_ref := graph.topology.fwd_edge_refs[i]
 		edge_types[edge_ref.EdgeID] = int16(edge_ref._Type)
 	}
 
 	edges := NewList[geo.Feature](int(graph.EdgeCount()))
-	for i, edge := range graph.edges {
+	for i := 0; i < graph.edges.EdgeCount(); i++ {
+		edge := graph.GetEdge(int32(i))
 		if i%1000 == 0 {
 			fmt.Println("edge ", i)
 		}
@@ -54,24 +65,25 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 	}
 
 	nodes := NewList[geo.Feature](int(graph.NodeCount()))
-	for i, node := range graph.node_refs {
+	for i, node := range graph.topology.node_refs {
 		if i%1000 == 0 {
 			fmt.Println("node ", i)
 		}
 		e := NewList[int32](3)
 		for j := 0; j < int(node.EdgeRefFWDCount); j++ {
-			e.Add(graph.fwd_edge_refs[int(node.EdgeRefFWDStart)+j].EdgeID)
+			e.Add(graph.topology.fwd_edge_refs[int(node.EdgeRefFWDStart)+j].EdgeID)
 		}
 		point := geo.NewPoint(geom.GetNode(int32(i)))
-		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.EdgeRefFWDCount, "edges": e, "tile": graph.node_tiles[i]}))
+		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.EdgeRefFWDCount, "edges": e, "tile": graph.node_tiles.GetNodeTile(int32(i))}))
 	}
 
 	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)
 }
 
 func CheckGraph(g IGraph) {
+	explorer := g.GetDefaultExplorer()
 	for i := 0; i < int(g.NodeCount()); i++ {
-		adj_edges := g.GetAdjacentEdges(int32(i), FORWARD)
+		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD)
 		for {
 			ref, ok := adj_edges.Next()
 			if !ok {
@@ -88,7 +100,7 @@ func CheckGraph(g IGraph) {
 				fmt.Println("error 84")
 			}
 		}
-		adj_edges = g.GetAdjacentEdges(int32(i), BACKWARD)
+		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD)
 		for {
 			ref, ok := adj_edges.Next()
 			if !ok {
@@ -111,7 +123,7 @@ func CheckGraph(g IGraph) {
 func SortNodesByLevel(g *CHGraph) {
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), g.node_levels[i]))
+		indices.Add(MakeTuple(int32(i), g.node_levels.GetNodeLevel(int32(i))))
 	}
 	sort.SliceStable(indices, func(i, j int) bool {
 		return indices[i].B > indices[j].B
@@ -121,80 +133,22 @@ func SortNodesByLevel(g *CHGraph) {
 		order[i] = index.A
 	}
 
-	ReorderNodes(g, order)
-}
-
-func ReorderNodes(g *CHGraph, order Array[int32]) {
 	mapping := NewArray[int32](len(order))
 	for new_id, id := range order {
 		mapping[int(id)] = int32(new_id)
 	}
 
-	node_refs := NewList[NodeRef](g.node_refs.Length())
-	nodes := NewList[Node](g.nodes.Length())
-	node_levels := NewList[int16](g.node_levels.Length())
-	fwd_edge_refs := NewList[EdgeRef](g.fwd_edge_refs.Length())
-	bwd_edge_refs := NewList[EdgeRef](g.bwd_edge_refs.Length())
-	node_geom := NewList[geo.Coord](g.nodes.Length())
+	ReorderCHGraph(g, mapping)
+}
 
-	fwd_start := 0
-	bwd_start := 0
-	for _, index := range order {
-		fwd_count := 0
-		fwd_edges := g.GetAdjacentEdges(index, FORWARD)
-		for {
-			ref, ok := fwd_edges.Next()
-			if !ok {
-				break
-			}
-			ref.OtherID = mapping[ref.OtherID]
-			fwd_edge_refs.Add(ref)
-			fwd_count += 1
-		}
-
-		bwd_count := 0
-		bwd_edges := g.GetAdjacentEdges(index, BACKWARD)
-		for {
-			ref, ok := bwd_edges.Next()
-			if !ok {
-				break
-			}
-			ref.OtherID = mapping[ref.OtherID]
-			bwd_edge_refs.Add(ref)
-			bwd_count += 1
-		}
-
-		node_levels.Add(g.node_levels[index])
-		node_geom.Add(g.geom.GetNode(index))
-		nodes.Add(g.nodes[index])
-		node_refs.Add(NodeRef{
-			EdgeRefFWDStart: int32(fwd_start),
-			EdgeRefFWDCount: int16(fwd_count),
-			EdgeRefBWDStart: int32(bwd_start),
-			EdgeRefBWDCount: int16(bwd_count),
-		})
-
-		fwd_start += fwd_count
-		bwd_start += bwd_count
-	}
-
-	for i, edge := range g.edges {
-		edge.NodeA = mapping[edge.NodeA]
-		edge.NodeB = mapping[edge.NodeB]
-		g.edges[i] = edge
-	}
-	for i, shc := range g.shortcuts {
-		shc.NodeA = mapping[shc.NodeA]
-		shc.NodeB = mapping[shc.NodeB]
-		g.shortcuts[i] = shc
-	}
-
-	g.node_refs = node_refs
-	g.nodes = nodes
-	g.node_levels = node_levels
-	g.fwd_edge_refs = fwd_edge_refs
-	g.bwd_edge_refs = bwd_edge_refs
-	geom := g.geom.(*Geometry)
-	geom.NodeGeometry = node_geom
-	g.geom = geom
+func ReorderCHGraph(g *CHGraph, node_mapping Array[int32]) {
+	g.nodes._ReorderNodes(node_mapping)
+	g.edges._ReorderNodes(node_mapping)
+	g.node_levels._ReorderNodes(node_mapping)
+	g.shortcuts._ReorderNodes(node_mapping)
+	g.topology._ReorderNodes(node_mapping)
+	g.geom._ReorderNodes(node_mapping)
+	g.weight._ReorderNodes(node_mapping)
+	g.sh_weight._ReorderNodes(node_mapping)
+	g.index = BuildNodeIndex(g.geom.GetAllNodes())
 }

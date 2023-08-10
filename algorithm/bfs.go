@@ -21,6 +21,8 @@ func CalcBreathFirstSearch(g graph.IGraph, start int32) {
 	queue := util.NewQueue[int32]()
 	queue.Push(start)
 
+	explorer := g.GetDefaultExplorer()
+
 	for {
 		curr_id, ok := queue.Pop()
 		if !ok {
@@ -32,7 +34,7 @@ func CalcBreathFirstSearch(g graph.IGraph, start int32) {
 			continue
 		}
 		curr_flag.visited = true
-		edges := g.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

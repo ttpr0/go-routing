@@ -57,6 +57,8 @@ func NewBidirectAStar(graph graph.IGraph, start, end int32) *BidirectAStar {
 }
 
 func (self *BidirectAStar) CalcShortestPath() bool {
+	explorer := self.graph.GetDefaultExplorer()
+
 	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
 	finished := false
 	for !finished {
@@ -68,7 +70,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited1 = true
-		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -121,7 +123,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited2 = true
-		edges = self.graph.GetAdjacentEdges(curr_id, graph.BACKWARD)
+		edges = explorer.GetAdjacentEdges(curr_id, graph.BACKWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -168,6 +170,8 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 }
 
 func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
+	explorer := self.graph.GetDefaultExplorer()
+
 	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
 	for c := 0; c < count; c++ {
 		curr_id, _ := self.startheap.Dequeue()
@@ -181,7 +185,7 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 			return false
 		}
 		curr_flag.visited1 = true
-		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -234,7 +238,7 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 			return false
 		}
 		curr_flag.visited2 = true
-		edges = self.graph.GetAdjacentEdges(curr_id, graph.BACKWARD)
+		edges = explorer.GetAdjacentEdges(curr_id, graph.BACKWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -280,6 +284,8 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 }
 
 func (self *BidirectAStar) GetShortestPath() Path {
+	explorer := self.graph.GetDefaultExplorer()
+
 	path := make([]int32, 0, 10)
 	curr_id := self.mid_id
 	var edge int32
@@ -289,7 +295,7 @@ func (self *BidirectAStar) GetShortestPath() Path {
 		}
 		edge = self.flags[curr_id].prev_edge1
 		path = append(path, edge)
-		curr_id, _ = self.graph.GetOtherNode(edge, curr_id)
+		curr_id = explorer.GetOtherNode(graph.CreateEdgeRef(edge), curr_id)
 	}
 	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
 		path[i], path[j] = path[j], path[i]
@@ -301,7 +307,7 @@ func (self *BidirectAStar) GetShortestPath() Path {
 		}
 		edge = self.flags[curr_id].prev_edge2
 		path = append(path, edge)
-		curr_id, _ = self.graph.GetOtherNode(edge, curr_id)
+		curr_id = explorer.GetOtherNode(graph.CreateEdgeRef(edge), curr_id)
 	}
 	return NewPath(self.graph, path)
 }

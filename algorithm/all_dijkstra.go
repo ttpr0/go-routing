@@ -12,6 +12,8 @@ type _FlagD struct {
 }
 
 func CalcAllDijkstra(g graph.IGraph, start int32) {
+	weight := g.GetWeighting()
+
 	flags := make([]_FlagD, g.NodeCount())
 	for i := 0; i < len(flags); i++ {
 		flags[i].path_length = 1000000000
@@ -20,6 +22,8 @@ func CalcAllDijkstra(g graph.IGraph, start int32) {
 
 	heap := NewPriorityQueue[int32, int32](100)
 	heap.Enqueue(start, 0)
+
+	explorer := g.GetDefaultExplorer()
 
 	for {
 		curr_id, ok := heap.Dequeue()
@@ -32,7 +36,7 @@ func CalcAllDijkstra(g graph.IGraph, start int32) {
 			continue
 		}
 		curr_flag.visited = true
-		edges := g.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -48,7 +52,7 @@ func CalcAllDijkstra(g graph.IGraph, start int32) {
 			if other_flag.visited {
 				continue
 			}
-			new_length := curr_flag.path_length + ref.Weight
+			new_length := curr_flag.path_length + weight.GetEdgeWeight(ref.EdgeID)
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length

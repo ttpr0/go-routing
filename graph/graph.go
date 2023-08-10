@@ -8,94 +8,110 @@ import (
 type IGraph interface {
 	GetGeometry() IGeometry
 	GetWeighting() IWeighting
-	GetOtherNode(edge, node int32) (int32, Direction)
-	GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef]
-	ForEachEdge(node int32, f func(int32))
+	GetDefaultExplorer() IGraphExplorer
+	GetGraphExplorer(weighting IWeighting) IGraphExplorer
 	NodeCount() int32
 	EdgeCount() int32
 	IsNode(node int32) bool
 	GetNode(node int32) Node
 	GetEdge(edge int32) Edge
-	GetNodeIndex() KDTree[int32]
+	GetIndex() IGraphIndex
+}
+
+type IGraphExplorer interface {
+	GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef]
+	GetEdgeWeight(edge EdgeRef) int32
+	GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32
+	GetOtherNode(edge EdgeRef, node int32) int32
+}
+
+type IGraphIndex interface {
 	GetClosestNode(point geo.Coord) (int32, bool)
 }
 
 type Graph struct {
-	node_refs     List[NodeRef]
-	nodes         List[Node]
-	fwd_edge_refs List[EdgeRef]
-	bwd_edge_refs List[EdgeRef]
-	edges         List[Edge]
-	geom          IGeometry
-	weight        IWeighting
-	index         KDTree[int32]
+	nodes    NodeStore
+	edges    EdgeStore
+	topology TopologyStore
+	geom     GeometryStore
+	weight   DefaultWeighting
+	index    KDTree[int32]
 }
 
 func (self *Graph) GetGeometry() IGeometry {
-	return self.geom
+	return &self.geom
 }
 func (self *Graph) GetWeighting() IWeighting {
-	return self.weight
+	return &self.weight
 }
-func (self *Graph) GetOtherNode(edge, node int32) (int32, Direction) {
-	e := self.edges[edge]
-	if node == e.NodeA {
-		return e.NodeB, FORWARD
-	}
-	if node == e.NodeB {
-		return e.NodeA, BACKWARD
-	}
-	return -1, 0
-}
-func (self *Graph) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
-	n := self.node_refs[node]
-	if direction == FORWARD {
-		return &EdgeRefIterator{
-			state:     int(n.EdgeRefFWDStart),
-			end:       int(n.EdgeRefFWDStart) + int(n.EdgeRefFWDCount),
-			edge_refs: &self.fwd_edge_refs,
-		}
-	} else {
-		return &EdgeRefIterator{
-			state:     int(n.EdgeRefBWDStart),
-			end:       int(n.EdgeRefBWDStart) + int(n.EdgeRefBWDCount),
-			edge_refs: &self.bwd_edge_refs,
-		}
+func (self *Graph) GetDefaultExplorer() IGraphExplorer {
+	return &BaseGraphExplorer{
+		graph:  self,
+		weight: &self.weight,
 	}
 }
-func (self *Graph) ForEachEdge(node int32, f func(int32)) {
-
+func (self *Graph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
+	return &BaseGraphExplorer{
+		graph:  self,
+		weight: weighting,
+	}
 }
 func (self *Graph) NodeCount() int32 {
-	return int32(len(self.nodes))
+	return int32(self.nodes.NodeCount())
 }
 func (self *Graph) EdgeCount() int32 {
-	return int32(len(self.edges))
+	return int32(self.edges.EdgeCount())
 }
 func (self *Graph) IsNode(node int32) bool {
-	if node < int32(len(self.nodes)) {
-		return true
-	} else {
-		return false
-	}
+	return self.nodes.IsNode(node)
 }
 func (self *Graph) GetNode(node int32) Node {
-	return self.nodes[node]
+	return self.nodes.GetNode(node)
 }
 func (self *Graph) GetEdge(edge int32) Edge {
-	return self.edges[edge]
+	return self.edges.GetEdge(edge)
 }
-func (self *Graph) GetNodeIndex() KDTree[int32] {
-	return self.index
+func (self *Graph) GetIndex() IGraphIndex {
+	return &BaseGraphIndex{
+		index: self.index,
+	}
 }
-func (self *Graph) GetClosestNode(point geo.Coord) (int32, bool) {
-	return self.index.GetClosest(point[:], 0.005)
+
+type BaseGraphExplorer struct {
+	graph  *Graph
+	weight IWeighting
+}
+
+func (self *BaseGraphExplorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
+	start, count := self.graph.topology.GetNodeRef(node, direction)
+	edge_refs := self.graph.topology.GetEdgeRefs(direction)
+	return &EdgeRefIterator{
+		state:     int(start),
+		end:       int(start) + int(count),
+		edge_refs: edge_refs,
+	}
+}
+func (self *BaseGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
+	return self.weight.GetEdgeWeight(edge.EdgeID)
+}
+func (self *BaseGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
+	return self.weight.GetTurnCost(from.EdgeID, via, to.EdgeID)
+}
+func (self *BaseGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
+	e := self.graph.GetEdge(edge.EdgeID)
+	if node == e.NodeA {
+		return e.NodeB
+	}
+	if node == e.NodeB {
+		return e.NodeA
+	}
+	return -1
 }
 
 type EdgeRefIterator struct {
 	state     int
 	end       int
-	edge_refs *List[EdgeRef]
+	edge_refs Array[EdgeRef]
 }
 
 func (self *EdgeRefIterator) Next() (EdgeRef, bool) {
@@ -105,4 +121,12 @@ func (self *EdgeRefIterator) Next() (EdgeRef, bool) {
 	}
 	self.state += 1
 	return self.edge_refs.Get(self.state - 1), true
+}
+
+type BaseGraphIndex struct {
+	index KDTree[int32]
+}
+
+func (self *BaseGraphIndex) GetClosestNode(point geo.Coord) (int32, bool) {
+	return self.index.GetClosest(point[:], 0.005)
 }

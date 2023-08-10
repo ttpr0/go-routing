@@ -47,6 +47,8 @@ func (self *RPHAST) Init(start int32, max_range float64) {
 	self.flags[start].PathLength = 0
 }
 func (self *RPHAST) CalcSPT() {
+	explorer := self.graph.GetDefaultExplorer()
+
 	for {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -58,7 +60,7 @@ func (self *RPHAST) CalcSPT() {
 			continue
 		}
 		curr_flag.Visited = true
-		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -73,7 +75,7 @@ func (self *RPHAST) CalcSPT() {
 			if other_flag.Visited {
 				continue
 			}
-			new_length := curr_flag.PathLength + float64(ref.Weight)
+			new_length := curr_flag.PathLength + float64(self.weight.GetEdgeWeight(ref.EdgeID))
 			if other_flag.PathLength > new_length {
 				other_flag.PrevEdge = edge_id
 				other_flag.PathLength = new_length
@@ -89,7 +91,7 @@ func (self *RPHAST) CalcSPT() {
 		if curr_len > self.max_range {
 			continue
 		}
-		edges := self.graph.GetAdjacentEdges(int32(i), graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(int32(i), graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -103,8 +105,8 @@ func (self *RPHAST) CalcSPT() {
 				continue
 			}
 			other_flag := self.flags[other_id]
-			if other_flag.PathLength > (curr_len + float64(ref.Weight)) {
-				other_flag.PathLength = curr_len + float64(ref.Weight)
+			if other_flag.PathLength > (curr_len + float64(self.weight.GetEdgeWeight(ref.EdgeID))) {
+				other_flag.PathLength = curr_len + float64(self.weight.GetEdgeWeight(ref.EdgeID))
 				self.flags[other_id] = other_flag
 			}
 		}

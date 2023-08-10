@@ -9,11 +9,12 @@ import (
 )
 
 func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, supply_locs, demand_locs [][2]float32, supply_weights, demand_weights []float32, max_range float32) []float32 {
+	index := g.GetIndex()
 	population_nodes := NewArray[int32](len(demand_locs))
 	node_flag := NewArray[bool](int(g.NodeCount()))
 	node_tiles := NewDict[int16, bool](10)
 	for i, loc := range demand_locs {
-		id, ok := g.GetClosestNode(loc)
+		id, ok := index.GetClosestNode(loc)
 		if ok {
 			population_nodes[i] = id
 			node_flag[id] = true
@@ -41,7 +42,7 @@ func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, supply_locs, demand_locs [][2]
 				temp := <-facility_chan
 				facility := temp.A
 				weight := temp.B
-				id, ok := g.GetClosestNode(facility)
+				id, ok := index.GetClosestNode(facility)
 				if !ok {
 					continue
 				}

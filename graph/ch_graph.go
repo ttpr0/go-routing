@@ -1,7 +1,6 @@
 package graph
 
 import (
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
@@ -9,11 +8,9 @@ type ICHGraph interface {
 	GetGeometry() IGeometry
 	GetWeighting() IWeighting
 	GetShortcutWeighting() IWeighting
-	GetOtherNode(edge, node int32) (int32, Direction)
-	GetOtherShortcutNode(shortcut, node int32) (int32, Direction)
+	GetDefaultExplorer() IGraphExplorer
+	GetGraphExplorer(weighting IWeighting) IGraphExplorer
 	GetNodeLevel(node int32) int16
-	GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef]
-	ForEachEdge(node int32, f func(int32))
 	NodeCount() int32
 	EdgeCount() int32
 	ShortcutCount() int32
@@ -22,113 +19,79 @@ type ICHGraph interface {
 	GetEdge(edge int32) Edge
 	GetShortcut(shortcut int32) CHShortcut
 	GetEdgesFromShortcut(edges *List[int32], shortcut_id int32, reversed bool)
-	GetNodeIndex() KDTree[int32]
-	GetClosestNode(point geo.Coord) (int32, bool)
+	GetIndex() IGraphIndex
 }
 
 type CHGraph struct {
-	node_refs     List[NodeRef]
-	nodes         List[Node]
-	node_levels   List[int16]
-	fwd_edge_refs List[EdgeRef]
-	bwd_edge_refs List[EdgeRef]
-	edges         List[Edge]
-	shortcuts     List[CHShortcut]
-	geom          IGeometry
-	weight        IWeighting
-	sh_weight     IWeighting
-	index         KDTree[int32]
+	nodes       NodeStore
+	edges       EdgeStore
+	shortcuts   CHShortcutStore
+	topology    TopologyStore
+	node_levels CHLevelStore
+	geom        GeometryStore
+	weight      DefaultWeighting
+	sh_weight   DefaultWeighting
+	index       KDTree[int32]
 }
 
 func (self *CHGraph) GetGeometry() IGeometry {
-	return self.geom
+	return &self.geom
 }
 
 func (self *CHGraph) GetWeighting() IWeighting {
-	return self.weight
+	return &self.weight
 }
 
 func (self *CHGraph) GetShortcutWeighting() IWeighting {
-	return self.sh_weight
+	return &self.sh_weight
 }
 
-func (self *CHGraph) GetOtherNode(edge int32, node int32) (int32, Direction) {
-	e := self.edges[edge]
-	if node == e.NodeA {
-		return e.NodeB, FORWARD
+func (self *CHGraph) GetDefaultExplorer() IGraphExplorer {
+	return &CHGraphExplorer{
+		graph:     self,
+		weight:    &self.weight,
+		sh_weight: &self.sh_weight,
 	}
-	if node == e.NodeB {
-		return e.NodeA, BACKWARD
-	}
-	return 0, 0
 }
 
-func (self *CHGraph) GetOtherShortcutNode(shortcut int32, node int32) (int32, Direction) {
-	e := self.shortcuts[shortcut]
-	if node == e.NodeA {
-		return e.NodeB, FORWARD
+func (self *CHGraph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
+	return &CHGraphExplorer{
+		graph:     self,
+		weight:    weighting,
+		sh_weight: &self.sh_weight,
 	}
-	if node == e.NodeB {
-		return e.NodeA, BACKWARD
-	}
-	return 0, 0
 }
 
 func (self *CHGraph) GetNodeLevel(node int32) int16 {
-	return self.node_levels[node]
-}
-
-func (self *CHGraph) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
-	n := self.node_refs[node]
-	if direction == FORWARD {
-		return &EdgeRefIterator{
-			state:     int(n.EdgeRefFWDStart),
-			end:       int(n.EdgeRefFWDStart) + int(n.EdgeRefFWDCount),
-			edge_refs: &self.fwd_edge_refs,
-		}
-	} else {
-		return &EdgeRefIterator{
-			state:     int(n.EdgeRefBWDStart),
-			end:       int(n.EdgeRefBWDStart) + int(n.EdgeRefBWDCount),
-			edge_refs: &self.bwd_edge_refs,
-		}
-	}
-}
-
-func (self *CHGraph) ForEachEdge(node int32, f func(int32)) {
-	panic("not implemented") // TODO: Implement
+	return self.node_levels.GetNodeLevel(node)
 }
 
 func (self *CHGraph) NodeCount() int32 {
-	return int32(len(self.nodes))
+	return int32(self.nodes.NodeCount())
 }
 
 func (self *CHGraph) EdgeCount() int32 {
-	return int32(len(self.edges))
+	return int32(self.edges.EdgeCount())
 }
 
 func (self *CHGraph) ShortcutCount() int32 {
-	return int32(len(self.shortcuts))
+	return int32(self.shortcuts.ShortcutCount())
 }
 
 func (self *CHGraph) IsNode(node int32) bool {
-	if node < int32(len(self.nodes)) {
-		return true
-	} else {
-		return false
-	}
+	return self.nodes.IsNode(node)
 }
 
 func (self *CHGraph) GetNode(node int32) Node {
-	return self.nodes[node]
+	return self.nodes.GetNode(node)
 }
 
 func (self *CHGraph) GetEdge(edge int32) Edge {
-	return self.edges[edge]
+	return self.edges.GetEdge(edge)
 }
 
 func (self *CHGraph) GetShortcut(shortcut int32) CHShortcut {
-	return self.shortcuts[shortcut]
+	return self.shortcuts.GetShortcut(shortcut)
 }
 
 func (self *CHGraph) GetEdgesFromShortcut(edges *List[int32], shortcut_id int32, reversed bool) {
@@ -161,9 +124,55 @@ func (self *CHGraph) GetEdgesFromShortcut(edges *List[int32], shortcut_id int32,
 		}
 	}
 }
-func (self *CHGraph) GetNodeIndex() KDTree[int32] {
-	return self.index
+func (self *CHGraph) GetIndex() IGraphIndex {
+	return &BaseGraphIndex{
+		index: self.index,
+	}
 }
-func (self *CHGraph) GetClosestNode(point geo.Coord) (int32, bool) {
-	return self.index.GetClosest(point[:], 0.005)
+
+type CHGraphExplorer struct {
+	graph     *CHGraph
+	weight    IWeighting
+	sh_weight IWeighting
+}
+
+func (self *CHGraphExplorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
+	start, count := self.graph.topology.GetNodeRef(node, direction)
+	edge_refs := self.graph.topology.GetEdgeRefs(direction)
+	return &EdgeRefIterator{
+		state:     int(start),
+		end:       int(start) + int(count),
+		edge_refs: edge_refs,
+	}
+}
+func (self *CHGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
+	if edge.IsCHShortcut() {
+		return self.sh_weight.GetEdgeWeight(edge.EdgeID)
+	} else {
+		return self.weight.GetEdgeWeight(edge.EdgeID)
+	}
+}
+func (self *CHGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
+	return 0
+}
+func (self *CHGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
+	if edge.IsCHShortcut() {
+		e := self.graph.shortcuts.GetShortcut(edge.EdgeID)
+		if node == e.NodeA {
+			return e.NodeB
+		}
+		if node == e.NodeB {
+			return e.NodeA
+		}
+		return 0
+	} else {
+		e := self.graph.GetEdge(edge.EdgeID)
+		if node == e.NodeA {
+			return e.NodeB
+		}
+		if node == e.NodeB {
+			return e.NodeA
+		}
+		return -1
+	}
 }

@@ -107,6 +107,8 @@ func (self *DistributedRoutingRunner) HandleRetrivalRequest() {
 		}
 		curr_id := request
 		var edge int32
+
+		explorer := self.graph.GetDefaultExplorer()
 		for {
 			if curr_id == self.start_id {
 				close(self.path_chan)
@@ -115,7 +117,7 @@ func (self *DistributedRoutingRunner) HandleRetrivalRequest() {
 			curr_flag := self.flags.Get(curr_id)
 			edge = curr_flag.prev_edge
 			self.path_chan <- edge
-			curr_id, _ = self.graph.GetOtherNode(edge, curr_id)
+			curr_id = explorer.GetOtherNode(graph.CreateEdgeRef(edge), curr_id)
 			if self.graph.GetNodeTile(curr_id) != self.tile_id {
 				self.handler.SendRetrivelRequest(MakeTuple(self.key, curr_id))
 				break
@@ -138,6 +140,8 @@ func (self *DistributedRoutingRunner) HandleExitRequest() {
 }
 
 func (self *DistributedRoutingRunner) RunRouting() {
+	explorer := self.graph.GetDefaultExplorer()
+
 	for !self.finished {
 		curr_flag, ok := self.heap.Dequeue()
 		if !ok {
@@ -162,7 +166,7 @@ func (self *DistributedRoutingRunner) RunRouting() {
 			self.handler.SendStopRequest(self.key, curr_flag.path_length)
 		}
 		self.flags.Set(curr_id, curr_flag)
-		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

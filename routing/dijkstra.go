@@ -42,6 +42,8 @@ func NewDijkstra(graph graph.IGraph, start, end int32) *Dijkstra {
 }
 
 func (self *Dijkstra) CalcShortestPath() bool {
+	explorer := self.graph.GetDefaultExplorer()
+
 	for {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -56,7 +58,7 @@ func (self *Dijkstra) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited = true
-		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -85,6 +87,8 @@ func (self *Dijkstra) CalcShortestPath() bool {
 }
 
 func (self *Dijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
+	explorer := self.graph.GetDefaultExplorer()
+
 	for c := 0; c < count; c++ {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -99,7 +103,7 @@ func (self *Dijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool 
 			continue
 		}
 		curr_flag.visited = true
-		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -130,6 +134,8 @@ func (self *Dijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool 
 }
 
 func (self *Dijkstra) GetShortestPath() Path {
+	explorer := self.graph.GetDefaultExplorer()
+
 	path := make([]int32, 0, 10)
 	length := int32(self.flags[self.end_id].path_length)
 	curr_id := self.end_id
@@ -140,7 +146,7 @@ func (self *Dijkstra) GetShortestPath() Path {
 		}
 		edge = self.flags[curr_id].prev_edge
 		path = append(path, edge)
-		curr_id, _ = self.graph.GetOtherNode(edge, curr_id)
+		curr_id = explorer.GetOtherNode(graph.CreateEdgeRef(edge), curr_id)
 	}
 	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
 		path[i], path[j] = path[j], path[i]

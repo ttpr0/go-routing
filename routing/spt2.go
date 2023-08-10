@@ -44,6 +44,8 @@ func (self *ShortestPathTree2) Init(start int32, max_range float64) {
 	self.flags[start].PathLength = 0
 }
 func (self *ShortestPathTree2) CalcSPT() {
+	explorer := self.graph.GetDefaultExplorer()
+
 	for {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -59,7 +61,7 @@ func (self *ShortestPathTree2) CalcSPT() {
 		if curr_flag.PathLength > self.max_range {
 			return
 		}
-		edges := self.graph.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

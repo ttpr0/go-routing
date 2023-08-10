@@ -1,86 +1,68 @@
 package graph
 
 import (
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type ITiledGraph interface {
 	GetGeometry() IGeometry
 	GetWeighting() IWeighting
-	GetOtherNode(edge, node int32) (int32, Direction)
-	GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef]
+	GetDefaultExplorer() IGraphExplorer
+	GetGraphExplorer(weighting IWeighting) IGraphExplorer
 	GetNodeTile(node int32) int16
-	ForEachEdge(node int32, f func(int32))
 	NodeCount() int32
 	EdgeCount() int32
 	TileCount() int16
 	IsNode(node int32) bool
 	GetNode(node int32) Node
 	GetEdge(edge int32) Edge
-	GetNodeIndex() KDTree[int32]
-	GetClosestNode(point geo.Coord) (int32, bool)
+	GetIndex() IGraphIndex
 }
 
 type TiledGraph struct {
-	node_refs     List[NodeRef]
-	nodes         List[Node]
-	node_tiles    List[int16]
-	fwd_edge_refs List[EdgeRef]
-	bwd_edge_refs List[EdgeRef]
-	edges         List[Edge]
-	geom          IGeometry
-	weight        IWeighting
-	index         KDTree[int32]
+	nodes      NodeStore
+	node_tiles NodeTileStore
+	topology   TopologyStore
+	edges      EdgeStore
+	geom       GeometryStore
+	weight     DefaultWeighting
+	index      KDTree[int32]
 }
 
 func (self *TiledGraph) GetGeometry() IGeometry {
-	return self.geom
+	return &self.geom
 }
 func (self *TiledGraph) GetWeighting() IWeighting {
-	return self.weight
+	return &self.weight
 }
-func (self *TiledGraph) GetOtherNode(edge, node int32) (int32, Direction) {
-	e := self.edges[edge]
-	if node == e.NodeA {
-		return e.NodeB, FORWARD
+func (self *TiledGraph) GetDefaultExplorer() IGraphExplorer {
+	return &TiledGraphExplorer{
+		graph:  self,
+		weight: &self.weight,
 	}
-	if node == e.NodeB {
-		return e.NodeA, BACKWARD
-	}
-	return -1, 0
 }
-func (self *TiledGraph) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
-	n := self.node_refs[node]
-	if direction == FORWARD {
-		return &EdgeRefIterator{
-			state:     int(n.EdgeRefFWDStart),
-			end:       int(n.EdgeRefFWDStart) + int(n.EdgeRefFWDCount),
-			edge_refs: &self.fwd_edge_refs,
-		}
-	} else {
-		return &EdgeRefIterator{
-			state:     int(n.EdgeRefBWDStart),
-			end:       int(n.EdgeRefBWDStart) + int(n.EdgeRefBWDCount),
-			edge_refs: &self.bwd_edge_refs,
-		}
+func (self *TiledGraph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
+	return &TiledGraphExplorer{
+		graph:  self,
+		weight: weighting,
 	}
 }
 func (self *TiledGraph) GetNodeTile(node int32) int16 {
-	return self.node_tiles[node]
+	return self.node_tiles.GetNodeTile(node)
 }
 func (self *TiledGraph) ForEachEdge(node int32, f func(int32)) {
 
 }
 func (self *TiledGraph) NodeCount() int32 {
-	return int32(len(self.nodes))
+	return int32(self.nodes.NodeCount())
 }
 func (self *TiledGraph) EdgeCount() int32 {
-	return int32(len(self.edges))
+	return int32(self.edges.EdgeCount())
 }
 func (self *TiledGraph) TileCount() int16 {
 	max := int16(0)
-	for _, tile := range self.node_tiles {
+	for i := 0; i < int(self.NodeCount()); i++ {
+		tile := self.node_tiles.GetNodeTile(int32(i))
 		if tile > max {
 			max = tile
 		}
@@ -88,21 +70,47 @@ func (self *TiledGraph) TileCount() int16 {
 	return max - 1
 }
 func (self *TiledGraph) IsNode(node int32) bool {
-	if node < int32(len(self.nodes)) {
-		return true
-	} else {
-		return false
-	}
+	return self.nodes.IsNode(node)
 }
 func (self *TiledGraph) GetNode(node int32) Node {
-	return self.nodes[node]
+	return self.nodes.GetNode(node)
 }
 func (self *TiledGraph) GetEdge(edge int32) Edge {
-	return self.edges[edge]
+	return self.edges.GetEdge(edge)
 }
-func (self *TiledGraph) GetNodeIndex() KDTree[int32] {
-	return self.index
+func (self *TiledGraph) GetIndex() IGraphIndex {
+	return &BaseGraphIndex{
+		index: self.index,
+	}
 }
-func (self *TiledGraph) GetClosestNode(point geo.Coord) (int32, bool) {
-	return self.index.GetClosest(point[:], 0.005)
+
+type TiledGraphExplorer struct {
+	graph  *TiledGraph
+	weight IWeighting
+}
+
+func (self *TiledGraphExplorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
+	start, count := self.graph.topology.GetNodeRef(node, direction)
+	edge_refs := self.graph.topology.GetEdgeRefs(direction)
+	return &EdgeRefIterator{
+		state:     int(start),
+		end:       int(start) + int(count),
+		edge_refs: edge_refs,
+	}
+}
+func (self *TiledGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
+	return self.weight.GetEdgeWeight(edge.EdgeID)
+}
+func (self *TiledGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
+	return self.weight.GetTurnCost(from.EdgeID, via, to.EdgeID)
+}
+func (self *TiledGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
+	e := self.graph.GetEdge(edge.EdgeID)
+	if node == e.NodeA {
+		return e.NodeB
+	}
+	if node == e.NodeB {
+		return e.NodeA
+	}
+	return -1
 }
