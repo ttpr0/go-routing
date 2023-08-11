@@ -31,6 +31,7 @@ func StoreTiledGraph(graph *TiledGraph, filename string) {
 	graph.geom._Store(filename + "-geom")
 	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
 	_StoreNodeTileStore(&graph.node_tiles, filename+"-tiles")
+	_StoreEdgeTypes(graph.edge_types, filename+"-tiles_types")
 }
 
 func StoreTiledGraph2(graph *TiledGraph2, filename string) {
@@ -40,6 +41,7 @@ func StoreTiledGraph2(graph *TiledGraph2, filename string) {
 	graph.geom._Store(filename + "-geom")
 	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
 	_StoreNodeTileStore(&graph.node_tiles, filename+"-tiles")
+	_StoreEdgeTypes(graph.edge_types, filename+"-tiles_types")
 	_StoreTileRanges(graph.border_nodes, graph.interior_nodes, graph.border_range_map, filename+"-tileranges")
 }
 
@@ -48,6 +50,7 @@ func StoreCHGraph(graph *CHGraph, filename string) {
 	graph.nodes._Store(filename + "-nodes")
 	graph.edges._Store(filename + "-edges")
 	graph.geom._Store(filename + "-geom")
+	graph.ch_topology._Store(filename + "-ch_graph")
 	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
 	_StoreCHLevelStore(&graph.node_levels, filename+"-level")
 	_StoreCHShortcutStore(&graph.shortcuts, &graph.sh_weight, filename+"-shortcut")
@@ -86,4 +89,16 @@ func _StoreTileRanges(border_nodes Dict[int16, Array[int32]], interior_nodes Dic
 	rangesfile, _ := os.Create(filename)
 	defer rangesfile.Close()
 	rangesfile.Write(tilebuffer.Bytes())
+}
+
+func _StoreEdgeTypes(edge_types Array[byte], filename string) {
+	typesbuffer := bytes.Buffer{}
+
+	for i := 0; i < edge_types.Length(); i++ {
+		binary.Write(&typesbuffer, binary.LittleEndian, edge_types[i])
+	}
+
+	typesfile, _ := os.Create(filename)
+	defer typesfile.Close()
+	typesfile.Write(typesbuffer.Bytes())
 }

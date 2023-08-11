@@ -18,7 +18,10 @@ type IGraph interface {
 	GetIndex() IGraphIndex
 }
 
+// not thread safe, use only one instance per thread
 type IGraphExplorer interface {
+	// multiple calls to this will overwrite underlying iterator object
+	// use only one instance at a time
 	GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef]
 	GetEdgeWeight(edge EdgeRef) int32
 	GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32
@@ -46,14 +49,16 @@ func (self *Graph) GetWeighting() IWeighting {
 }
 func (self *Graph) GetDefaultExplorer() IGraphExplorer {
 	return &BaseGraphExplorer{
-		graph:  self,
-		weight: &self.weight,
+		graph:    self,
+		accessor: self.topology.GetAccessor(),
+		weight:   &self.weight,
 	}
 }
 func (self *Graph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
 	return &BaseGraphExplorer{
-		graph:  self,
-		weight: weighting,
+		graph:    self,
+		accessor: self.topology.GetAccessor(),
+		weight:   weighting,
 	}
 }
 func (self *Graph) NodeCount() int32 {
@@ -78,17 +83,16 @@ func (self *Graph) GetIndex() IGraphIndex {
 }
 
 type BaseGraphExplorer struct {
-	graph  *Graph
-	weight IWeighting
+	graph    *Graph
+	accessor TopologyAccessor
+	weight   IWeighting
 }
 
 func (self *BaseGraphExplorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
-	start, count := self.graph.topology.GetNodeRef(node, direction)
-	edge_refs := self.graph.topology.GetEdgeRefs(direction)
+	accessor := &self.accessor
+	accessor.SetBaseNode(node, direction)
 	return &EdgeRefIterator{
-		state:     int(start),
-		end:       int(start) + int(count),
-		edge_refs: edge_refs,
+		accessor: accessor,
 	}
 }
 func (self *BaseGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
@@ -109,18 +113,22 @@ func (self *BaseGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 }
 
 type EdgeRefIterator struct {
-	state     int
-	end       int
-	edge_refs Array[EdgeRef]
+	accessor *TopologyAccessor
 }
 
 func (self *EdgeRefIterator) Next() (EdgeRef, bool) {
-	if self.state == self.end {
+	ok := self.accessor.Next()
+	if !ok {
 		var t EdgeRef
 		return t, false
 	}
-	self.state += 1
-	return self.edge_refs.Get(self.state - 1), true
+	edge_id := self.accessor.GetEdgeID()
+	other_id := self.accessor.GetOtherID()
+	return EdgeRef{
+		EdgeID:  edge_id,
+		OtherID: other_id,
+		_Type:   0,
+	}, true
 }
 
 type BaseGraphIndex struct {

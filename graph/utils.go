@@ -80,6 +80,7 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)
 }
 
+// checks graph topology
 func CheckGraph(g IGraph) {
 	explorer := g.GetDefaultExplorer()
 	for i := 0; i < int(g.NodeCount()); i++ {
@@ -120,6 +121,61 @@ func CheckGraph(g IGraph) {
 	}
 }
 
+// checks topology of ch graph
+func CheckCHGraph(g ICHGraph) {
+	explorer := g.GetDefaultExplorer()
+	for i := 0; i < int(g.NodeCount()); i++ {
+		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD)
+		for {
+			ref, ok := adj_edges.Next()
+			if !ok {
+				break
+			}
+			if ref.IsShortcut() {
+				edge := g.GetShortcut(ref.EdgeID)
+				if edge.NodeA != int32(i) {
+					fmt.Println("error 1")
+				}
+				if edge.NodeB != ref.OtherID {
+					fmt.Println("error 2")
+				}
+			} else {
+				edge := g.GetEdge(ref.EdgeID)
+				if edge.NodeA != int32(i) {
+					fmt.Println("error 3")
+				}
+				if edge.NodeB != ref.OtherID {
+					fmt.Println("error 4")
+				}
+			}
+		}
+		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD)
+		for {
+			ref, ok := adj_edges.Next()
+			if !ok {
+				break
+			}
+			if ref.IsShortcut() {
+				edge := g.GetShortcut(ref.EdgeID)
+				if edge.NodeB != int32(i) {
+					fmt.Println("error 5")
+				}
+				if edge.NodeA != ref.OtherID {
+					fmt.Println("error 6")
+				}
+			} else {
+				edge := g.GetEdge(ref.EdgeID)
+				if edge.NodeB != int32(i) {
+					fmt.Println("error 7")
+				}
+				if edge.NodeA != ref.OtherID {
+					fmt.Println("error 8")
+				}
+			}
+		}
+	}
+}
+
 func SortNodesByLevel(g *CHGraph) {
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
@@ -147,6 +203,7 @@ func ReorderCHGraph(g *CHGraph, node_mapping Array[int32]) {
 	g.node_levels._ReorderNodes(node_mapping)
 	g.shortcuts._ReorderNodes(node_mapping)
 	g.topology._ReorderNodes(node_mapping)
+	g.ch_topology._ReorderNodes(node_mapping)
 	g.geom._ReorderNodes(node_mapping)
 	g.weight._ReorderNodes(node_mapping)
 	g.sh_weight._ReorderNodes(node_mapping)

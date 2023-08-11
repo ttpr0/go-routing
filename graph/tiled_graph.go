@@ -24,6 +24,7 @@ type TiledGraph struct {
 	node_tiles NodeTileStore
 	topology   TopologyStore
 	edges      EdgeStore
+	edge_types Array[byte]
 	geom       GeometryStore
 	weight     DefaultWeighting
 	index      KDTree[int32]
@@ -85,17 +86,16 @@ func (self *TiledGraph) GetIndex() IGraphIndex {
 }
 
 type TiledGraphExplorer struct {
-	graph  *TiledGraph
-	weight IWeighting
+	graph    *TiledGraph
+	accessor TopologyAccessor
+	weight   IWeighting
 }
 
 func (self *TiledGraphExplorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
-	start, count := self.graph.topology.GetNodeRef(node, direction)
-	edge_refs := self.graph.topology.GetEdgeRefs(direction)
-	return &EdgeRefIterator{
-		state:     int(start),
-		end:       int(start) + int(count),
-		edge_refs: edge_refs,
+	self.accessor.SetBaseNode(node, direction)
+	return &TiledEdgeRefIterator{
+		accessor:   &self.accessor,
+		edge_types: self.graph.edge_types,
 	}
 }
 func (self *TiledGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
@@ -113,4 +113,25 @@ func (self *TiledGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 		return e.NodeA
 	}
 	return -1
+}
+
+type TiledEdgeRefIterator struct {
+	accessor   *TopologyAccessor
+	edge_types Array[byte]
+}
+
+func (self *TiledEdgeRefIterator) Next() (EdgeRef, bool) {
+	ok := self.accessor.Next()
+	if !ok {
+		var t EdgeRef
+		return t, false
+	}
+	edge_id := self.accessor.GetEdgeID()
+	other_id := self.accessor.GetOtherID()
+	typ := self.edge_types[edge_id]
+	return EdgeRef{
+		EdgeID:  edge_id,
+		OtherID: other_id,
+		_Type:   typ,
+	}, true
 }

@@ -44,18 +44,20 @@ func CalcNodeTiles(geom IGeometry, features []geo.Feature) List[int16] {
 //*******************************************
 
 func PreprocessTiledGraph(graph *Graph, node_tiles List[int16]) *TiledGraph {
-	fwd_edge_refs := UpdateCrossBorder(graph.edges.GetAllEdges(), graph.topology.fwd_edge_refs, node_tiles)
-	bwd_edge_refs := UpdateCrossBorder(graph.edges.GetAllEdges(), graph.topology.bwd_edge_refs, node_tiles)
+	edge_types := NewArray[byte](graph.edges.EdgeCount())
 
 	tiled_graph := &TiledGraph{
-		topology:   TopologyStore{node_refs: graph.topology.node_refs, fwd_edge_refs: fwd_edge_refs, bwd_edge_refs: bwd_edge_refs},
+		topology:   graph.topology,
 		nodes:      graph.nodes,
 		node_tiles: NodeTileStore{node_tiles: Array[int16](node_tiles)},
 		edges:      graph.edges,
+		edge_types: edge_types,
 		geom:       graph.geom,
 		weight:     graph.weight,
 		index:      graph.index,
 	}
+
+	UpdateCrossBorder(tiled_graph.edges.edges, tiled_graph.edge_types, node_tiles)
 
 	tiles := NewDict[int16, bool](100)
 	for _, tile_id := range tiled_graph.node_tiles.GetTiles() {
@@ -77,26 +79,9 @@ func PreprocessTiledGraph(graph *Graph, node_tiles List[int16]) *TiledGraph {
 		fmt.Printf("tile %v: finished \n", tile_id)
 		c += 1
 	}
-	UpdateSkipEdges(tiled_graph, is_skip)
+	UpdateSkipEdges(tiled_graph.edge_types, is_skip)
 
 	return tiled_graph
-}
-
-// sets type of cross border edges to 10
-func UpdateCrossBorder(edges Array[Edge], edge_refs List[EdgeRef], node_tiles List[int16]) List[EdgeRef] {
-	for i := 0; i < edge_refs.Length(); i++ {
-		edge_ref := edge_refs[i]
-		if edge_ref._Type != 0 {
-			continue
-		}
-		edge := edges[edge_ref.EdgeID]
-		if node_tiles[edge.NodeA] != node_tiles[edge.NodeB] {
-			edge_ref._Type = 10
-			edge_refs.Set(i, edge_ref)
-		}
-	}
-
-	return edge_refs
 }
 
 // return list of nodes that have at least one cross-border edge
@@ -202,23 +187,22 @@ type _Flag struct {
 	visited    bool
 }
 
-// sets the type of skip edges to 20
-func UpdateSkipEdges(graph *TiledGraph, is_skip []bool) {
-	edgerefcount := graph.topology.fwd_edge_refs.Length()
-	for i := 0; i < edgerefcount; i++ {
-		edgeref := graph.topology.fwd_edge_refs.Get(i)
-		if !edgeref.IsCrossBorder() && is_skip[edgeref.EdgeID] {
-			edgeref._Type = 20
+// sets edge type of cross border edges to 10
+func UpdateCrossBorder(edges Array[Edge], edge_types Array[byte], node_tiles List[int16]) {
+	for i := 0; i < edges.Length(); i++ {
+		edge := edges[i]
+		if node_tiles[edge.NodeA] != node_tiles[edge.NodeB] {
+			edge_types[i] = 10
 		}
-		graph.topology.fwd_edge_refs.Set(i, edgeref)
 	}
-	edgerefcount = graph.topology.bwd_edge_refs.Length()
-	for i := 0; i < edgerefcount; i++ {
-		edgeref := graph.topology.bwd_edge_refs.Get(i)
-		if !edgeref.IsCrossBorder() && is_skip[edgeref.EdgeID] {
-			edgeref._Type = 20
+}
+
+// sets the edge type of skip edges to 20
+func UpdateSkipEdges(edge_types Array[byte], is_skip []bool) {
+	for i := 0; i < edge_types.Length(); i++ {
+		if edge_types[i] != 10 && is_skip[i] {
+			edge_types[i] = 20
 		}
-		graph.topology.bwd_edge_refs.Set(i, edgeref)
 	}
 }
 

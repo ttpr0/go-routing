@@ -25,8 +25,9 @@ type ICHGraph interface {
 type CHGraph struct {
 	nodes       NodeStore
 	edges       EdgeStore
-	shortcuts   CHShortcutStore
 	topology    TopologyStore
+	shortcuts   CHShortcutStore
+	ch_topology TopologyStore
 	node_levels CHLevelStore
 	geom        GeometryStore
 	weight      DefaultWeighting
@@ -48,17 +49,21 @@ func (self *CHGraph) GetShortcutWeighting() IWeighting {
 
 func (self *CHGraph) GetDefaultExplorer() IGraphExplorer {
 	return &CHGraphExplorer{
-		graph:     self,
-		weight:    &self.weight,
-		sh_weight: &self.sh_weight,
+		graph:       self,
+		accessor:    self.topology.GetAccessor(),
+		sh_accessor: self.ch_topology.GetAccessor(),
+		weight:      &self.weight,
+		sh_weight:   &self.sh_weight,
 	}
 }
 
 func (self *CHGraph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
 	return &CHGraphExplorer{
-		graph:     self,
-		weight:    weighting,
-		sh_weight: &self.sh_weight,
+		graph:       self,
+		accessor:    self.topology.GetAccessor(),
+		sh_accessor: self.ch_topology.GetAccessor(),
+		weight:      weighting,
+		sh_weight:   &self.sh_weight,
 	}
 }
 
@@ -131,18 +136,20 @@ func (self *CHGraph) GetIndex() IGraphIndex {
 }
 
 type CHGraphExplorer struct {
-	graph     *CHGraph
-	weight    IWeighting
-	sh_weight IWeighting
+	graph       *CHGraph
+	accessor    TopologyAccessor
+	sh_accessor TopologyAccessor
+	weight      IWeighting
+	sh_weight   IWeighting
 }
 
 func (self *CHGraphExplorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
-	start, count := self.graph.topology.GetNodeRef(node, direction)
-	edge_refs := self.graph.topology.GetEdgeRefs(direction)
-	return &EdgeRefIterator{
-		state:     int(start),
-		end:       int(start) + int(count),
-		edge_refs: edge_refs,
+	self.accessor.SetBaseNode(node, direction)
+	self.sh_accessor.SetBaseNode(node, direction)
+	return &CHEdgeRefIterator{
+		accessor:    &self.accessor,
+		ch_accessor: &self.sh_accessor,
+		typ:         0,
 	}
 }
 func (self *CHGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
@@ -156,7 +163,7 @@ func (self *CHGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) in
 	return 0
 }
 func (self *CHGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
-	if edge.IsCHShortcut() {
+	if edge.IsShortcut() {
 		e := self.graph.shortcuts.GetShortcut(edge.EdgeID)
 		if node == e.NodeA {
 			return e.NodeB
@@ -164,7 +171,7 @@ func (self *CHGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 		if node == e.NodeB {
 			return e.NodeA
 		}
-		return 0
+		return -1
 	} else {
 		e := self.graph.GetEdge(edge.EdgeID)
 		if node == e.NodeA {
@@ -175,4 +182,34 @@ func (self *CHGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 		}
 		return -1
 	}
+}
+
+type CHEdgeRefIterator struct {
+	accessor    *TopologyAccessor
+	ch_accessor *TopologyAccessor
+	typ         byte
+}
+
+func (self *CHEdgeRefIterator) Next() (EdgeRef, bool) {
+	ok := self.accessor.Next()
+	if !ok {
+		if self.typ == 100 {
+			var t EdgeRef
+			return t, false
+		}
+		self.accessor = self.ch_accessor
+		self.typ = 100
+		ok := self.accessor.Next()
+		if !ok {
+			var t EdgeRef
+			return t, false
+		}
+	}
+	edge_id := self.accessor.GetEdgeID()
+	other_id := self.accessor.GetOtherID()
+	return EdgeRef{
+		EdgeID:  edge_id,
+		OtherID: other_id,
+		_Type:   self.typ,
+	}, true
 }

@@ -26,6 +26,7 @@ type TiledGraph2 struct {
 	node_tiles       NodeTileStore
 	topology         TopologyStore
 	edges            EdgeStore
+	edge_types       Array[byte]
 	geom             GeometryStore
 	weight           DefaultWeighting
 	index            KDTree[int32]
@@ -112,17 +113,16 @@ func (self *BorderRangeIterator) Next() (Tuple[int32, float32], bool) {
 }
 
 type TiledGraph2Explorer struct {
-	graph  *TiledGraph2
-	weight IWeighting
+	graph    *TiledGraph2
+	accessor TopologyAccessor
+	weight   IWeighting
 }
 
 func (self *TiledGraph2Explorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
-	start, count := self.graph.topology.GetNodeRef(node, direction)
-	edge_refs := self.graph.topology.GetEdgeRefs(direction)
-	return &EdgeRefIterator{
-		state:     int(start),
-		end:       int(start) + int(count),
-		edge_refs: edge_refs,
+	self.accessor.SetBaseNode(node, direction)
+	return &TiledEdgeRefIterator{
+		accessor:   &self.accessor,
+		edge_types: self.graph.edge_types,
 	}
 }
 func (self *TiledGraph2Explorer) GetEdgeWeight(edge EdgeRef) int32 {

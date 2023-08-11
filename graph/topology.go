@@ -31,21 +31,27 @@ func (self *TopologyStore) GetEdgeRefs(dir Direction) Array[EdgeRef] {
 	}
 }
 
+// used in ch preprocessing
 func (self *TopologyStore) GetAdjacentEdgeRefs(node int32, dir Direction) List[EdgeRef] {
-	ref := self.node_refs[node]
 	if dir == FORWARD {
-		start, count := ref.EdgeRefFWDStart, int32(ref.EdgeRefFWDCount)
-		return self.fwd_edge_refs[start : start+count]
+		ref := self.node_refs[node]
+		return self.fwd_edge_refs[ref.EdgeRefFWDStart : ref.EdgeRefFWDStart+int32(ref.EdgeRefFWDCount)]
 	} else {
-		start, count := ref.EdgeRefBWDStart, int32(ref.EdgeRefBWDCount)
-		return self.bwd_edge_refs[start : start+count]
+		ref := self.node_refs[node]
+		return self.bwd_edge_refs[ref.EdgeRefBWDStart : ref.EdgeRefBWDStart+int32(ref.EdgeRefBWDCount)]
+	}
+}
+
+func (self *TopologyStore) GetAccessor() TopologyAccessor {
+	return TopologyAccessor{
+		topology: self,
 	}
 }
 
 // reorders nodes in topologystore,
 // mapping: old id -> new id
 func (self *TopologyStore) _ReorderNodes(mapping Array[int32]) {
-	node_refs := NewList[NodeRef](self.node_refs.Length())
+	node_refs := NewArray[NodeRef](self.node_refs.Length())
 	for i, id := range mapping {
 		node_refs[id] = self.node_refs[i]
 	}
@@ -84,7 +90,7 @@ func (self *TopologyStore) _ReorderNodes(mapping Array[int32]) {
 		bwd_start += bwd_count
 	}
 
-	self.node_refs = node_refs
+	self.node_refs = List[NodeRef](node_refs)
 	self.fwd_edge_refs = fwd_edge_refs
 	self.bwd_edge_refs = bwd_edge_refs
 }
@@ -122,7 +128,7 @@ func (self *TopologyStore) _Store(filename string) {
 	topologyfile.Write(topologybuffer.Bytes())
 }
 
-func _LoadTopologyStore(file string, nodecount int, edgecount int) *TopologyStore {
+func _LoadTopologyStore(file string, nodecount int) *TopologyStore {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -185,4 +191,50 @@ func _LoadTopologyStore(file string, nodecount int, edgecount int) *TopologyStor
 		fwd_edge_refs: fwd_edge_refs,
 		bwd_edge_refs: bwd_edge_refs,
 	}
+}
+
+type TopologyAccessor struct {
+	topology      *TopologyStore
+	state         int32
+	end           int32
+	edge_refs     Array[EdgeRef]
+	curr_edge_id  int32
+	curr_other_id int32
+}
+
+func (self *TopologyAccessor) SetBaseNode(node int32, dir Direction) {
+	ref := self.topology.node_refs[node]
+	if dir == FORWARD {
+		start, count := ref.EdgeRefFWDStart, int32(ref.EdgeRefFWDCount)
+		self.state = start
+		self.end = start + count
+		self.edge_refs = Array[EdgeRef](self.topology.fwd_edge_refs)
+	} else {
+		start, count := ref.EdgeRefBWDStart, int32(ref.EdgeRefBWDCount)
+		self.state = start
+		self.end = start + count
+		self.edge_refs = Array[EdgeRef](self.topology.bwd_edge_refs)
+	}
+}
+func (self *TopologyAccessor) Next() bool {
+	if self.state == self.end {
+		return false
+	}
+	ref := self.edge_refs[self.state]
+	self.curr_edge_id = ref.EdgeID
+	self.curr_other_id = ref.OtherID
+	self.state += 1
+	return true
+}
+func (self *TopologyAccessor) GetEdgeID() int32 {
+	return self.curr_edge_id
+}
+func (self *TopologyAccessor) GetOtherID() int32 {
+	return self.curr_other_id
+}
+func (self *TopologyAccessor) HasNext() bool {
+	if self.state == self.end {
+		return false
+	}
+	return true
 }

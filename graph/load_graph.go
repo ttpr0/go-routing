@@ -19,9 +19,9 @@ func LoadGraph(file string) IGraph {
 	nodecount := nodes.NodeCount()
 	edges := _LoadEdgeStore(file + "-edges")
 	edgecount := edges.EdgeCount()
-	topology := _LoadTopologyStore(file+"-graph", nodecount, edgecount)
+	topology := _LoadTopologyStore(file+"-graph", nodecount)
 	geoms := _LoadGeometryStore(file+"-geom", nodecount, edgecount)
-	weights := _LoadDefaultWeighting(file+"fastest_weighting", edgecount)
+	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
 	index := BuildNodeIndex(geoms.GetAllNodes())
 
 	return &Graph{
@@ -39,9 +39,10 @@ func LoadCHGraph(file string) ICHGraph {
 	nodecount := nodes.NodeCount()
 	edges := _LoadEdgeStore(file + "-edges")
 	edgecount := edges.EdgeCount()
-	topology := _LoadTopologyStore(file+"-graph", nodecount, edgecount)
+	topology := _LoadTopologyStore(file+"-graph", nodecount)
 	geoms := _LoadGeometryStore(file+"-geom", nodecount, edgecount)
-	weights := _LoadDefaultWeighting(file+"fastest_weighting", edgecount)
+	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
+	ch_topology := _LoadTopologyStore(file+"-ch_graph", nodecount)
 	levels := _LoadCHLevelStore(file+"-level", nodecount)
 	shortcuts, sh_weights := _LoadCHShortcutStore(file + "-shortcut")
 	chg := &CHGraph{
@@ -50,11 +51,12 @@ func LoadCHGraph(file string) ICHGraph {
 		edges:       *edges,
 		shortcuts:   *shortcuts,
 		topology:    *topology,
+		ch_topology: *ch_topology,
 		geom:        *geoms,
 		weight:      *weights,
 		sh_weight:   *sh_weights,
 	}
-	SortNodesByLevel(chg)
+	// SortNodesByLevel(chg)
 	chg.index = BuildNodeIndex(chg.geom.GetAllNodes())
 	return chg
 }
@@ -64,9 +66,10 @@ func LoadTiledGraph(file string) ITiledGraph {
 	nodecount := nodes.NodeCount()
 	edges := _LoadEdgeStore(file + "-edges")
 	edgecount := edges.EdgeCount()
-	topology := _LoadTopologyStore(file+"-graph", nodecount, edgecount)
+	topology := _LoadTopologyStore(file+"-graph", nodecount)
 	geoms := _LoadGeometryStore(file+"-geom", nodecount, edgecount)
-	weights := _LoadDefaultWeighting(file+"fastest_weighting", edgecount)
+	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
+	edge_types := _LoadEdgeTypes(file+"-tiles_types", edgecount)
 	node_tiles := _LoadNodeTileStore(file+"-tiles", nodecount)
 	fmt.Println("start buidling index")
 	index := BuildNodeIndex(geoms.GetAllNodes())
@@ -77,6 +80,7 @@ func LoadTiledGraph(file string) ITiledGraph {
 		node_tiles: *node_tiles,
 		topology:   *topology,
 		edges:      *edges,
+		edge_types: edge_types,
 		geom:       *geoms,
 		weight:     *weights,
 		index:      index,
@@ -88,9 +92,10 @@ func LoadTiledGraph2(file string) ITiledGraph2 {
 	nodecount := nodes.NodeCount()
 	edges := _LoadEdgeStore(file + "-edges")
 	edgecount := edges.EdgeCount()
-	topology := _LoadTopologyStore(file+"-graph", nodecount, edgecount)
+	topology := _LoadTopologyStore(file+"-graph", nodecount)
 	geoms := _LoadGeometryStore(file+"-geom", nodecount, edgecount)
-	weights := _LoadDefaultWeighting(file+"fastest_weighting", edgecount)
+	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
+	edge_types := _LoadEdgeTypes(file+"-tiles_types", edgecount)
 	node_tiles := _LoadNodeTileStore(file+"-tiles", nodecount)
 	fmt.Println("start buidling index")
 	index := BuildNodeIndex(geoms.GetAllNodes())
@@ -102,6 +107,7 @@ func LoadTiledGraph2(file string) ITiledGraph2 {
 		node_tiles:       *node_tiles,
 		topology:         *topology,
 		edges:            *edges,
+		edge_types:       edge_types,
 		geom:             *geoms,
 		weight:           *weights,
 		index:            index,
@@ -165,4 +171,22 @@ func _LoadTileRanges(file string) (Dict[int16, Array[int32]], Dict[int16, Array[
 	}
 
 	return border_nodes, interior_nodes, border_range_map
+}
+
+func _LoadEdgeTypes(file string, edgecount int) Array[byte] {
+	_, err := os.Stat(file)
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file)
+	}
+
+	tiledata, _ := os.ReadFile(file)
+	tilereader := bytes.NewReader(tiledata)
+	edge_types := NewArray[byte](edgecount)
+	for i := 0; i < edgecount; i++ {
+		var t byte
+		binary.Read(tilereader, binary.LittleEndian, &t)
+		edge_types[i] = t
+	}
+
+	return edge_types
 }

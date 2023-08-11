@@ -97,11 +97,6 @@ func (self *CH) CalcShortestPath() bool {
 				}
 				edge_id := ref.EdgeID
 				other_id := ref.OtherID
-				// if ref.IsShortcut() {
-				// 	other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
-				// } else {
-				// 	other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
-				// }
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
 					continue
 				}
@@ -111,12 +106,7 @@ func (self *CH) CalcShortestPath() bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				var weight int32
-				if ref.IsShortcut() {
-					weight = self.shweight.GetEdgeWeight(edge_id)
-				} else {
-					weight = self.weight.GetEdgeWeight(edge_id)
-				}
+				weight := explorer.GetEdgeWeight(ref)
 				new_length := curr_flag.path_length1 + float64(weight)
 				if new_length < other_flag.path_length1 {
 					other_flag.path_length1 = new_length
@@ -149,11 +139,6 @@ func (self *CH) CalcShortestPath() bool {
 				}
 				edge_id := ref.EdgeID
 				other_id := ref.OtherID
-				// if ref.IsShortcut() {
-				// 	other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
-				// } else {
-				// 	other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
-				// }
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
 					continue
 				}
@@ -163,12 +148,7 @@ func (self *CH) CalcShortestPath() bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				var weight int32
-				if ref.IsShortcut() {
-					weight = self.shweight.GetEdgeWeight(edge_id)
-				} else {
-					weight = self.weight.GetEdgeWeight(edge_id)
-				}
+				weight := explorer.GetEdgeWeight(ref)
 				new_length := curr_flag.path_length2 + float64(weight)
 				if new_length < other_flag.path_length2 {
 					other_flag.path_length2 = new_length
@@ -229,12 +209,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 					break
 				}
 				edge_id := ref.EdgeID
-				var other_id int32
-				if ref.IsShortcut() {
-					other_id = explorer.GetOtherNode(ref, curr_id)
-				} else {
-					other_id = explorer.GetOtherNode(ref, curr_id)
-				}
+				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
 					continue
 				}
@@ -244,12 +219,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				var weight int32
-				if ref.IsShortcut() {
-					weight = self.shweight.GetEdgeWeight(edge_id)
-				} else {
-					weight = self.weight.GetEdgeWeight(edge_id)
-				}
+				weight := explorer.GetEdgeWeight(ref)
 
 				if ref.IsShortcut() {
 					self.graph.GetEdgesFromShortcut(&edges, edge_id, false)
@@ -291,12 +261,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 					break
 				}
 				edge_id := ref.EdgeID
-				var other_id int32
-				if ref.IsShortcut() {
-					other_id = explorer.GetOtherNode(ref, curr_id)
-				} else {
-					other_id = explorer.GetOtherNode(ref, curr_id)
-				}
+				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
 					continue
 				}
@@ -306,12 +271,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				var weight int32
-				if ref.IsShortcut() {
-					weight = self.shweight.GetEdgeWeight(edge_id)
-				} else {
-					weight = self.weight.GetEdgeWeight(edge_id)
-				}
+				weight := explorer.GetEdgeWeight(ref)
 				if ref.IsShortcut() {
 					self.graph.GetEdgesFromShortcut(&edges, edge_id, false)
 				} else {
