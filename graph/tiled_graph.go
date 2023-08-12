@@ -38,14 +38,16 @@ func (self *TiledGraph) GetWeighting() IWeighting {
 }
 func (self *TiledGraph) GetDefaultExplorer() IGraphExplorer {
 	return &TiledGraphExplorer{
-		graph:  self,
-		weight: &self.weight,
+		graph:    self,
+		accessor: self.topology.GetAccessor(),
+		weight:   &self.weight,
 	}
 }
 func (self *TiledGraph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
 	return &TiledGraphExplorer{
-		graph:  self,
-		weight: weighting,
+		graph:    self,
+		accessor: self.topology.GetAccessor(),
+		weight:   weighting,
 	}
 }
 func (self *TiledGraph) GetNodeTile(node int32) int16 {

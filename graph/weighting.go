@@ -28,11 +28,11 @@ func (self *DefaultWeighting) GetTurnCost(from, via, to int32) int32 {
 // reorders nodes in weightstore,
 // mapping: old id -> new id
 func (self *DefaultWeighting) _ReorderNodes(mapping Array[int32]) {
-	new_weights := NewArray[int32](len(self.edge_weights))
-	for i, id := range mapping {
-		new_weights[id] = self.edge_weights[i]
-	}
-	self.edge_weights = new_weights
+	// new_weights := NewArray[int32](len(self.edge_weights))
+	// for i, id := range mapping {
+	// 	new_weights[id] = self.edge_weights[i]
+	// }
+	// self.edge_weights = new_weights
 }
 
 func _StoreDefaultWeighting(weight *DefaultWeighting, filename string) {

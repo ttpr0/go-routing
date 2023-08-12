@@ -56,7 +56,7 @@ func LoadCHGraph(file string) ICHGraph {
 		weight:      *weights,
 		sh_weight:   *sh_weights,
 	}
-	// SortNodesByLevel(chg)
+	SortNodesByLevel(chg)
 	chg.index = BuildNodeIndex(chg.geom.GetAllNodes())
 	return chg
 }
