@@ -20,14 +20,15 @@ type ITiledGraph interface {
 }
 
 type TiledGraph struct {
-	nodes      NodeStore
-	node_tiles NodeTileStore
-	topology   TopologyStore
-	edges      EdgeStore
-	edge_types Array[byte]
-	geom       GeometryStore
-	weight     DefaultWeighting
-	index      KDTree[int32]
+	nodes         NodeStore
+	node_tiles    NodeTileStore
+	topology      TopologyStore
+	edges         EdgeStore
+	skip_topology TopologyStore
+	edge_types    Array[byte]
+	geom          GeometryStore
+	weight        DefaultWeighting
+	index         KDTree[int32]
 }
 
 func (self *TiledGraph) GetGeometry() IGeometry {
@@ -38,9 +39,10 @@ func (self *TiledGraph) GetWeighting() IWeighting {
 }
 func (self *TiledGraph) GetDefaultExplorer() IGraphExplorer {
 	return &TiledGraphExplorer{
-		graph:    self,
-		accessor: self.topology.GetAccessor(),
-		weight:   &self.weight,
+		graph:         self,
+		accessor:      self.topology.GetAccessor(),
+		skip_accessor: self.skip_topology.GetAccessor(),
+		weight:        &self.weight,
 	}
 }
 func (self *TiledGraph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
@@ -88,16 +90,25 @@ func (self *TiledGraph) GetIndex() IGraphIndex {
 }
 
 type TiledGraphExplorer struct {
-	graph    *TiledGraph
-	accessor TopologyAccessor
-	weight   IWeighting
+	graph         *TiledGraph
+	accessor      TopologyAccessor
+	skip_accessor TopologyAccessor
+	weight        IWeighting
 }
 
 func (self *TiledGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	self.accessor.SetBaseNode(node, direction)
-	return &TiledEdgeRefIterator{
-		accessor:   &self.accessor,
-		edge_types: self.graph.edge_types,
+	if typ == ADJACENT_SKIP {
+		self.skip_accessor.SetBaseNode(node, direction)
+		return &TiledEdgeRefIterator{
+			accessor:   &self.skip_accessor,
+			edge_types: self.graph.edge_types,
+		}
+	} else {
+		self.accessor.SetBaseNode(node, direction)
+		return &TiledEdgeRefIterator{
+			accessor:   &self.accessor,
+			edge_types: self.graph.edge_types,
+		}
 	}
 }
 func (self *TiledGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {

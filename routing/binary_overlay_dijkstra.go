@@ -60,7 +60,13 @@ func (self *BODijkstra) CalcShortestPath() bool {
 		}
 		curr_flag.visited = true
 		self.flags.Set(curr_id, curr_flag)
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
+		var edges IIterator[graph.EdgeRef]
+		if curr_flag.skip {
+			edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP)
+		} else {
+			edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
+		}
+		// edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -69,9 +75,9 @@ func (self *BODijkstra) CalcShortestPath() bool {
 			if !ref.IsEdge() {
 				continue
 			}
-			if curr_flag.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
-				continue
-			}
+			// if curr_flag.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
+			// 	continue
+			// }
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			var other_flag _FlagBOD

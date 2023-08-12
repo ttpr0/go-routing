@@ -29,6 +29,7 @@ func StoreTiledGraph(graph *TiledGraph, filename string) {
 	graph.nodes._Store(filename + "-nodes")
 	graph.edges._Store(filename + "-edges")
 	graph.geom._Store(filename + "-geom")
+	graph.skip_topology._Store(filename + "-skip_topology")
 	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
 	_StoreNodeTileStore(&graph.node_tiles, filename+"-tiles")
 	_StoreEdgeTypes(graph.edge_types, filename+"-tiles_types")

@@ -67,6 +67,7 @@ func LoadTiledGraph(file string) ITiledGraph {
 	edges := _LoadEdgeStore(file + "-edges")
 	edgecount := edges.EdgeCount()
 	topology := _LoadTopologyStore(file+"-graph", nodecount)
+	skip_topology := _LoadTopologyStore(file+"-skip_topology", nodecount)
 	geoms := _LoadGeometryStore(file+"-geom", nodecount, edgecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
 	edge_types := _LoadEdgeTypes(file+"-tiles_types", edgecount)
@@ -76,14 +77,15 @@ func LoadTiledGraph(file string) ITiledGraph {
 	fmt.Println("finished building index")
 
 	return &TiledGraph{
-		nodes:      *nodes,
-		node_tiles: *node_tiles,
-		topology:   *topology,
-		edges:      *edges,
-		edge_types: edge_types,
-		geom:       *geoms,
-		weight:     *weights,
-		index:      index,
+		nodes:         *nodes,
+		node_tiles:    *node_tiles,
+		topology:      *topology,
+		edges:         *edges,
+		skip_topology: *skip_topology,
+		edge_types:    edge_types,
+		geom:          *geoms,
+		weight:        *weights,
+		index:         index,
 	}
 }
 

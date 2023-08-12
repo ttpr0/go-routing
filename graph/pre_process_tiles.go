@@ -46,21 +46,10 @@ func CalcNodeTiles(geom IGeometry, features []geo.Feature) List[int16] {
 func PreprocessTiledGraph(graph *Graph, node_tiles List[int16]) *TiledGraph {
 	edge_types := NewArray[byte](graph.edges.EdgeCount())
 
-	tiled_graph := &TiledGraph{
-		topology:   graph.topology,
-		nodes:      graph.nodes,
-		node_tiles: NodeTileStore{node_tiles: Array[int16](node_tiles)},
-		edges:      graph.edges,
-		edge_types: edge_types,
-		geom:       graph.geom,
-		weight:     graph.weight,
-		index:      graph.index,
-	}
-
-	UpdateCrossBorder(tiled_graph.edges.edges, tiled_graph.edge_types, node_tiles)
+	UpdateCrossBorder(graph.edges.edges, edge_types, node_tiles)
 
 	tiles := NewDict[int16, bool](100)
-	for _, tile_id := range tiled_graph.node_tiles.GetTiles() {
+	for _, tile_id := range node_tiles {
 		if tiles.ContainsKey(tile_id) {
 			continue
 		}
@@ -73,23 +62,39 @@ func PreprocessTiledGraph(graph *Graph, node_tiles List[int16]) *TiledGraph {
 	for tile_id, _ := range tiles {
 		fmt.Printf("tile %v: %v / %v \n", tile_id, c, tile_count)
 		fmt.Printf("tile %v: getting start nodes \n", tile_id)
-		start_nodes := GetStartNodes(tiled_graph, tile_id)
+		start_nodes := GetStartNodes(graph, node_tiles, edge_types, tile_id)
 		fmt.Printf("tile %v: calculating skip edges \n", tile_id)
-		CalcSkipEdges(tiled_graph, start_nodes, is_skip)
+		CalcSkipEdges(graph, node_tiles, edge_types, start_nodes, is_skip)
 		fmt.Printf("tile %v: finished \n", tile_id)
 		c += 1
 	}
-	UpdateSkipEdges(tiled_graph.edge_types, is_skip)
+	UpdateSkipEdges(edge_types, is_skip)
+
+	skip_topology := CreateSkipTopology(graph, edge_types)
+
+	tiled_graph := &TiledGraph{
+		topology:      graph.topology,
+		nodes:         graph.nodes,
+		node_tiles:    NodeTileStore{node_tiles: Array[int16](node_tiles)},
+		edges:         graph.edges,
+		skip_topology: skip_topology,
+		edge_types:    edge_types,
+		geom:          graph.geom,
+		weight:        graph.weight,
+		index:         graph.index,
+	}
 
 	return tiled_graph
 }
 
 // return list of nodes that have at least one cross-border edge
-func GetStartNodes(graph *TiledGraph, tile_id int16) List[int32] {
+func GetStartNodes(graph *Graph, node_tiles List[int16], edge_types Array[byte], tile_id int16) List[int32] {
 	list := NewList[int32](100)
 
 	explorer := graph.GetDefaultExplorer()
-	for id, tile := range graph.node_tiles.GetTiles() {
+	for i := 0; i < graph.nodes.NodeCount(); i++ {
+		id := i
+		tile := node_tiles[id]
 		if tile != tile_id {
 			continue
 		}
@@ -99,7 +104,7 @@ func GetStartNodes(graph *TiledGraph, tile_id int16) List[int32] {
 			if !ok {
 				break
 			}
-			if ref.IsCrossBorder() {
+			if edge_types[ref.EdgeID] == 10 {
 				list.Add(int32(id))
 				break
 			}
@@ -109,7 +114,7 @@ func GetStartNodes(graph *TiledGraph, tile_id int16) List[int32] {
 }
 
 // marks every edge as that lies on a shortest path between border nodes
-func CalcSkipEdges(graph *TiledGraph, start_nodes List[int32], is_skip []bool) {
+func CalcSkipEdges(graph *Graph, node_tiles List[int16], edge_types Array[byte], start_nodes List[int32], is_skip []bool) {
 	weight := graph.GetWeighting()
 
 	explorer := graph.GetDefaultExplorer()
@@ -137,7 +142,7 @@ func CalcSkipEdges(graph *TiledGraph, start_nodes List[int32], is_skip []bool) {
 				if !ok {
 					break
 				}
-				if ref.IsSkip() {
+				if edge_types[ref.EdgeID] == 20 || !ref.IsEdge() {
 					continue
 				}
 				edge_id := ref.EdgeID
@@ -156,7 +161,7 @@ func CalcSkipEdges(graph *TiledGraph, start_nodes List[int32], is_skip []bool) {
 				if newlength < other_flag.pathlength {
 					other_flag.pathlength = newlength
 					other_flag.prevEdge = edge_id
-					if ref.IsCrossBorder() {
+					if edge_types[ref.EdgeID] == 10 {
 						end_nodes[other_id] = true
 					} else {
 						heap.Enqueue(other_id, newlength)
@@ -203,6 +208,76 @@ func UpdateSkipEdges(edge_types Array[byte], is_skip []bool) {
 		if edge_types[i] != 10 && is_skip[i] {
 			edge_types[i] = 20
 		}
+	}
+}
+
+func CreateSkipTopology(graph *Graph, edge_types Array[byte]) TopologyStore {
+	node_refs := NewList[NodeRef](graph.nodes.NodeCount())
+	fwd_edge_refs := NewList[EdgeRef](graph.edges.EdgeCount())
+	bwd_edge_refs := NewList[EdgeRef](graph.edges.EdgeCount())
+
+	explorer := graph.GetDefaultExplorer()
+
+	fwd_start := 0
+	bwd_start := 0
+	for i := 0; i < graph.nodes.NodeCount(); i++ {
+		fwd_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_EDGES)
+		fwd_count := 0
+		for {
+			ref, ok := fwd_edges.Next()
+			if !ok {
+				break
+			}
+			if !ref.IsEdge() {
+				continue
+			}
+			if edge_types[ref.EdgeID] != 10 && edge_types[ref.EdgeID] != 20 {
+				continue
+			}
+			fwd_edge_refs.Add(EdgeRef{
+				EdgeID:  ref.EdgeID,
+				OtherID: ref.OtherID,
+				_Type:   edge_types[ref.EdgeID],
+			})
+			fwd_count += 1
+		}
+
+		bwd_edges := explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_EDGES)
+		bwd_count := 0
+		for {
+			ref, ok := bwd_edges.Next()
+			if !ok {
+				break
+			}
+			if !ref.IsEdge() {
+				continue
+			}
+			if edge_types[ref.EdgeID] != 10 && edge_types[ref.EdgeID] != 20 {
+				continue
+			}
+			bwd_edge_refs.Add(EdgeRef{
+				EdgeID:  ref.EdgeID,
+				OtherID: ref.OtherID,
+				_Type:   edge_types[ref.EdgeID],
+			})
+			bwd_count += 1
+		}
+
+		node_refs.Add(NodeRef{
+			EdgeRefFWDStart: int32(fwd_start),
+			EdgeRefFWDCount: int16(fwd_count),
+			EdgeRefBWDStart: int32(bwd_start),
+			EdgeRefBWDCount: int16(bwd_count),
+		})
+
+		fwd_start += fwd_count
+		bwd_start += bwd_count
+	}
+
+	return TopologyStore{
+		node_refs:     node_refs,
+		fwd_edge_refs: fwd_edge_refs,
+		bwd_edge_refs: bwd_edge_refs,
 	}
 }
 
