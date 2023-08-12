@@ -112,9 +112,9 @@ func (self *DynamicGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int32
 	weight += self.GetWeight(edges[0].A, edges[0].B == 2 || edges[0].B == 3)
 	weight += self.GetWeight(edges[1].A, edges[1].B == 2 || edges[1].B == 3)
 	shortcut := CHShortcut{
-		NodeA: node_a,
-		NodeB: node_b,
-		Edges: edges,
+		NodeA:  node_a,
+		NodeB:  node_b,
+		_Edges: edges,
 	}
 	shc_id := self.shortcuts.Length()
 	self.sh_weight.Add(weight)

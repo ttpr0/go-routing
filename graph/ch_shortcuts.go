@@ -52,7 +52,7 @@ func _StoreCHShortcutStore(sh_store *CHShortcutStore, sh_weight *DefaultWeightin
 		binary.Write(&shcbuffer, binary.LittleEndian, int32(shortcut.NodeA))
 		binary.Write(&shcbuffer, binary.LittleEndian, int32(shortcut.NodeB))
 		binary.Write(&shcbuffer, binary.LittleEndian, uint32(weight))
-		for _, edge := range shortcut.Edges {
+		for _, edge := range shortcut._Edges {
 			binary.Write(&shcbuffer, binary.LittleEndian, edge.A)
 			binary.Write(&shcbuffer, binary.LittleEndian, edge.B == 2 || edge.B == 3)
 		}
@@ -83,9 +83,9 @@ func _LoadCHShortcutStore(file string) (*CHShortcutStore, *DefaultWeighting) {
 		var weight uint32
 		binary.Read(shortcutreader, binary.LittleEndian, &weight)
 		shortcut := CHShortcut{
-			NodeA: node_a,
-			NodeB: node_b,
-			Edges: [2]Tuple[int32, byte]{},
+			NodeA:  node_a,
+			NodeB:  node_b,
+			_Edges: [2]Tuple[int32, byte]{},
 		}
 		for j := 0; j < 2; j++ {
 			var id int32
@@ -93,9 +93,9 @@ func _LoadCHShortcutStore(file string) (*CHShortcutStore, *DefaultWeighting) {
 			var is bool
 			binary.Read(shortcutreader, binary.LittleEndian, &is)
 			if is {
-				shortcut.Edges[j] = MakeTuple(id, byte(2))
+				shortcut._Edges[j] = MakeTuple(id, byte(2))
 			} else {
-				shortcut.Edges[j] = MakeTuple(id, byte(0))
+				shortcut._Edges[j] = MakeTuple(id, byte(0))
 			}
 		}
 		shortcuts.Add(shortcut)

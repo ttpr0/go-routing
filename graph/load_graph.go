@@ -119,6 +119,39 @@ func LoadTiledGraph2(file string) ITiledGraph2 {
 	}
 }
 
+func LoadTiledGraph3(file string) ITiledGraph3 {
+	nodes := _LoadNodeStore(file + "-nodes")
+	nodecount := nodes.NodeCount()
+	edges := _LoadEdgeStore(file + "-edges")
+	edgecount := edges.EdgeCount()
+	topology := _LoadTopologyStore(file+"-graph", nodecount)
+	geoms := _LoadGeometryStore(file+"-geom", nodecount, edgecount)
+	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
+	edge_types := _LoadEdgeTypes(file+"-tiles_types", edgecount)
+	node_tiles := _LoadNodeTileStore(file+"-tiles", nodecount)
+	fmt.Println("start buidling index")
+	index := BuildNodeIndex(geoms.GetAllNodes())
+	fmt.Println("finished building index")
+	border_topology := _LoadTopologyStore(file+"-skip3_border_topology", nodecount)
+	skip_topology := _LoadTopologyStore(file+"-skip3_topology", nodecount)
+	skip_edges, skip_weights := _LoadShortcutStore(file + "-skip3_shortcuts")
+
+	return &TiledGraph3{
+		nodes:           *nodes,
+		node_tiles:      *node_tiles,
+		topology:        *topology,
+		edges:           *edges,
+		border_topology: *border_topology,
+		skip_topology:   *skip_topology,
+		skip_edges:      *skip_edges,
+		skip_weights:    *skip_weights,
+		edge_types:      edge_types,
+		geom:            *geoms,
+		weight:          *weights,
+		index:           index,
+	}
+}
+
 //*******************************************
 // load graph information
 //*******************************************

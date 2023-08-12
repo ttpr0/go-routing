@@ -21,7 +21,12 @@ type IGraph interface {
 // not thread safe, use only one instance per thread
 type IGraphExplorer interface {
 	// multiple calls to this will overwrite underlying iterator object
+	//
 	// use only one instance at a time
+	//
+	// direction tells the traversel direction (FORWARD meand outgoing edges, BACKWARD ingoing edges)
+	//
+	// typ is basically a hint to tell which edges/sub-graph will be traversed
 	GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef]
 	GetEdgeWeight(edge EdgeRef) int32
 	GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32

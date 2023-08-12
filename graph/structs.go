@@ -22,10 +22,17 @@ type Node struct {
 	Type int8
 }
 
+type Shortcut struct {
+	NodeA         int32
+	NodeB         int32
+	_EdgeRefStart int32
+	_EdgeRefCount int16
+}
+
 type CHShortcut struct {
-	NodeA int32
-	NodeB int32
-	Edges [2]Tuple[int32, byte]
+	NodeA  int32
+	NodeB  int32
+	_Edges [2]Tuple[int32, byte]
 }
 
 type NodeRef struct {

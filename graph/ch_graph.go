@@ -102,26 +102,26 @@ func (self *CHGraph) GetShortcut(shortcut int32) CHShortcut {
 func (self *CHGraph) GetEdgesFromShortcut(edges *List[int32], shortcut_id int32, reversed bool) {
 	shortcut := self.GetShortcut(shortcut_id)
 	if reversed {
-		e := shortcut.Edges[1]
+		e := shortcut._Edges[1]
 		if e.B == 2 || e.B == 3 {
 			self.GetEdgesFromShortcut(edges, e.A, reversed)
 		} else {
 			edges.Add(e.A)
 		}
-		e = shortcut.Edges[0]
+		e = shortcut._Edges[0]
 		if e.B == 2 || e.B == 3 {
 			self.GetEdgesFromShortcut(edges, e.A, reversed)
 		} else {
 			edges.Add(e.A)
 		}
 	} else {
-		e := shortcut.Edges[0]
+		e := shortcut._Edges[0]
 		if e.B == 2 || e.B == 3 {
 			self.GetEdgesFromShortcut(edges, e.A, reversed)
 		} else {
 			edges.Add(e.A)
 		}
-		e = shortcut.Edges[1]
+		e = shortcut._Edges[1]
 		if e.B == 2 || e.B == 3 {
 			self.GetEdgesFromShortcut(edges, e.A, reversed)
 		} else {

@@ -62,7 +62,7 @@ func PreprocessTiledGraph(graph *Graph, node_tiles List[int16]) *TiledGraph {
 	for tile_id, _ := range tiles {
 		fmt.Printf("tile %v: %v / %v \n", tile_id, c, tile_count)
 		fmt.Printf("tile %v: getting start nodes \n", tile_id)
-		start_nodes := GetStartNodes(graph, node_tiles, edge_types, tile_id)
+		start_nodes, _ := GetStartNodes(graph, node_tiles, edge_types, tile_id)
 		fmt.Printf("tile %v: calculating skip edges \n", tile_id)
 		CalcSkipEdges(graph, node_tiles, edge_types, start_nodes, is_skip)
 		fmt.Printf("tile %v: finished \n", tile_id)
@@ -88,8 +88,9 @@ func PreprocessTiledGraph(graph *Graph, node_tiles List[int16]) *TiledGraph {
 }
 
 // return list of nodes that have at least one cross-border edge
-func GetStartNodes(graph *Graph, node_tiles List[int16], edge_types Array[byte], tile_id int16) List[int32] {
-	list := NewList[int32](100)
+func GetStartNodes(graph *Graph, node_tiles List[int16], edge_types Array[byte], tile_id int16) (List[int32], List[int32]) {
+	in_list := NewList[int32](100)
+	out_list := NewList[int32](100)
 
 	explorer := graph.GetDefaultExplorer()
 	for i := 0; i < graph.nodes.NodeCount(); i++ {
@@ -105,12 +106,24 @@ func GetStartNodes(graph *Graph, node_tiles List[int16], edge_types Array[byte],
 				break
 			}
 			if edge_types[ref.EdgeID] == 10 {
-				list.Add(int32(id))
+				in_list.Add(int32(id))
+				break
+			}
+		}
+
+		iter = explorer.GetAdjacentEdges(int32(id), FORWARD, ADJACENT_ALL)
+		for {
+			ref, ok := iter.Next()
+			if !ok {
+				break
+			}
+			if edge_types[ref.EdgeID] == 10 {
+				out_list.Add(int32(id))
 				break
 			}
 		}
 	}
-	return list
+	return in_list, out_list
 }
 
 // marks every edge as that lies on a shortest path between border nodes
@@ -422,5 +435,281 @@ func CalcFullSPT(graph *TiledGraph, start int32, flags Dict[int32, _Flag]) {
 			flags[other_id] = other_flag
 		}
 		flags[curr_id] = curr_flag
+	}
+}
+
+//*******************************************
+// preprocess tiled-graph 3
+//*******************************************
+
+func PreprocessTiledGraph3(graph *Graph, node_tiles List[int16]) *TiledGraph3 {
+	edge_types := NewArray[byte](graph.edges.EdgeCount())
+
+	UpdateCrossBorder(graph.edges.edges, edge_types, node_tiles)
+
+	tiles := NewDict[int16, bool](100)
+	for _, tile_id := range node_tiles {
+		if tiles.ContainsKey(tile_id) {
+			continue
+		}
+		tiles[tile_id] = true
+	}
+
+	tile_count := tiles.Length()
+	shortcuts := ShortcutStore{
+		shortcuts: NewList[Shortcut](100),
+		edge_refs: NewList[Tuple[int32, byte]](100),
+	}
+	shortcut_weights := NewList[int32](100)
+	c := 1
+	for tile_id, _ := range tiles {
+		fmt.Printf("tile %v: %v / %v \n", tile_id, c, tile_count)
+		fmt.Printf("tile %v: getting start nodes \n", tile_id)
+		start_nodes, end_nodes := GetStartNodes(graph, node_tiles, edge_types, tile_id)
+		fmt.Printf("tile %v: calculating skip edges \n", tile_id)
+		CalcShortcutEdges(graph, node_tiles, edge_types, start_nodes, end_nodes, &shortcuts, &shortcut_weights)
+		fmt.Printf("tile %v: finished \n", tile_id)
+		c += 1
+	}
+
+	skip_topology := CreateSkipShortcutTopology(graph, &shortcuts)
+
+	border_topology := CreateCrossBorderTopology(graph, edge_types)
+
+	tiled_graph := &TiledGraph3{
+		topology:        graph.topology,
+		nodes:           graph.nodes,
+		node_tiles:      NodeTileStore{node_tiles: Array[int16](node_tiles)},
+		edges:           graph.edges,
+		border_topology: border_topology,
+		skip_topology:   skip_topology,
+		skip_edges:      shortcuts,
+		skip_weights:    DefaultWeighting{shortcut_weights},
+		edge_types:      edge_types,
+		geom:            graph.geom,
+		weight:          graph.weight,
+		index:           graph.index,
+	}
+
+	return tiled_graph
+}
+
+// computes shortest path and returns edges and accumulated weight
+func CalcShortcutEdges(graph *Graph, node_tiles List[int16], edge_types Array[byte], start_nodes, end_nodes List[int32], shortcuts *ShortcutStore, shortcut_weights *List[int32]) {
+	explorer := graph.GetDefaultExplorer()
+	for _, start := range start_nodes {
+		heap := NewPriorityQueue[int32, int32](10)
+		flags := NewDict[int32, _Flag](10)
+
+		flags[start] = _Flag{pathlength: 0, visited: false, prevEdge: -1}
+		heap.Enqueue(start, 0)
+
+		for {
+			curr_id, ok := heap.Dequeue()
+			if !ok {
+				break
+			}
+			curr_flag := flags[curr_id]
+			if curr_flag.visited {
+				continue
+			}
+			curr_flag.visited = true
+			iter := explorer.GetAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL)
+			for {
+				ref, ok := iter.Next()
+				if !ok {
+					break
+				}
+				if !ref.IsEdge() {
+					continue
+				}
+				edge_id := ref.EdgeID
+				if edge_types[edge_id] == 10 {
+					continue
+				}
+				other_id := ref.OtherID
+				var other_flag _Flag
+				if flags.ContainsKey(other_id) {
+					other_flag = flags[other_id]
+				} else {
+					other_flag = _Flag{pathlength: 10000000, visited: false, prevEdge: -1}
+				}
+				if other_flag.visited {
+					continue
+				}
+				weight := explorer.GetEdgeWeight(ref)
+				newlength := curr_flag.pathlength + weight
+				if newlength < other_flag.pathlength {
+					other_flag.pathlength = newlength
+					other_flag.prevEdge = edge_id
+					heap.Enqueue(other_id, newlength)
+				}
+				flags[other_id] = other_flag
+			}
+			flags[curr_id] = curr_flag
+		}
+
+		for _, end := range end_nodes {
+			if !flags.ContainsKey(end) {
+				continue
+			}
+			path := make([]Tuple[int32, byte], 0)
+			length := int32(flags[end].pathlength)
+			// curr_id := end
+			// var edge int32
+			// for {
+			// 	if curr_id == start {
+			// 		break
+			// 	}
+			// 	edge = flags[curr_id].prevEdge
+			// 	path = append(path, MakeTuple(edge, byte(0)))
+			// 	curr_id = explorer.GetOtherNode(EdgeRef{EdgeID: edge}, curr_id)
+			// }
+			shortcuts.AddShortcut(start, end, path)
+			shortcut_weights.Add(length)
+		}
+	}
+}
+
+func CreateCrossBorderTopology(graph *Graph, edge_types Array[byte]) TopologyStore {
+	node_refs := NewList[NodeRef](graph.nodes.NodeCount())
+	fwd_edge_refs := NewList[EdgeRef](graph.edges.EdgeCount())
+	bwd_edge_refs := NewList[EdgeRef](graph.edges.EdgeCount())
+
+	explorer := graph.GetDefaultExplorer()
+
+	fwd_start := 0
+	bwd_start := 0
+	for i := 0; i < graph.nodes.NodeCount(); i++ {
+		fwd_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_EDGES)
+		fwd_count := 0
+		for {
+			ref, ok := fwd_edges.Next()
+			if !ok {
+				break
+			}
+			if !ref.IsEdge() {
+				continue
+			}
+			if edge_types[ref.EdgeID] != 10 {
+				continue
+			}
+			fwd_edge_refs.Add(EdgeRef{
+				EdgeID:  ref.EdgeID,
+				OtherID: ref.OtherID,
+				_Type:   edge_types[ref.EdgeID],
+			})
+			fwd_count += 1
+		}
+
+		bwd_edges := explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_EDGES)
+		bwd_count := 0
+		for {
+			ref, ok := bwd_edges.Next()
+			if !ok {
+				break
+			}
+			if !ref.IsEdge() {
+				continue
+			}
+			if edge_types[ref.EdgeID] != 10 {
+				continue
+			}
+			bwd_edge_refs.Add(EdgeRef{
+				EdgeID:  ref.EdgeID,
+				OtherID: ref.OtherID,
+				_Type:   edge_types[ref.EdgeID],
+			})
+			bwd_count += 1
+		}
+
+		node_refs.Add(NodeRef{
+			EdgeRefFWDStart: int32(fwd_start),
+			EdgeRefFWDCount: int16(fwd_count),
+			EdgeRefBWDStart: int32(bwd_start),
+			EdgeRefBWDCount: int16(bwd_count),
+		})
+
+		fwd_start += fwd_count
+		bwd_start += bwd_count
+	}
+
+	return TopologyStore{
+		node_refs:     node_refs,
+		fwd_edge_refs: fwd_edge_refs,
+		bwd_edge_refs: bwd_edge_refs,
+	}
+}
+
+func CreateSkipShortcutTopology(graph *Graph, shortcuts *ShortcutStore) TopologyStore {
+	fwd_ref_lists := NewDict[int32, List[EdgeRef]](100)
+	bwd_ref_lists := NewDict[int32, List[EdgeRef]](100)
+	for i := 0; i < shortcuts.ShortcutCount(); i++ {
+		shc := shortcuts.GetShortcut(int32(i))
+		var fwd_refs List[EdgeRef]
+		if !fwd_ref_lists.ContainsKey(shc.NodeA) {
+			fwd_refs = NewList[EdgeRef](10)
+		} else {
+			fwd_refs = fwd_ref_lists[shc.NodeA]
+		}
+		fwd_refs.Add(EdgeRef{EdgeID: int32(i), OtherID: shc.NodeB, _Type: 101})
+		fwd_ref_lists[shc.NodeA] = fwd_refs
+
+		var bwd_refs List[EdgeRef]
+		if !bwd_ref_lists.ContainsKey(shc.NodeB) {
+			bwd_refs = NewList[EdgeRef](10)
+		} else {
+			bwd_refs = bwd_ref_lists[shc.NodeB]
+		}
+		bwd_refs.Add(EdgeRef{EdgeID: int32(i), OtherID: shc.NodeA, _Type: 101})
+		bwd_ref_lists[shc.NodeB] = bwd_refs
+	}
+
+	node_refs := NewList[NodeRef](graph.nodes.NodeCount())
+	fwd_edge_refs := NewList[EdgeRef](shortcuts.ShortcutCount())
+	bwd_edge_refs := NewList[EdgeRef](shortcuts.ShortcutCount())
+
+	fwd_start := 0
+	bwd_start := 0
+	for i := 0; i < graph.nodes.NodeCount(); i++ {
+		var fwd_edges List[EdgeRef]
+		if !fwd_ref_lists.ContainsKey(int32(i)) {
+			fwd_edges = nil
+		} else {
+			fwd_edges = fwd_ref_lists[int32(i)]
+		}
+		fwd_count := 0
+		for _, ref := range fwd_edges {
+			fwd_edge_refs.Add(ref)
+			fwd_count += 1
+		}
+
+		var bwd_edges List[EdgeRef]
+		if !bwd_ref_lists.ContainsKey(int32(i)) {
+			bwd_edges = nil
+		} else {
+			bwd_edges = bwd_ref_lists[int32(i)]
+		}
+		bwd_count := 0
+		for _, ref := range bwd_edges {
+			bwd_edge_refs.Add(ref)
+			bwd_count += 1
+		}
+
+		node_refs.Add(NodeRef{
+			EdgeRefFWDStart: int32(fwd_start),
+			EdgeRefFWDCount: int16(fwd_count),
+			EdgeRefBWDStart: int32(bwd_start),
+			EdgeRefBWDCount: int16(bwd_count),
+		})
+
+		fwd_start += fwd_count
+		bwd_start += bwd_count
+	}
+
+	return TopologyStore{
+		node_refs:     node_refs,
+		fwd_edge_refs: fwd_edge_refs,
+		bwd_edge_refs: bwd_edge_refs,
 	}
 }
