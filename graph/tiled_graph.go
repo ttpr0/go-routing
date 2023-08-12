@@ -93,7 +93,7 @@ type TiledGraphExplorer struct {
 	weight   IWeighting
 }
 
-func (self *TiledGraphExplorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
+func (self *TiledGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
 	self.accessor.SetBaseNode(node, direction)
 	return &TiledEdgeRefIterator{
 		accessor:   &self.accessor,

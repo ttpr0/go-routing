@@ -712,7 +712,7 @@ func MarkNodesOnPath(start, end int32, sp_counts Array[int32], graph IGraph, hea
 			continue
 		}
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

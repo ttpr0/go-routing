@@ -38,7 +38,7 @@ func CalcRPHASTEnhanced2SFCA(g graph.ICHGraph, supply_locs, demand_locs [][2]flo
 		}
 		graph_subset[node] = true
 		node_level := g.GetNodeLevel(node)
-		edges := explorer.GetAdjacentEdges(node, graph.BACKWARD)
+		edges := explorer.GetAdjacentEdges(node, graph.BACKWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

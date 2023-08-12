@@ -60,7 +60,7 @@ func (self *RPHAST) CalcSPT() {
 			continue
 		}
 		curr_flag.Visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -91,7 +91,7 @@ func (self *RPHAST) CalcSPT() {
 		if curr_len > self.max_range {
 			continue
 		}
-		edges := explorer.GetAdjacentEdges(int32(i), graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(int32(i), graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

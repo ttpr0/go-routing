@@ -36,7 +36,7 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 			continue
 		}
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -64,7 +64,7 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 
 	for i := 0; i < len(flags); i++ {
 		curr_len := flags[i].path_length
-		edges := explorer.GetAdjacentEdges(int32(i), graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(int32(i), graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

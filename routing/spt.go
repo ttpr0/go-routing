@@ -67,7 +67,7 @@ func (self *ShortestPathTree) CalcShortestPathTree() {
 		}
 		self.consumer.ConsumePoint(self.geom.GetNode(curr_id), int(curr_flag.path_length))
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

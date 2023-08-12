@@ -65,7 +65,7 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited1 = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -120,7 +120,7 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited2 = true
-		edges = explorer.GetAdjacentEdges(curr_id, graph.BACKWARD)
+		edges = explorer.GetAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -177,7 +177,7 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *List[geo.CoordArray
 			continue
 		}
 		curr_flag.visited1 = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -223,7 +223,7 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *List[geo.CoordArray
 			continue
 		}
 		curr_flag.visited2 = true
-		edges = explorer.GetAdjacentEdges(curr_id, graph.BACKWARD)
+		edges = explorer.GetAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

@@ -89,7 +89,7 @@ func (self *CH) CalcShortestPath() bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+			edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 			for {
 				ref, ok := edges.Next()
 				if !ok {
@@ -131,7 +131,7 @@ func (self *CH) CalcShortestPath() bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			edges := explorer.GetAdjacentEdges(curr_id, graph.BACKWARD)
+			edges := explorer.GetAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL)
 			for {
 				ref, ok := edges.Next()
 				if !ok {
@@ -202,7 +202,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			shortcuts := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+			shortcuts := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 			for {
 				ref, ok := shortcuts.Next()
 				if !ok {
@@ -254,7 +254,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			shortcuts := explorer.GetAdjacentEdges(curr_id, graph.BACKWARD)
+			shortcuts := explorer.GetAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL)
 			for {
 				ref, ok := shortcuts.Next()
 				if !ok {

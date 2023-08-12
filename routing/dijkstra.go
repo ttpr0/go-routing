@@ -58,7 +58,7 @@ func (self *Dijkstra) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -103,7 +103,7 @@ func (self *Dijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool 
 			continue
 		}
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

@@ -36,7 +36,7 @@ func CalcAllDijkstra(g graph.IGraph, start int32) {
 			continue
 		}
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

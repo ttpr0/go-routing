@@ -60,7 +60,7 @@ func (self *AStar) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -105,7 +105,7 @@ func (self *AStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 			continue
 		}
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

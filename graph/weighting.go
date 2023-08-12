@@ -101,7 +101,7 @@ func _CreateTCWeighting(graph *Graph) *TCWeighting {
 	explorer := graph.GetDefaultExplorer()
 	for i := 0; i < int(graph.NodeCount()); i++ {
 		fwd_index := 0
-		iter := explorer.GetAdjacentEdges(int32(i), FORWARD)
+		iter := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL)
 		for {
 			ref, ok := iter.Next()
 			if !ok {
@@ -115,7 +115,7 @@ func _CreateTCWeighting(graph *Graph) *TCWeighting {
 			fwd_index += 1
 		}
 		bwd_index := 0
-		iter = explorer.GetAdjacentEdges(int32(i), BACKWARD)
+		iter = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL)
 		for {
 			ref, ok := iter.Next()
 			if !ok {

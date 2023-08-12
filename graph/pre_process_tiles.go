@@ -93,7 +93,7 @@ func GetStartNodes(graph *TiledGraph, tile_id int16) List[int32] {
 		if tile != tile_id {
 			continue
 		}
-		iter := explorer.GetAdjacentEdges(int32(id), BACKWARD)
+		iter := explorer.GetAdjacentEdges(int32(id), BACKWARD, ADJACENT_ALL)
 		for {
 			ref, ok := iter.Next()
 			if !ok {
@@ -131,7 +131,7 @@ func CalcSkipEdges(graph *TiledGraph, start_nodes List[int32], is_skip []bool) {
 				continue
 			}
 			curr_flag.visited = true
-			iter := explorer.GetAdjacentEdges(curr_id, FORWARD)
+			iter := explorer.GetAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL)
 			for {
 				ref, ok := iter.Next()
 				if !ok {
@@ -278,7 +278,7 @@ func GetBorderNodes(graph *TiledGraph, tile_id int16) (Array[int32], Array[int32
 		if tile != tile_id {
 			continue
 		}
-		iter := explorer.GetAdjacentEdges(int32(id), BACKWARD)
+		iter := explorer.GetAdjacentEdges(int32(id), BACKWARD, ADJACENT_ALL)
 		is_border := false
 		for {
 			ref, ok := iter.Next()
@@ -317,7 +317,7 @@ func CalcFullSPT(graph *TiledGraph, start int32, flags Dict[int32, _Flag]) {
 			continue
 		}
 		curr_flag.visited = true
-		iter := explorer.GetAdjacentEdges(curr_id, FORWARD)
+		iter := explorer.GetAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL)
 		for {
 			ref, ok := iter.Next()
 			if !ok {

@@ -30,3 +30,12 @@ const (
 	ROAD           RoadType = 14
 	TRACK          RoadType = 15
 )
+
+type Adjacency byte
+
+const (
+	ADJACENT_EDGES     Adjacency = 0
+	ADJACENT_SHORTCUTS Adjacency = 1
+	ADJACENT_ALL       Adjacency = 2
+	ADJACENT_SKIP      Adjacency = 3
+)

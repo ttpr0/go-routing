@@ -143,7 +143,7 @@ type CHGraphExplorer struct {
 	sh_weight   IWeighting
 }
 
-func (self *CHGraphExplorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
+func (self *CHGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
 	self.accessor.SetBaseNode(node, direction)
 	self.sh_accessor.SetBaseNode(node, direction)
 	return &CHEdgeRefIterator{

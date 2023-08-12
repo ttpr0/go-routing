@@ -55,6 +55,7 @@ func (self *TopologyStore) _ReorderNodes(mapping Array[int32]) {
 	for i, id := range mapping {
 		node_refs[id] = self.node_refs[i]
 	}
+	self.node_refs = List[NodeRef](node_refs)
 
 	fwd_edge_refs := NewList[EdgeRef](self.fwd_edge_refs.Length())
 	bwd_edge_refs := NewList[EdgeRef](self.bwd_edge_refs.Length())
@@ -89,8 +90,6 @@ func (self *TopologyStore) _ReorderNodes(mapping Array[int32]) {
 		fwd_start += fwd_count
 		bwd_start += bwd_count
 	}
-
-	self.node_refs = List[NodeRef](node_refs)
 	self.fwd_edge_refs = fwd_edge_refs
 	self.bwd_edge_refs = bwd_edge_refs
 }

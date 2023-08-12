@@ -22,7 +22,7 @@ type IGraph interface {
 type IGraphExplorer interface {
 	// multiple calls to this will overwrite underlying iterator object
 	// use only one instance at a time
-	GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef]
+	GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef]
 	GetEdgeWeight(edge EdgeRef) int32
 	GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32
 	GetOtherNode(edge EdgeRef, node int32) int32
@@ -88,7 +88,7 @@ type BaseGraphExplorer struct {
 	weight   IWeighting
 }
 
-func (self *BaseGraphExplorer) GetAdjacentEdges(node int32, direction Direction) IIterator[EdgeRef] {
+func (self *BaseGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
 	accessor := &self.accessor
 	accessor.SetBaseNode(node, direction)
 	return &EdgeRefIterator{

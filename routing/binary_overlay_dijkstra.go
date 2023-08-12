@@ -60,7 +60,7 @@ func (self *BODijkstra) CalcShortestPath() bool {
 		}
 		curr_flag.visited = true
 		self.flags.Set(curr_id, curr_flag)
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -126,7 +126,7 @@ func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) boo
 		}
 		curr_flag.visited = true
 		self.flags.Set(curr_id, curr_flag)
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD)
+		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {

@@ -48,11 +48,6 @@ func BuildNodeIndex(node_geoms List[geo.Coord]) KDTree[int32] {
 
 func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollection) {
 	geom := graph.GetGeometry()
-	edge_types := make([]int16, int(graph.EdgeCount()))
-	for i := 0; i < graph.topology.fwd_edge_refs.Length(); i++ {
-		edge_ref := graph.topology.fwd_edge_refs[i]
-		edge_types[edge_ref.EdgeID] = int16(edge_ref._Type)
-	}
 
 	edges := NewList[geo.Feature](int(graph.EdgeCount()))
 	for i := 0; i < graph.edges.EdgeCount(); i++ {
@@ -60,8 +55,14 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 		if i%1000 == 0 {
 			fmt.Println("edge ", i)
 		}
+		var edge_type int16
+		if graph.GetNodeTile(edge.NodeA) == graph.GetNodeTile(edge.NodeB) {
+			edge_type = graph.GetNodeTile(edge.NodeA)
+		} else {
+			edge_type = -10
+		}
 		line := geo.NewLineString(geom.GetEdge(int32(i)))
-		edges.Add(geo.NewFeature(&line, map[string]any{"index": i, "nodeA": edge.NodeA, "nodeB": edge.NodeB, "type": edge_types[i]}))
+		edges.Add(geo.NewFeature(&line, map[string]any{"index": i, "nodeA": edge.NodeA, "nodeB": edge.NodeB, "type": edge_type}))
 	}
 
 	nodes := NewList[geo.Feature](int(graph.NodeCount()))
@@ -73,8 +74,9 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 		for j := 0; j < int(node.EdgeRefFWDCount); j++ {
 			e.Add(graph.topology.fwd_edge_refs[int(node.EdgeRefFWDStart)+j].EdgeID)
 		}
+		node_tile := graph.node_tiles.GetNodeTile(int32(i))
 		point := geo.NewPoint(geom.GetNode(int32(i)))
-		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.EdgeRefFWDCount, "edges": e, "tile": graph.node_tiles.GetNodeTile(int32(i))}))
+		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.EdgeRefFWDCount, "edges": e, "tile": node_tile}))
 	}
 
 	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)
@@ -84,7 +86,7 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 func CheckGraph(g IGraph) {
 	explorer := g.GetDefaultExplorer()
 	for i := 0; i < int(g.NodeCount()); i++ {
-		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD)
+		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL)
 		for {
 			ref, ok := adj_edges.Next()
 			if !ok {
@@ -101,7 +103,7 @@ func CheckGraph(g IGraph) {
 				fmt.Println("error 84")
 			}
 		}
-		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD)
+		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL)
 		for {
 			ref, ok := adj_edges.Next()
 			if !ok {
@@ -125,7 +127,7 @@ func CheckGraph(g IGraph) {
 func CheckCHGraph(g ICHGraph) {
 	explorer := g.GetDefaultExplorer()
 	for i := 0; i < int(g.NodeCount()); i++ {
-		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD)
+		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL)
 		for {
 			ref, ok := adj_edges.Next()
 			if !ok {
@@ -149,7 +151,7 @@ func CheckCHGraph(g ICHGraph) {
 				}
 			}
 		}
-		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD)
+		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL)
 		for {
 			ref, ok := adj_edges.Next()
 			if !ok {
