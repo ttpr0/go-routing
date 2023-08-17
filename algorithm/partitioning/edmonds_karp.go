@@ -74,11 +74,13 @@ func (self *EdmondsKarp) ComputeMinCut() {
 	//queue := self.source_queue.Copy()
 
 	queue := NewQueue[int32]()
+	visited := NewArray[bool](int(self.g.NodeCount()))
 
 	// clear visited
 	for i := 0; i < int(self.g.NodeCount()); i++ {
 		if self.node_tiles[i] == self.source_tile {
 			queue.Push(int32(i))
+			visited[i] = true
 		}
 	}
 
@@ -101,10 +103,11 @@ func (self *EdmondsKarp) ComputeMinCut() {
 			if !ok {
 				break
 			}
-			if self.edge_flow[ref.EdgeID] == 1 || self.node_tiles[ref.OtherID] != self.base_tile {
+			if self.edge_flow[ref.EdgeID] == 1 || visited[ref.OtherID] {
 				continue
 			}
 			queue.Push(ref.OtherID)
+			visited[ref.OtherID] = true
 		}
 		edges = explorer.GetAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES)
 		for {
@@ -112,10 +115,11 @@ func (self *EdmondsKarp) ComputeMinCut() {
 			if !ok {
 				break
 			}
-			if self.edge_flow[ref.EdgeID] == 0 || self.node_tiles[ref.OtherID] != self.base_tile {
+			if self.edge_flow[ref.EdgeID] == 0 || visited[ref.OtherID] {
 				continue
 			}
 			queue.Push(ref.OtherID)
+			visited[ref.OtherID] = true
 		}
 	}
 
