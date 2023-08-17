@@ -61,29 +61,80 @@ func InertialFlow(g graph.IGraph) Array[int16] {
 	// compute node orderings by location embedding
 	orders := CreateOrders(g)
 
-	// create source and sink thresholds
-	k := 0.25
-	so_c := int(float64(g.NodeCount()) * k)
-	si_c := int(float64(g.NodeCount()) * (1 - k))
+	// create node_tiles array
+	node_tiles := NewArray[int16](int(g.NodeCount()))
 
-	var max_alg *EdmondsKarp
-	max_flow := -1
-	fmt.Println("start computing flows")
-	for _, order := range orders {
-		alg := NewEdmondsKarp(g, order[:so_c], 1, order[si_c:], 2, order[so_c:si_c], 0)
-		flow := alg.ComputeMaxFlow()
-		fmt.Println("computed flow:", flow)
-		if flow > max_flow {
-			max_flow = flow
-			max_alg = alg
+	// init processing queue containing to be splitted tiles
+	proc_queue := NewQueue[int16]()
+	proc_queue.Push(0)
+
+	// keep track of tile ids
+	max_tile := int16(0)
+
+	// iterate until no more tiles to be processed
+	for proc_queue.Size() > 0 {
+		curr_tile, _ := proc_queue.Pop()
+		source_tile := max_tile + 1
+		sink_tile := max_tile + 2
+
+		// dont process if node count is small enough
+		node_count := 0
+		for i := 0; i < node_tiles.Length(); i++ {
+			if node_tiles[i] == curr_tile {
+				node_count += 1
+			}
 		}
+		if node_count < 10000 {
+			continue
+		}
+
+		// compute max-flow for every direction
+		var max_alg *EdmondsKarp
+		max_flow := -1
+		fmt.Println("start computing flows")
+		for _, order := range orders {
+			// select nodes from current tile
+			nodes := NewList[int32](node_count)
+			for _, node := range order {
+				if node_tiles[node] == curr_tile {
+					nodes.Add(node)
+				}
+			}
+			// create source and sink thresholds
+			k := 0.25
+			so_c := int(float64(nodes.Length()) * k)
+			si_c := int(float64(nodes.Length()) * (1 - k))
+
+			// compute max-flow for current direction
+			alg := NewEdmondsKarp(g, nodes[:so_c], source_tile, nodes[si_c:], sink_tile, nodes[so_c:si_c], curr_tile)
+			flow := alg.ComputeMaxFlow()
+			fmt.Println("computed flow:", flow)
+
+			// select minimum max-flow
+			if flow < max_flow || max_flow == -1 {
+				max_flow = flow
+				max_alg = alg
+			}
+		}
+		// compute min-cut on minimum max-flow
+		fmt.Println("start computing min cut")
+		max_alg.ComputeMinCut()
+
+		// set computed tiles
+		tiles := max_alg.GetNodeTiles()
+		for i := 0; i < node_tiles.Length(); i++ {
+			if node_tiles[i] != curr_tile {
+				continue
+			}
+			node_tiles[i] = tiles[i]
+		}
+		max_tile += 2
+
+		// add new tiles to processing queue
+		proc_queue.Push(source_tile)
+		proc_queue.Push(sink_tile)
 	}
-	if max_alg == nil {
-		panic("no min cut found")
-	}
-	fmt.Println("start computing min cut")
-	max_alg.ComputeMinCut()
 
 	fmt.Println("inertial flow finished")
-	return max_alg.GetNodeTiles()
+	return node_tiles
 }
