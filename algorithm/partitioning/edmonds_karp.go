@@ -1,16 +1,20 @@
 package partitioning
 
 import (
-	"fmt"
-
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type EdmondsKarp struct {
-	g           graph.IGraph
-	node_tiles  Array[int16]
-	edge_flow   Array[byte]
+	g          graph.IGraph
+	node_tiles Array[int16]
+
+	// edge flows stored as 0 or 1;
+	//
+	// To solve issue with reverse oneway edges, each directed edge of the original graph is viewed as two edges with two flows:
+	// first is for the actual edge,
+	// second for a "virtual" edge used during BFS reversed to the orignal edge;
+	edge_flow   Array[Tuple[byte, byte]]
 	base_tile   int16
 	source_tile int16
 	sink_tile   int16
@@ -21,12 +25,12 @@ type EdmondsKarp struct {
 	visited      Array[bool]
 }
 
-func NewEdmondsKarp(g graph.IGraph, sources Array[int32], source_tile int16, sinks Array[int32], sink_tile int16, base_nodes Array[int32], base_tile int16) *EdmondsKarp {
+func NewEdmondsKarp(g graph.IGraph, sources List[int32], source_tile int16, sinks List[int32], sink_tile int16, base_nodes List[int32], base_tile int16) *EdmondsKarp {
 	source_queue := NewArrayQueue[int32](100)
 	node_tiles := NewArray[int16](int(g.NodeCount()))
 	bfs_flags := NewArray[_Flag](int(g.NodeCount()))
 	visited := NewArray[bool](int(g.NodeCount()))
-	edge_flow := NewArray[byte](int(g.EdgeCount()))
+	edge_flow := NewArray[Tuple[byte, byte]](int(g.EdgeCount()))
 
 	for _, node := range base_nodes {
 		node_tiles[node] = base_tile
@@ -55,12 +59,7 @@ func NewEdmondsKarp(g graph.IGraph, sources Array[int32], source_tile int16, sin
 }
 
 func (self *EdmondsKarp) ComputeMaxFlow() int {
-	c := 0
 	for {
-		c += 1
-		if c%100 == 0 {
-			fmt.Println("iteration", c)
-		}
 		flow := self.BFS()
 		if flow == 0 {
 			break
@@ -103,11 +102,15 @@ func (self *EdmondsKarp) ComputeMinCut() {
 			if !ok {
 				break
 			}
-			if self.edge_flow[ref.EdgeID] == 1 || visited[ref.OtherID] {
+			if visited[ref.OtherID] || self.node_tiles[ref.OtherID] != self.base_tile {
 				continue
 			}
-			queue.Push(ref.OtherID)
-			visited[ref.OtherID] = true
+
+			flow := self.edge_flow[ref.EdgeID]
+			if flow.A == 0 || flow.B == 1 {
+				queue.Push(ref.OtherID)
+				visited[ref.OtherID] = true
+			}
 		}
 		edges = explorer.GetAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES)
 		for {
@@ -115,11 +118,15 @@ func (self *EdmondsKarp) ComputeMinCut() {
 			if !ok {
 				break
 			}
-			if self.edge_flow[ref.EdgeID] == 0 || visited[ref.OtherID] {
+			if visited[ref.OtherID] || self.node_tiles[ref.OtherID] != self.base_tile {
 				continue
 			}
-			queue.Push(ref.OtherID)
-			visited[ref.OtherID] = true
+
+			flow := self.edge_flow[ref.EdgeID]
+			if flow.A == 1 || flow.B == 0 {
+				queue.Push(ref.OtherID)
+				visited[ref.OtherID] = true
+			}
 		}
 	}
 
@@ -138,6 +145,7 @@ type _Flag struct {
 	prev_node  int32
 	prev_edge  int32
 	is_reverse bool
+	is_virtual bool
 }
 
 // computed bfs on residual graph and returns new flow
@@ -177,25 +185,36 @@ func (self *EdmondsKarp) BFS() int {
 			if !ok {
 				break
 			}
-
 			// check if edge should stil be traversed
-			if visited[ref.OtherID] || self.edge_flow[ref.EdgeID] == 1 {
+			if visited[ref.OtherID] {
 				continue
 			}
-
 			// check if node is part of subgraph
 			tile := self.node_tiles[ref.OtherID]
 			if tile != self.base_tile && tile != self.source_tile && tile != self.sink_tile {
 				continue
 			}
 
-			other_flag := flags[ref.OtherID]
-			other_flag.is_reverse = false
-			other_flag.prev_edge = ref.EdgeID
-			other_flag.prev_node = curr
-			flags[ref.OtherID] = other_flag
-			queue.Push(ref.OtherID)
-			visited[ref.OtherID] = true
+			flow := self.edge_flow[ref.EdgeID]
+			if flow.A == 0 {
+				other_flag := flags[ref.OtherID]
+				other_flag.is_reverse = false
+				other_flag.is_virtual = false
+				other_flag.prev_edge = ref.EdgeID
+				other_flag.prev_node = curr
+				flags[ref.OtherID] = other_flag
+				queue.Push(ref.OtherID)
+				visited[ref.OtherID] = true
+			} else if flow.B == 1 {
+				other_flag := flags[ref.OtherID]
+				other_flag.is_reverse = true
+				other_flag.is_virtual = true
+				other_flag.prev_edge = ref.EdgeID
+				other_flag.prev_node = curr
+				flags[ref.OtherID] = other_flag
+				queue.Push(ref.OtherID)
+				visited[ref.OtherID] = true
+			}
 		}
 		edges = explorer.GetAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES)
 		for {
@@ -203,25 +222,36 @@ func (self *EdmondsKarp) BFS() int {
 			if !ok {
 				break
 			}
-
+			// check if edge should stil be traversed
+			if visited[ref.OtherID] {
+				continue
+			}
 			// check if node is part of subgraph
 			tile := self.node_tiles[ref.OtherID]
 			if tile != self.base_tile && tile != self.source_tile && tile != self.sink_tile {
 				continue
 			}
 
-			// check if edge should stil be traversed
-			if visited[ref.OtherID] || self.edge_flow[ref.EdgeID] == 0 {
-				continue
+			flow := self.edge_flow[ref.EdgeID]
+			if flow.A == 1 {
+				other_flag := flags[ref.OtherID]
+				other_flag.is_reverse = true
+				other_flag.is_virtual = false
+				other_flag.prev_edge = ref.EdgeID
+				other_flag.prev_node = curr
+				flags[ref.OtherID] = other_flag
+				queue.Push(ref.OtherID)
+				visited[ref.OtherID] = true
+			} else if flow.B == 0 {
+				other_flag := flags[ref.OtherID]
+				other_flag.is_reverse = false
+				other_flag.is_virtual = true
+				other_flag.prev_edge = ref.EdgeID
+				other_flag.prev_node = curr
+				flags[ref.OtherID] = other_flag
+				queue.Push(ref.OtherID)
+				visited[ref.OtherID] = true
 			}
-
-			other_flag := flags[ref.OtherID]
-			other_flag.is_reverse = true
-			other_flag.prev_edge = ref.EdgeID
-			other_flag.prev_node = curr
-			flags[ref.OtherID] = other_flag
-			queue.Push(ref.OtherID)
-			visited[ref.OtherID] = true
 		}
 	}
 
@@ -234,9 +264,21 @@ func (self *EdmondsKarp) BFS() int {
 		}
 		curr_flag := flags[end]
 		if curr_flag.is_reverse {
-			self.edge_flow[curr_flag.prev_edge] = 0
+			flow := self.edge_flow[curr_flag.prev_edge]
+			if curr_flag.is_virtual {
+				flow.B = 0
+			} else {
+				flow.A = 0
+			}
+			self.edge_flow[curr_flag.prev_edge] = flow
 		} else {
-			self.edge_flow[curr_flag.prev_edge] = 1
+			flow := self.edge_flow[curr_flag.prev_edge]
+			if curr_flag.is_virtual {
+				flow.B = 1
+			} else {
+				flow.A = 1
+			}
+			self.edge_flow[curr_flag.prev_edge] = flow
 		}
 		end = curr_flag.prev_node
 	}
