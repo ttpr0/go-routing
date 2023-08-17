@@ -71,7 +71,16 @@ func (self *EdmondsKarp) ComputeMaxFlow() int {
 }
 
 func (self *EdmondsKarp) ComputeMinCut() {
-	queue := self.source_queue.Copy()
+	//queue := self.source_queue.Copy()
+
+	queue := NewQueue[int32]()
+
+	// clear visited
+	for i := 0; i < int(self.g.NodeCount()); i++ {
+		if self.node_tiles[i] == self.source_tile {
+			queue.Push(int32(i))
+		}
+	}
 
 	explorer := self.g.GetDefaultExplorer()
 	for {
@@ -129,13 +138,20 @@ type _Flag struct {
 
 // computed bfs on residual graph and returns new flow
 func (self *EdmondsKarp) BFS() int {
-	queue := self.source_queue.Copy()
+	// queue := self.source_queue.Copy()
 	flags := self.bfs_flags
 	visited := self.visited
 
+	queue := NewQueue[int32]()
+
 	// clear visited
 	for i := 0; i < visited.Length(); i++ {
-		visited[i] = false
+		if self.node_tiles[i] == self.source_tile {
+			visited[i] = true
+			queue.Push(int32(i))
+		} else {
+			visited[i] = false
+		}
 	}
 
 	explorer := self.g.GetDefaultExplorer()
@@ -150,10 +166,6 @@ func (self *EdmondsKarp) BFS() int {
 			end = curr
 			break
 		}
-		if visited[curr] {
-			continue
-		}
-		visited[curr] = true
 
 		edges := explorer.GetAdjacentEdges(curr, graph.FORWARD, graph.ADJACENT_EDGES)
 		for {
@@ -162,14 +174,14 @@ func (self *EdmondsKarp) BFS() int {
 				break
 			}
 
-			// check if node is part of subgraph
-			tile := self.node_tiles[ref.OtherID]
-			if tile != self.base_tile && tile != self.source_tile && tile != self.sink_tile {
+			// check if edge should stil be traversed
+			if visited[ref.OtherID] || self.edge_flow[ref.EdgeID] == 1 {
 				continue
 			}
 
-			// check if edge should stil be traversed
-			if visited[ref.OtherID] || self.edge_flow[ref.EdgeID] == 1 {
+			// check if node is part of subgraph
+			tile := self.node_tiles[ref.OtherID]
+			if tile != self.base_tile && tile != self.source_tile && tile != self.sink_tile {
 				continue
 			}
 
@@ -179,6 +191,7 @@ func (self *EdmondsKarp) BFS() int {
 			other_flag.prev_node = curr
 			flags[ref.OtherID] = other_flag
 			queue.Push(ref.OtherID)
+			visited[ref.OtherID] = true
 		}
 		edges = explorer.GetAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES)
 		for {
@@ -204,6 +217,7 @@ func (self *EdmondsKarp) BFS() int {
 			other_flag.prev_node = curr
 			flags[ref.OtherID] = other_flag
 			queue.Push(ref.OtherID)
+			visited[ref.OtherID] = true
 		}
 	}
 
