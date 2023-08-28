@@ -3,12 +3,13 @@ package access
 import (
 	"sync"
 
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, supply_locs, demand_locs [][2]float32, supply_weights, demand_weights []float32, max_range float32) []float32 {
+func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, supply_locs, demand_locs Array[geo.Coord], supply_weights, demand_weights Array[int32], max_range float32) []float32 {
 	index := g.GetIndex()
 	population_nodes := NewArray[int32](len(demand_locs))
 	node_flag := NewArray[bool](int(g.NodeCount()))
@@ -24,9 +25,9 @@ func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, supply_locs, demand_locs [][2]
 			population_nodes[i] = -1
 		}
 	}
-	facility_chan := make(chan Tuple[[2]float32, float32], len(supply_locs))
+	facility_chan := make(chan Tuple[geo.Coord, float32], len(supply_locs))
 	for i, facility := range supply_locs {
-		facility_chan <- MakeTuple(facility, supply_weights[i])
+		facility_chan <- MakeTuple(facility, float32(supply_weights[i]))
 	}
 
 	access := NewArray[float32](len(demand_locs))
@@ -94,7 +95,7 @@ func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, supply_locs, demand_locs [][2]
 						continue
 					}
 					distance_decay := float32(1 - flag.PathLength/float64(max_range))
-					facility_weight += demand_weights[i] * distance_decay
+					facility_weight += float32(demand_weights[i]) * distance_decay
 				}
 				for i, node := range population_nodes {
 					if node == -1 {

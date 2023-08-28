@@ -4,11 +4,12 @@ import (
 	"sync"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/algorithm"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func CalcRPHASTEnhanced2SFCA(g graph.ICHGraph, supply_locs, demand_locs [][2]float32, supply_weights, demand_weights []float32, max_range float32) []float32 {
+func CalcRPHASTEnhanced2SFCA(g graph.ICHGraph, supply_locs, demand_locs Array[geo.Coord], supply_weights, demand_weights Array[int32], max_range float32) []float32 {
 	node_queue := NewQueue[int32]()
 	index := g.GetIndex()
 	population_nodes := NewArray[int32](len(demand_locs))
@@ -21,9 +22,9 @@ func CalcRPHASTEnhanced2SFCA(g graph.ICHGraph, supply_locs, demand_locs [][2]flo
 			population_nodes[i] = -1
 		}
 	}
-	facility_chan := make(chan Tuple[[2]float32, float32], len(supply_locs))
+	facility_chan := make(chan Tuple[geo.Coord, float32], len(supply_locs))
 	for i, facility := range supply_locs {
-		facility_chan <- MakeTuple(facility, supply_weights[i])
+		facility_chan <- MakeTuple(facility, float32(supply_weights[i]))
 	}
 
 	explorer := g.GetDefaultExplorer()
@@ -85,7 +86,7 @@ func CalcRPHASTEnhanced2SFCA(g graph.ICHGraph, supply_locs, demand_locs [][2]flo
 						continue
 					}
 					distance_decay := float32(1 - flag.PathLength/float64(max_range))
-					facility_weight += demand_weights[i] * distance_decay
+					facility_weight += float32(demand_weights[i]) * distance_decay
 				}
 				for i, node := range population_nodes {
 					if node == -1 {

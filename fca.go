@@ -1,21 +1,19 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/provider"
 )
 
 type FCARequest struct {
-	PopulationLocations [][2]float32 `json:"population_locations"`
-	PopulationDemand    []float32    `json:"population_weights"`
-	FacilityLocations   [][2]float32 `json:"facility_locations"`
-	FacilityCapacities  []float32    `json:"facility_capacities"`
-	MaxRange            float64      `json:"max_range"`
-	Mode                string       `json:"mode"`
+	Demand        DemandRequestParams  `json:"demand"`
+	DistanceDecay DecayRequestParams   `json:"distance_decay"`
+	Routing       RoutingRequestParams `json:"routing"`
+	Supply        SupplyRequestParams  `json:"supply"`
+	Mode          string               `json:"mode"`
 }
 
 type FCAResponse struct {
@@ -23,26 +21,63 @@ type FCAResponse struct {
 }
 
 func HandleFCARequest(w http.ResponseWriter, r *http.Request) {
-	data, _ := io.ReadAll(r.Body)
-	req := FCARequest{}
-	err := json.Unmarshal(data, &req)
-	if err != nil {
-		fmt.Println(err.Error())
+	req := ReadRequestBody[FCARequest](r)
+	fmt.Println("Run FCA Request")
+
+	demand_view := GetDemandView(req.Demand)
+	if demand_view == nil {
+		WriteResponse(w, NewErrorResponse("2sfca/enhanced", "failed to get demand-view, parameters are invalid"), http.StatusBadRequest)
+		return
+	}
+	supply_view := GetSupplyView(req.Supply)
+	if supply_view == nil {
+		WriteResponse(w, NewErrorResponse("2sfca/enhanced", "failed to get supply-view, parameters are invalid"), http.StatusBadRequest)
+		return
+	}
+	routing_provider := GetRoutingProvider(req.Routing)
+	distance_decay := GetDistanceDecay(req.DistanceDecay)
+	if distance_decay == nil {
+		WriteResponse(w, NewErrorResponse("2sfca/enhanced", "failed to get distance-decay, parameters are invalid"), http.StatusBadRequest)
+		return
+	}
+	options := provider.RoutingOptions{
+		Mode:     "dijkstra",
+		MaxRange: distance_decay.GetMaxDistance(),
 	}
 
-	var res []float32
+	var weights []float32
 	if req.Mode == "tiled" {
 		fmt.Println("run tiled fca")
-		res = access.CalcEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
+		weights = access.CalcEnhanced2SFCA(GRAPH, req.Supply.Locations, req.Demand.Locations, req.Supply.Weights, req.Demand.Weights, options.MaxRange)
 	} else if req.Mode == "ch" {
 		fmt.Println("run ch fca")
-		res = access.CalcRPHASTEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
-	} else {
+		// weights = access.CalcRPHASTEnhanced2SFCA(GRAPH, req.Supply.Locations, req.Demand.Locations, req.Supply.Weights, req.Demand.Weights, options.MaxRange)
+	} else if req.Mode == "default" {
 		fmt.Println("run default fca")
-		res = access.CalcEnhanced2SFCA(GRAPH, req.FacilityLocations, req.PopulationLocations, req.FacilityCapacities, req.PopulationDemand, float32(req.MaxRange))
+		weights = access.CalcEnhanced2SFCA(GRAPH, req.Supply.Locations, req.Demand.Locations, req.Supply.Weights, req.Demand.Weights, options.MaxRange)
+	} else {
+		weights = access.CalcEnhanced2SFCA2(demand_view, supply_view, distance_decay, routing_provider, options)
 	}
 
-	resp := FCAResponse{Access: res}
-	data, _ = json.Marshal(resp)
-	w.Write(data)
+	max_weight := float32(0)
+	for i := 0; i < len(weights); i++ {
+		w := weights[i]
+		if w > max_weight {
+			max_weight = w
+		}
+	}
+	factor := 100 / max_weight
+	for i := 0; i < len(weights); i++ {
+		w := weights[i]
+		if w != 0 {
+			w = w * factor
+		} else {
+			w = -9999
+		}
+		weights[i] = w
+	}
+
+	resp := FCAResponse{weights}
+	fmt.Println("reponse build")
+	WriteResponse(w, resp, http.StatusOK)
 }
