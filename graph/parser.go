@@ -57,7 +57,7 @@ func ParseOsm(filename string, nodes *List[OSMNode], edges *List[OSMEdge], index
 
 func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 	nodes := NewList[Node](osmnodes.Length())
-	node_refs := NewList[NodeRef](osmnodes.Length())
+	node_refs := NewList[_NodeEntry](osmnodes.Length())
 	edges := NewList[Edge](osmedges.Length() * 2)
 	fwd_edge_refs := NewList[EdgeRef](osmedges.Length() * 2)
 	bwd_edge_refs := NewList[EdgeRef](osmedges.Length() * 2)
@@ -96,7 +96,7 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 
 	for id, osmnode := range *osmnodes {
 		node := Node{}
-		node_ref := NodeRef{}
+		node_ref := _NodeEntry{}
 		node_ref.EdgeRefFWDStart = int32(fwd_edge_refs.Length())
 		node_ref.EdgeRefBWDStart = int32(bwd_edge_refs.Length())
 		for _, edgeid := range osmnode.Edges {

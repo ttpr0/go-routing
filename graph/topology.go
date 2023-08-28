@@ -9,8 +9,15 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
+type _NodeEntry struct {
+	EdgeRefFWDStart int32
+	EdgeRefFWDCount int16
+	EdgeRefBWDStart int32
+	EdgeRefBWDCount int16
+}
+
 type TopologyStore struct {
-	node_refs     List[NodeRef]
+	node_refs     List[_NodeEntry]
 	fwd_edge_refs List[EdgeRef]
 	bwd_edge_refs List[EdgeRef]
 }
@@ -51,11 +58,11 @@ func (self *TopologyStore) GetAccessor() TopologyAccessor {
 // reorders nodes in topologystore,
 // mapping: old id -> new id
 func (self *TopologyStore) _ReorderNodes(mapping Array[int32]) {
-	node_refs := NewArray[NodeRef](self.node_refs.Length())
+	node_refs := NewArray[_NodeEntry](self.node_refs.Length())
 	for i, id := range mapping {
 		node_refs[id] = self.node_refs[i]
 	}
-	self.node_refs = List[NodeRef](node_refs)
+	self.node_refs = List[_NodeEntry](node_refs)
 
 	fwd_edge_refs := NewList[EdgeRef](self.fwd_edge_refs.Length())
 	bwd_edge_refs := NewList[EdgeRef](self.bwd_edge_refs.Length())
@@ -80,7 +87,7 @@ func (self *TopologyStore) _ReorderNodes(mapping Array[int32]) {
 			bwd_count += 1
 		}
 
-		node_refs[i] = NodeRef{
+		node_refs[i] = _NodeEntry{
 			EdgeRefFWDStart: int32(fwd_start),
 			EdgeRefFWDCount: int16(fwd_count),
 			EdgeRefBWDStart: int32(bwd_start),
@@ -139,7 +146,7 @@ func _LoadTopologyStore(file string, nodecount int) *TopologyStore {
 	binary.Read(topologyreader, binary.LittleEndian, &fwd_edgerefcount)
 	var bwd_edgerefcount int32
 	binary.Read(topologyreader, binary.LittleEndian, &bwd_edgerefcount)
-	node_refs := NewList[NodeRef](int(nodecount))
+	node_refs := NewList[_NodeEntry](int(nodecount))
 	fwd_edge_refs := NewList[EdgeRef](int(fwd_edgerefcount))
 	bwd_edge_refs := NewList[EdgeRef](int(bwd_edgerefcount))
 	for i := 0; i < int(nodecount); i++ {
@@ -151,7 +158,7 @@ func _LoadTopologyStore(file string, nodecount int) *TopologyStore {
 		binary.Read(topologyreader, binary.LittleEndian, &s2)
 		var c2 int16
 		binary.Read(topologyreader, binary.LittleEndian, &c2)
-		node_refs.Add(NodeRef{
+		node_refs.Add(_NodeEntry{
 			EdgeRefFWDStart: s1,
 			EdgeRefFWDCount: c1,
 			EdgeRefBWDStart: s2,

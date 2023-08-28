@@ -35,13 +35,6 @@ type CHShortcut struct {
 	_Edges [2]Tuple[int32, byte]
 }
 
-type NodeRef struct {
-	EdgeRefFWDStart int32
-	EdgeRefFWDCount int16
-	EdgeRefBWDStart int32
-	EdgeRefBWDCount int16
-}
-
 type EdgeRef struct {
 	EdgeID  int32
 	_Type   byte

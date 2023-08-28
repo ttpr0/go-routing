@@ -225,7 +225,7 @@ func UpdateSkipEdges(edge_types Array[byte], is_skip []bool) {
 }
 
 func CreateSkipTopology(graph *Graph, edge_types Array[byte]) TopologyStore {
-	node_refs := NewList[NodeRef](graph.nodes.NodeCount())
+	node_refs := NewList[_NodeEntry](graph.nodes.NodeCount())
 	fwd_edge_refs := NewList[EdgeRef](graph.edges.EdgeCount())
 	bwd_edge_refs := NewList[EdgeRef](graph.edges.EdgeCount())
 
@@ -276,7 +276,7 @@ func CreateSkipTopology(graph *Graph, edge_types Array[byte]) TopologyStore {
 			bwd_count += 1
 		}
 
-		node_refs.Add(NodeRef{
+		node_refs.Add(_NodeEntry{
 			EdgeRefFWDStart: int32(fwd_start),
 			EdgeRefFWDCount: int16(fwd_count),
 			EdgeRefBWDStart: int32(bwd_start),
@@ -442,6 +442,21 @@ func CalcFullSPT(graph *TiledGraph, start int32, flags Dict[int32, _Flag]) {
 // preprocess tiled-graph 3
 //*******************************************
 
+func PreprocessTiledGraph4(graph *TiledGraph) *TiledGraph3 {
+	g := &Graph{
+		nodes:    graph.nodes,
+		edges:    graph.edges,
+		topology: graph.topology,
+		geom:     graph.geom,
+		weight:   graph.weight,
+		index:    graph.index,
+	}
+
+	tiles := graph.node_tiles.node_tiles
+
+	return PreprocessTiledGraph3(g, List[int16](tiles))
+}
+
 func PreprocessTiledGraph3(graph *Graph, node_tiles List[int16]) *TiledGraph3 {
 	edge_types := NewArray[byte](graph.edges.EdgeCount())
 
@@ -572,7 +587,7 @@ func CalcShortcutEdges(graph *Graph, node_tiles List[int16], edge_types Array[by
 }
 
 func CreateCrossBorderTopology(graph *Graph, edge_types Array[byte]) TopologyStore {
-	node_refs := NewList[NodeRef](graph.nodes.NodeCount())
+	node_refs := NewList[_NodeEntry](graph.nodes.NodeCount())
 	fwd_edge_refs := NewList[EdgeRef](graph.edges.EdgeCount())
 	bwd_edge_refs := NewList[EdgeRef](graph.edges.EdgeCount())
 
@@ -623,7 +638,7 @@ func CreateCrossBorderTopology(graph *Graph, edge_types Array[byte]) TopologySto
 			bwd_count += 1
 		}
 
-		node_refs.Add(NodeRef{
+		node_refs.Add(_NodeEntry{
 			EdgeRefFWDStart: int32(fwd_start),
 			EdgeRefFWDCount: int16(fwd_count),
 			EdgeRefBWDStart: int32(bwd_start),
@@ -665,7 +680,7 @@ func CreateSkipShortcutTopology(graph *Graph, shortcuts *ShortcutStore) Topology
 		bwd_ref_lists[shc.NodeB] = bwd_refs
 	}
 
-	node_refs := NewList[NodeRef](graph.nodes.NodeCount())
+	node_refs := NewList[_NodeEntry](graph.nodes.NodeCount())
 	fwd_edge_refs := NewList[EdgeRef](shortcuts.ShortcutCount())
 	bwd_edge_refs := NewList[EdgeRef](shortcuts.ShortcutCount())
 
@@ -696,7 +711,7 @@ func CreateSkipShortcutTopology(graph *Graph, shortcuts *ShortcutStore) Topology
 			bwd_count += 1
 		}
 
-		node_refs.Add(NodeRef{
+		node_refs.Add(_NodeEntry{
 			EdgeRefFWDStart: int32(fwd_start),
 			EdgeRefFWDCount: int16(fwd_count),
 			EdgeRefBWDStart: int32(bwd_start),

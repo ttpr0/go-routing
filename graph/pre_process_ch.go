@@ -208,7 +208,7 @@ func TransformToDynamicGraph(g *Graph) *DynamicGraph {
 }
 
 func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
-	node_refs := NewList[NodeRef](dg.nodes.NodeCount())
+	node_refs := NewList[_NodeEntry](dg.nodes.NodeCount())
 	fwd_edge_refs := NewList[EdgeRef](dg.shortcuts.Length())
 	bwd_edge_refs := NewList[EdgeRef](dg.sh_weight.Length())
 
@@ -230,7 +230,7 @@ func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 			bwd_count += 1
 		}
 
-		node_refs.Add(NodeRef{
+		node_refs.Add(_NodeEntry{
 			EdgeRefFWDStart: int32(fwd_start),
 			EdgeRefFWDCount: int16(fwd_count),
 			EdgeRefBWDStart: int32(bwd_start),
