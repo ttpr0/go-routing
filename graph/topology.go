@@ -20,6 +20,11 @@ type _NodeEntry struct {
 	BWDEdgeCount int16
 }
 
+type _DynamicNodeEntry struct {
+	FWDEdges List[_TypedEdgeEntry]
+	BWDEdges List[_TypedEdgeEntry]
+}
+
 type _EdgeEntry struct {
 	EdgeID  int32
 	OtherID int32
@@ -85,6 +90,51 @@ func (self *TypedTopologyStore) GetAccessor() TypedTopologyAccessor {
 		topology: self,
 	}
 }
+
+type DynamicTopologyStore struct {
+	node_entries Array[_DynamicNodeEntry]
+}
+
+func NewDynamicTopology(node_count int) DynamicTopologyStore {
+	topology := NewArray[_DynamicNodeEntry](node_count)
+
+	for i := 0; i < node_count; i++ {
+		topology[i] = _DynamicNodeEntry{
+			FWDEdges: NewList[_TypedEdgeEntry](4),
+			BWDEdges: NewList[_TypedEdgeEntry](4),
+		}
+	}
+
+	return DynamicTopologyStore{
+		node_entries: topology,
+	}
+}
+
+func (self *DynamicTopologyStore) AddEdgeEntries(node_a, node_b, edge_id int32, edge_typ byte) {
+	fwd_edges := self.node_entries[node_a].FWDEdges
+	fwd_edges.Add(_TypedEdgeEntry{
+		EdgeID:  edge_id,
+		OtherID: node_b,
+		Type:    edge_typ,
+	})
+	self.node_entries[node_a].FWDEdges = fwd_edges
+	bwd_edges := self.node_entries[node_b].BWDEdges
+	bwd_edges.Add(_TypedEdgeEntry{
+		EdgeID:  edge_id,
+		OtherID: node_a,
+		Type:    edge_typ,
+	})
+	self.node_entries[node_b].BWDEdges = bwd_edges
+}
+func (self *DynamicTopologyStore) GetAccessor() DynamicTopologyAccessor {
+	return DynamicTopologyAccessor{
+		topology: self,
+	}
+}
+
+//*******************************************
+// utility methods on topology stores
+//*******************************************
 
 // reorders nodes in topologystore,
 // mapping: old id -> new id
@@ -366,6 +416,86 @@ func _LoadTypedTopology(file string, nodecount int) *TypedTopologyStore {
 	}
 }
 
+func DynamicToTopology(dyn *DynamicTopologyStore) *TopologyStore {
+	node_refs := NewList[_NodeEntry](dyn.node_entries.Length())
+	fwd_edge_refs := NewList[_EdgeEntry](dyn.node_entries.Length())
+	bwd_edge_refs := NewList[_EdgeEntry](dyn.node_entries.Length())
+
+	fwd_start := 0
+	bwd_start := 0
+	for i := 0; i < dyn.node_entries.Length(); i++ {
+		fwd_count := 0
+		bwd_count := 0
+
+		fwd_refs := dyn.node_entries[i].FWDEdges
+		bwd_refs := dyn.node_entries[i].BWDEdges
+
+		for _, ref := range fwd_refs {
+			fwd_edge_refs.Add(_EdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID})
+			fwd_count += 1
+		}
+		for _, ref := range bwd_refs {
+			bwd_edge_refs.Add(_EdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID})
+			bwd_count += 1
+		}
+
+		node_refs.Add(_NodeEntry{
+			FWDEdgeStart: int32(fwd_start),
+			FWDEdgeCount: int16(fwd_count),
+			BWDEdgeStart: int32(bwd_start),
+			BWDEdgeCount: int16(bwd_count),
+		})
+		fwd_start += fwd_count
+		bwd_start += bwd_count
+	}
+
+	return &TopologyStore{
+		node_entries:     Array[_NodeEntry](node_refs),
+		fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs),
+		bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs),
+	}
+}
+
+func DynamicToTypedTopology(dyn *DynamicTopologyStore) *TypedTopologyStore {
+	node_refs := NewList[_NodeEntry](dyn.node_entries.Length())
+	fwd_edge_refs := NewList[_TypedEdgeEntry](dyn.node_entries.Length())
+	bwd_edge_refs := NewList[_TypedEdgeEntry](dyn.node_entries.Length())
+
+	fwd_start := 0
+	bwd_start := 0
+	for i := 0; i < dyn.node_entries.Length(); i++ {
+		fwd_count := 0
+		bwd_count := 0
+
+		fwd_refs := dyn.node_entries[i].FWDEdges
+		bwd_refs := dyn.node_entries[i].BWDEdges
+
+		for _, ref := range fwd_refs {
+			fwd_edge_refs.Add(_TypedEdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID, Type: ref.Type})
+			fwd_count += 1
+		}
+		for _, ref := range bwd_refs {
+			bwd_edge_refs.Add(_TypedEdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID, Type: ref.Type})
+			bwd_count += 1
+		}
+
+		node_refs.Add(_NodeEntry{
+			FWDEdgeStart: int32(fwd_start),
+			FWDEdgeCount: int16(fwd_count),
+			BWDEdgeStart: int32(bwd_start),
+			BWDEdgeCount: int16(bwd_count),
+		})
+		fwd_start += fwd_count
+		bwd_start += bwd_count
+	}
+
+	return &TypedTopologyStore{
+		node_entries:     Array[_NodeEntry](node_refs),
+		fwd_edge_entries: Array[_TypedEdgeEntry](fwd_edge_refs),
+		bwd_edge_entries: Array[_TypedEdgeEntry](bwd_edge_refs),
+	}
+}
+
 //*******************************************
 // topology accessor
 //*******************************************
@@ -457,6 +587,49 @@ func (self *TypedTopologyAccessor) GetEdgeID() int32 {
 func (self *TypedTopologyAccessor) GetOtherID() int32 {
 	return self.curr_other_id
 }
-func (self *TypedTopologyAccessor) Type() byte {
+func (self *TypedTopologyAccessor) GetType() byte {
+	return self.curr_type
+}
+
+type DynamicTopologyAccessor struct {
+	topology      *DynamicTopologyStore
+	state         int32
+	end           int32
+	edge_refs     List[_TypedEdgeEntry]
+	curr_edge_id  int32
+	curr_other_id int32
+	curr_type     byte
+}
+
+func (self *DynamicTopologyAccessor) SetBaseNode(node int32, dir Direction) {
+	ref := self.topology.node_entries[node]
+	if dir == FORWARD {
+		self.state = 0
+		self.end = int32(len(ref.FWDEdges))
+		self.edge_refs = ref.FWDEdges
+	} else {
+		self.state = 0
+		self.end = int32(len(ref.BWDEdges))
+		self.edge_refs = ref.BWDEdges
+	}
+}
+func (self *DynamicTopologyAccessor) Next() bool {
+	if self.state == self.end {
+		return false
+	}
+	ref := self.edge_refs[self.state]
+	self.curr_edge_id = ref.EdgeID
+	self.curr_other_id = ref.OtherID
+	self.curr_type = ref.Type
+	self.state += 1
+	return true
+}
+func (self *DynamicTopologyAccessor) GetEdgeID() int32 {
+	return self.curr_edge_id
+}
+func (self *DynamicTopologyAccessor) GetOtherID() int32 {
+	return self.curr_other_id
+}
+func (self *DynamicTopologyAccessor) Type() byte {
 	return self.curr_type
 }
