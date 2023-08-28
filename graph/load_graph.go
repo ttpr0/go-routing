@@ -22,7 +22,7 @@ func LoadGraph(file string) IGraph {
 	topology := _LoadTopologyStore(file+"-graph", nodecount)
 	geoms := _LoadGeometryStore(file+"-geom", nodecount, edgecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
-	index := BuildNodeIndex(geoms.GetAllNodes())
+	index := _BuildKDTreeIndex(geoms.GetAllNodes())
 
 	return &Graph{
 		nodes:    *nodes,
@@ -57,7 +57,7 @@ func LoadCHGraph(file string) ICHGraph {
 		sh_weight:   *sh_weights,
 	}
 	SortNodesByLevel(chg)
-	chg.index = BuildNodeIndex(chg.geom.GetAllNodes())
+	chg.index = _BuildKDTreeIndex(chg.geom.GetAllNodes())
 	return chg
 }
 
@@ -74,7 +74,7 @@ func LoadTiledGraph(file string) ITiledGraph {
 	edge_types := _LoadEdgeTypes(file+"-tiles_types", edgecount)
 	node_tiles := _LoadNodeTileStore(file+"-tiles", nodecount)
 	fmt.Println("start buidling index")
-	index := BuildNodeIndex(geoms.GetAllNodes())
+	index := _BuildKDTreeIndex(geoms.GetAllNodes())
 	fmt.Println("finished building index")
 
 	return &TiledGraph{
@@ -103,7 +103,7 @@ func LoadTiledGraph2(file string) ITiledGraph2 {
 	edge_types := _LoadEdgeTypes(file+"-tiles_types", edgecount)
 	node_tiles := _LoadNodeTileStore(file+"-tiles", nodecount)
 	fmt.Println("start buidling index")
-	index := BuildNodeIndex(geoms.GetAllNodes())
+	index := _BuildKDTreeIndex(geoms.GetAllNodes())
 	fmt.Println("finished building index")
 	border_nodes, interior_nodes, border_range_map := _LoadTileRanges(file + "-tileranges")
 

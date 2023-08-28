@@ -1,43 +1,18 @@
 package graph
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
-	"os"
 	"sort"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func LoadOrCreate(graph_path string, osm_file string, partition_file string) ITiledGraph {
-	// check if graph files already exist
-	_, err1 := os.Stat(graph_path + "-nodes")
-	_, err2 := os.Stat(graph_path + "-edges")
-	_, err3 := os.Stat(graph_path + "-geom")
-	_, err4 := os.Stat(graph_path + "-tiles")
-	if errors.Is(err1, os.ErrNotExist) || errors.Is(err2, os.ErrNotExist) || errors.Is(err3, os.ErrNotExist) || errors.Is(err4, os.ErrNotExist) {
-		// create graph
-		g := ParseGraph(osm_file)
-
-		file_str, _ := os.ReadFile(partition_file)
-		collection := geo.FeatureCollection{}
-		_ = json.Unmarshal(file_str, &collection)
-		g.index = BuildNodeIndex(g.geom.GetAllNodes())
-
-		tiles := CalcNodeTiles(g.GetGeometry(), collection.Features())
-		tg := PreprocessTiledGraph(g, tiles)
-
-		StoreTiledGraph(tg, graph_path)
-
-		return tg
-	} else {
-		return LoadTiledGraph(graph_path)
-	}
+func BuildGraphIndex(g *Graph) {
+	g.index = _BuildKDTreeIndex(g.geom.GetAllNodes())
 }
 
-func BuildNodeIndex(node_geoms List[geo.Coord]) KDTree[int32] {
+func _BuildKDTreeIndex(node_geoms List[geo.Coord]) KDTree[int32] {
 	tree := NewKDTree[int32](2)
 	for i := 0; i < node_geoms.Length(); i++ {
 		geom := node_geoms[i]
@@ -245,5 +220,5 @@ func ReorderCHGraph(g *CHGraph, node_mapping Array[int32]) {
 	g.geom._ReorderNodes(node_mapping)
 	g.weight._ReorderNodes(node_mapping)
 	g.sh_weight._ReorderNodes(node_mapping)
-	g.index = BuildNodeIndex(g.geom.GetAllNodes())
+	g.index = _BuildKDTreeIndex(g.geom.GetAllNodes())
 }
