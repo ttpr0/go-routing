@@ -21,13 +21,13 @@ type BODijkstra2 struct {
 	heap     PriorityQueue[_FlagBOD2, float64]
 	start_id int32
 	end_id   int32
-	graph    graph.ITiledGraph3
+	graph    graph.ITiledGraph
 	geom     graph.IGeometry
 	weight   graph.IWeighting
 	flags    Dict[int32, _FlagBOD2]
 }
 
-func NewBODijkstra2(graph graph.ITiledGraph3, start, end int32) *BODijkstra2 {
+func NewBODijkstra2(graph graph.ITiledGraph, start, end int32) *BODijkstra2 {
 	d := BODijkstra2{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
 
 	flags := NewDict[int32, _FlagBOD2](100)

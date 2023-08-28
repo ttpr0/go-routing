@@ -29,10 +29,11 @@ func StoreTiledGraph(graph *TiledGraph, filename string) {
 	graph.nodes._Store(filename + "-nodes")
 	graph.edges._Store(filename + "-edges")
 	graph.geom._Store(filename + "-geom")
-	graph.skip_topology._Store(filename + "-skip_topology")
+	_StoreTypedTopology(&graph.skip_topology, filename+"-skip_topology")
 	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
 	_StoreNodeTileStore(&graph.node_tiles, filename+"-tiles")
 	_StoreEdgeTypes(graph.edge_types, filename+"-tiles_types")
+	_StoreShortcutStore(&graph.skip_edges, &graph.skip_weights, filename+"-skip_shortcuts")
 }
 
 func StoreTiledGraph2(graph *TiledGraph2, filename string) {
@@ -44,20 +45,6 @@ func StoreTiledGraph2(graph *TiledGraph2, filename string) {
 	_StoreNodeTileStore(&graph.node_tiles, filename+"-tiles")
 	_StoreEdgeTypes(graph.edge_types, filename+"-tiles_types")
 	_StoreTileRanges(graph.border_nodes, graph.interior_nodes, graph.border_range_map, filename+"-tileranges")
-}
-
-func StoreTiledGraph3(graph *TiledGraph3, filename string) {
-	graph.topology._Store(filename + "-graph")
-	graph.nodes._Store(filename + "-nodes")
-	graph.edges._Store(filename + "-edges")
-	graph.geom._Store(filename + "-geom")
-	graph.skip_topology._Store(filename + "-skip_topology")
-	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
-	_StoreNodeTileStore(&graph.node_tiles, filename+"-tiles")
-	_StoreEdgeTypes(graph.edge_types, filename+"-tiles_types")
-	graph.border_topology._Store(filename + "-skip3_border_topology")
-	graph.skip_topology._Store(filename + "-skip3_topology")
-	_StoreShortcutStore(&graph.skip_edges, &graph.skip_weights, filename+"-skip3_shortcuts")
 }
 
 func StoreCHGraph(graph *CHGraph, filename string) {

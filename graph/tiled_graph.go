@@ -16,6 +16,8 @@ type ITiledGraph interface {
 	IsNode(node int32) bool
 	GetNode(node int32) Node
 	GetEdge(edge int32) Edge
+	GetShortcut(shc int32) Shortcut
+	GetEdgesFromShortcut(edges *List[int32], shortcut_id int32)
 	GetIndex() IGraphIndex
 }
 
@@ -24,7 +26,9 @@ type TiledGraph struct {
 	node_tiles    NodeTileStore
 	topology      TopologyStore
 	edges         EdgeStore
-	skip_topology TopologyStore
+	skip_topology TypedTopologyStore
+	skip_edges    ShortcutStore
+	skip_weights  DefaultWeighting
 	edge_types    Array[byte]
 	geom          GeometryStore
 	weight        DefaultWeighting
@@ -43,13 +47,16 @@ func (self *TiledGraph) GetDefaultExplorer() IGraphExplorer {
 		accessor:      self.topology.GetAccessor(),
 		skip_accessor: self.skip_topology.GetAccessor(),
 		weight:        &self.weight,
+		skip_weight:   &self.skip_weights,
 	}
 }
 func (self *TiledGraph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
 	return &TiledGraphExplorer{
-		graph:    self,
-		accessor: self.topology.GetAccessor(),
-		weight:   weighting,
+		graph:         self,
+		accessor:      self.topology.GetAccessor(),
+		skip_accessor: self.skip_topology.GetAccessor(),
+		weight:        weighting,
+		skip_weight:   &self.skip_weights,
 	}
 }
 func (self *TiledGraph) GetNodeTile(node int32) int16 {
@@ -83,6 +90,14 @@ func (self *TiledGraph) GetNode(node int32) Node {
 func (self *TiledGraph) GetEdge(edge int32) Edge {
 	return self.edges.GetEdge(edge)
 }
+func (self *TiledGraph) GetShortcut(shc int32) Shortcut {
+	return self.skip_edges.GetShortcut(shc)
+}
+func (self *TiledGraph) GetEdgesFromShortcut(edges *List[int32], shortcut_id int32) {
+	for _, ref := range self.skip_edges.GetEdgesFromShortcut(shortcut_id) {
+		edges.Add(ref.A)
+	}
+}
 func (self *TiledGraph) GetIndex() IGraphIndex {
 	return &BaseGraphIndex{
 		index: self.index,
@@ -92,16 +107,16 @@ func (self *TiledGraph) GetIndex() IGraphIndex {
 type TiledGraphExplorer struct {
 	graph         *TiledGraph
 	accessor      TopologyAccessor
-	skip_accessor TopologyAccessor
+	skip_accessor TypedTopologyAccessor
 	weight        IWeighting
+	skip_weight   IWeighting
 }
 
 func (self *TiledGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
 	if typ == ADJACENT_SKIP {
 		self.skip_accessor.SetBaseNode(node, direction)
-		return &TiledEdgeRefIterator{
-			accessor:   &self.skip_accessor,
-			edge_types: self.graph.edge_types,
+		return &SkipEdgeRefIterator{
+			accessor: &self.skip_accessor,
 		}
 	} else {
 		self.accessor.SetBaseNode(node, direction)
@@ -112,20 +127,35 @@ func (self *TiledGraphExplorer) GetAdjacentEdges(node int32, direction Direction
 	}
 }
 func (self *TiledGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
-	return self.weight.GetEdgeWeight(edge.EdgeID)
+	if edge.IsShortcut() {
+		return self.skip_weight.GetEdgeWeight(edge.EdgeID)
+	} else {
+		return self.weight.GetEdgeWeight(edge.EdgeID)
+	}
 }
 func (self *TiledGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
 	return self.weight.GetTurnCost(from.EdgeID, via, to.EdgeID)
 }
 func (self *TiledGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
-	e := self.graph.GetEdge(edge.EdgeID)
-	if node == e.NodeA {
-		return e.NodeB
+	if edge.IsShortcut() {
+		e := self.graph.skip_edges.GetShortcut(edge.EdgeID)
+		if node == e.NodeA {
+			return e.NodeB
+		}
+		if node == e.NodeB {
+			return e.NodeA
+		}
+		return -1
+	} else {
+		e := self.graph.GetEdge(edge.EdgeID)
+		if node == e.NodeA {
+			return e.NodeB
+		}
+		if node == e.NodeB {
+			return e.NodeA
+		}
+		return -1
 	}
-	if node == e.NodeB {
-		return e.NodeA
-	}
-	return -1
 }
 
 type TiledEdgeRefIterator struct {
@@ -136,12 +166,30 @@ type TiledEdgeRefIterator struct {
 func (self *TiledEdgeRefIterator) Next() (EdgeRef, bool) {
 	ok := self.accessor.Next()
 	if !ok {
-		var t EdgeRef
-		return t, false
+		return EdgeRef{}, false
 	}
 	edge_id := self.accessor.GetEdgeID()
 	other_id := self.accessor.GetOtherID()
 	typ := self.edge_types[edge_id]
+	return EdgeRef{
+		EdgeID:  edge_id,
+		OtherID: other_id,
+		_Type:   typ,
+	}, true
+}
+
+type SkipEdgeRefIterator struct {
+	accessor *TypedTopologyAccessor
+}
+
+func (self *SkipEdgeRefIterator) Next() (EdgeRef, bool) {
+	ok := self.accessor.Next()
+	if !ok {
+		return EdgeRef{}, false
+	}
+	edge_id := self.accessor.GetEdgeID()
+	other_id := self.accessor.GetOtherID()
+	typ := self.accessor.GetType()
 	return EdgeRef{
 		EdgeID:  edge_id,
 		OtherID: other_id,
