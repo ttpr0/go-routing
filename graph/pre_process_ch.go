@@ -151,28 +151,40 @@ func (self *DynamicGraph) GetWeightBetween(from, to int32) int32 {
 
 type DynamicEdgeRefIterator struct {
 	state        int
-	edge_refs    List[EdgeRef]
+	edge_refs    List[_EdgeEntry]
 	shotcut_refs List[EdgeRef]
 	typ          byte
 }
 
 func (self *DynamicEdgeRefIterator) Next() (EdgeRef, bool) {
-	if self.state == len(self.edge_refs) {
-		if self.typ == 100 || len(self.shotcut_refs) == 0 {
-			var t EdgeRef
-			return t, false
+	if self.typ == 0 {
+		if self.state < len(self.edge_refs) {
+			ref := self.edge_refs[self.state]
+			self.state += 1
+			return EdgeRef{
+				EdgeID:  ref.EdgeID,
+				OtherID: ref.OtherID,
+				_Type:   self.typ,
+			}, true
+		} else {
+			self.state = 0
+			self.typ = 100
 		}
-		self.edge_refs = self.shotcut_refs
-		self.state = 0
-		self.typ = 100
 	}
-	ref := self.edge_refs[self.state]
-	self.state += 1
-	return EdgeRef{
-		EdgeID:  ref.EdgeID,
-		OtherID: ref.OtherID,
-		_Type:   self.typ,
-	}, true
+	if self.typ == 100 {
+		if self.state < len(self.shotcut_refs) {
+			ref := self.shotcut_refs[self.state]
+			self.state += 1
+			return EdgeRef{
+				EdgeID:  ref.EdgeID,
+				OtherID: ref.OtherID,
+				_Type:   self.typ,
+			}, true
+		} else {
+			return EdgeRef{}, false
+		}
+	}
+	return EdgeRef{}, false
 }
 
 //*******************************************
@@ -209,8 +221,8 @@ func TransformToDynamicGraph(g *Graph) *DynamicGraph {
 
 func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 	node_refs := NewList[_NodeEntry](dg.nodes.NodeCount())
-	fwd_edge_refs := NewList[EdgeRef](dg.shortcuts.Length())
-	bwd_edge_refs := NewList[EdgeRef](dg.sh_weight.Length())
+	fwd_edge_refs := NewList[_EdgeEntry](dg.shortcuts.Length())
+	bwd_edge_refs := NewList[_EdgeEntry](dg.sh_weight.Length())
 
 	fwd_start := 0
 	bwd_start := 0
@@ -222,19 +234,19 @@ func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 		bwd_refs := dg.ch_topology[i].BWDEdgeRefs
 
 		for _, ref := range fwd_refs {
-			fwd_edge_refs.Add(ref)
+			fwd_edge_refs.Add(_EdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID, Type: ref._Type})
 			fwd_count += 1
 		}
 		for _, ref := range bwd_refs {
-			bwd_edge_refs.Add(ref)
+			bwd_edge_refs.Add(_EdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID, Type: ref._Type})
 			bwd_count += 1
 		}
 
 		node_refs.Add(_NodeEntry{
-			EdgeRefFWDStart: int32(fwd_start),
-			EdgeRefFWDCount: int16(fwd_count),
-			EdgeRefBWDStart: int32(bwd_start),
-			EdgeRefBWDCount: int16(bwd_count),
+			FWDEdgeStart: int32(fwd_start),
+			FWDEdgeCount: int16(fwd_count),
+			BWDEdgeStart: int32(bwd_start),
+			BWDEdgeCount: int16(bwd_count),
 		})
 		fwd_start += fwd_count
 		bwd_start += bwd_count
@@ -244,7 +256,7 @@ func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 		nodes:       dg.nodes,
 		edges:       dg.edges,
 		topology:    dg.topology,
-		ch_topology: TopologyStore{node_refs: node_refs, fwd_edge_refs: fwd_edge_refs, bwd_edge_refs: bwd_edge_refs},
+		ch_topology: TopologyStore{node_entries: Array[_NodeEntry](node_refs), fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs), bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs)},
 		shortcuts:   CHShortcutStore{Array[CHShortcut](dg.shortcuts)},
 		node_levels: CHLevelStore{dg.node_levels},
 		geom:        dg.geom,

@@ -66,17 +66,53 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 	}
 
 	nodes := NewList[geo.Feature](int(graph.NodeCount()))
-	for i, node := range graph.topology.node_refs {
+	for i, node := range graph.topology.node_entries {
 		if i%1000 == 0 {
 			fmt.Println("node ", i)
 		}
 		e := NewList[int32](3)
-		for j := 0; j < int(node.EdgeRefFWDCount); j++ {
-			e.Add(graph.topology.fwd_edge_refs[int(node.EdgeRefFWDStart)+j].EdgeID)
+		for j := 0; j < int(node.FWDEdgeCount); j++ {
+			e.Add(graph.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
 		}
 		node_tile := graph.node_tiles.GetNodeTile(int32(i))
 		point := geo.NewPoint(geom.GetNode(int32(i)))
-		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.EdgeRefFWDCount, "edges": e, "tile": node_tile}))
+		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.FWDEdgeCount, "edges": e, "tile": node_tile}))
+	}
+
+	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)
+}
+
+func GraphToGeoJSON2(graph *Graph, node_tiles Array[int16]) (geo.FeatureCollection, geo.FeatureCollection) {
+	geom := graph.GetGeometry()
+
+	edges := NewList[geo.Feature](int(graph.EdgeCount()))
+	for i := 0; i < graph.edges.EdgeCount(); i++ {
+		edge := graph.GetEdge(int32(i))
+		if i%1000 == 0 {
+			fmt.Println("edge ", i)
+		}
+		var edge_type int16
+		if node_tiles[edge.NodeA] == node_tiles[edge.NodeB] {
+			edge_type = node_tiles[edge.NodeA]
+		} else {
+			edge_type = -10
+		}
+		line := geo.NewLineString(geom.GetEdge(int32(i)))
+		edges.Add(geo.NewFeature(&line, map[string]any{"index": i, "nodeA": edge.NodeA, "nodeB": edge.NodeB, "type": edge_type}))
+	}
+
+	nodes := NewList[geo.Feature](int(graph.NodeCount()))
+	for i, node := range graph.topology.node_entries {
+		if i%1000 == 0 {
+			fmt.Println("node ", i)
+		}
+		e := NewList[int32](3)
+		for j := 0; j < int(node.FWDEdgeCount); j++ {
+			e.Add(graph.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
+		}
+		node_tile := node_tiles[i]
+		point := geo.NewPoint(geom.GetNode(int32(i)))
+		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.FWDEdgeCount, "edges": e, "tile": node_tile}))
 	}
 
 	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)

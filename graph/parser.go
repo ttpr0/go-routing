@@ -59,8 +59,8 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 	nodes := NewList[Node](osmnodes.Length())
 	node_refs := NewList[_NodeEntry](osmnodes.Length())
 	edges := NewList[Edge](osmedges.Length() * 2)
-	fwd_edge_refs := NewList[EdgeRef](osmedges.Length() * 2)
-	bwd_edge_refs := NewList[EdgeRef](osmedges.Length() * 2)
+	fwd_edge_refs := NewList[_EdgeEntry](osmedges.Length() * 2)
+	bwd_edge_refs := NewList[_EdgeEntry](osmedges.Length() * 2)
 	edge_weights := NewList[int32](osmedges.Length() * 2)
 	node_geoms := NewList[geo.Coord](osmnodes.Length())
 	edge_geoms := NewList[geo.CoordArray](osmedges.Length() * 2)
@@ -97,42 +97,42 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 	for id, osmnode := range *osmnodes {
 		node := Node{}
 		node_ref := _NodeEntry{}
-		node_ref.EdgeRefFWDStart = int32(fwd_edge_refs.Length())
-		node_ref.EdgeRefBWDStart = int32(bwd_edge_refs.Length())
+		node_ref.FWDEdgeStart = int32(fwd_edge_refs.Length())
+		node_ref.BWDEdgeStart = int32(bwd_edge_refs.Length())
 		for _, edgeid := range osmnode.Edges {
 			index := edge_index_mapping[int(edgeid)]
 			edge := edges[index]
 			if edge.NodeA == int32(id) {
-				edgeref := EdgeRef{
+				edgeref := _EdgeEntry{
 					EdgeID:  int32(index),
-					_Type:   0,
+					Type:    0,
 					OtherID: edge.NodeB,
 				}
 				fwd_edge_refs.Add(edgeref)
 				if index < edges.Length()-1 {
 					edge = edges[index+1]
 					if edge.NodeB == int32(id) {
-						edgeref := EdgeRef{
+						edgeref := _EdgeEntry{
 							EdgeID:  int32(index + 1),
-							_Type:   0,
+							Type:    0,
 							OtherID: edge.NodeA,
 						}
 						bwd_edge_refs.Add(edgeref)
 					}
 				}
 			} else if edge.NodeB == int32(id) {
-				edgeref := EdgeRef{
+				edgeref := _EdgeEntry{
 					EdgeID:  int32(index),
-					_Type:   0,
+					Type:    0,
 					OtherID: edge.NodeA,
 				}
 				bwd_edge_refs.Add(edgeref)
 				if index < edges.Length()-1 {
 					edge = edges[index+1]
 					if edge.NodeA == int32(id) {
-						edgeref := EdgeRef{
+						edgeref := _EdgeEntry{
 							EdgeID:  int32(index + 1),
-							_Type:   0,
+							Type:    0,
 							OtherID: edge.NodeB,
 						}
 						fwd_edge_refs.Add(edgeref)
@@ -140,8 +140,8 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 				}
 			}
 		}
-		node_ref.EdgeRefFWDCount = int16(fwd_edge_refs.Length() - int(node_ref.EdgeRefFWDStart))
-		node_ref.EdgeRefBWDCount = int16(bwd_edge_refs.Length() - int(node_ref.EdgeRefBWDStart))
+		node_ref.FWDEdgeCount = int16(fwd_edge_refs.Length() - int(node_ref.FWDEdgeStart))
+		node_ref.BWDEdgeCount = int16(bwd_edge_refs.Length() - int(node_ref.BWDEdgeStart))
 		nodes.Add(node)
 		node_refs.Add(node_ref)
 		node_geoms.Add(osmnode.Point)
@@ -150,7 +150,7 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 	return &Graph{
 		nodes:    NodeStore{nodes: Array[Node](nodes)},
 		edges:    EdgeStore{edges: Array[Edge](edges)},
-		topology: TopologyStore{node_refs: node_refs, fwd_edge_refs: fwd_edge_refs, bwd_edge_refs: bwd_edge_refs},
+		topology: TopologyStore{node_entries: Array[_NodeEntry](node_refs), fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs), bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs)},
 		geom:     GeometryStore{node_geoms, edge_geoms},
 		weight:   DefaultWeighting{edge_weights},
 	}
