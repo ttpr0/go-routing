@@ -10,8 +10,6 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-var GRAPH graph.IGraph = graph.LoadGraph("./graphs/niedersachsen")
-
 type IRoutingProvider interface {
 	SetProfile(profile string)
 
@@ -45,6 +43,13 @@ func (self *RoutingOptions) GetMaxRange() float32 {
 }
 
 type RoutingProvider struct {
+	Graph graph.IGraph
+}
+
+func NewRoutingProvider(g graph.IGraph) *RoutingProvider {
+	return &RoutingProvider{
+		Graph: g,
+	}
 }
 
 func (self *RoutingProvider) SetProfile(profile string) {
@@ -55,7 +60,7 @@ func (self *RoutingProvider) SetParameter(name string, value any) {
 }
 
 func (self *RoutingProvider) RequestTDMatrix(dem view.IPointView, sup view.IPointView, options RoutingOptions) ITDMatrix {
-	index := GRAPH.GetIndex()
+	index := self.Graph.GetIndex()
 	population_nodes := NewArray[int32](dem.PointCount())
 	for i := 0; i < dem.PointCount(); i++ {
 		loc := dem.GetCoordinate(i)
@@ -77,7 +82,7 @@ func (self *RoutingProvider) RequestTDMatrix(dem view.IPointView, sup view.IPoin
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
 		go func() {
-			spt := routing.NewSPT2(GRAPH)
+			spt := routing.NewSPT2(self.Graph)
 			for {
 				if len(facility_chan) == 0 {
 					break

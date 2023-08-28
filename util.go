@@ -73,19 +73,19 @@ func WriteResponse[T any](w http.ResponseWriter, resp T, status int) {
 }
 
 func GetRoutingProvider(param RoutingRequestParams) provider.IRoutingProvider {
-	var provider provider.RoutingProvider
+	prov := provider.NewRoutingProvider(GRAPH)
 
 	if param.Profile != "" {
-		provider.SetProfile(param.Profile)
+		prov.SetProfile(param.Profile)
 	}
 	if param.RangeType != "" {
-		provider.SetRangeType(param.RangeType)
+		prov.SetRangeType(param.RangeType)
 	}
 	if param.LocationType != "" {
-		provider.SetParameter("location_type", param.LocationType)
+		prov.SetParameter("location_type", param.LocationType)
 	}
 
-	return &provider
+	return prov
 }
 
 func GetDemandView(param DemandRequestParams) view.IPointView {
