@@ -250,7 +250,6 @@ func CreateSkipTopology(graph *Graph, edge_types Array[byte]) TopologyStore {
 			fwd_edge_refs.Add(_EdgeEntry{
 				EdgeID:  ref.EdgeID,
 				OtherID: ref.OtherID,
-				Type:    edge_types[ref.EdgeID],
 			})
 			fwd_count += 1
 		}
@@ -271,7 +270,6 @@ func CreateSkipTopology(graph *Graph, edge_types Array[byte]) TopologyStore {
 			bwd_edge_refs.Add(_EdgeEntry{
 				EdgeID:  ref.EdgeID,
 				OtherID: ref.OtherID,
-				Type:    edge_types[ref.EdgeID],
 			})
 			bwd_count += 1
 		}
@@ -612,7 +610,6 @@ func CreateCrossBorderTopology(graph *Graph, edge_types Array[byte]) TopologySto
 			fwd_edge_refs.Add(_EdgeEntry{
 				EdgeID:  ref.EdgeID,
 				OtherID: ref.OtherID,
-				Type:    edge_types[ref.EdgeID],
 			})
 			fwd_count += 1
 		}
@@ -633,7 +630,6 @@ func CreateCrossBorderTopology(graph *Graph, edge_types Array[byte]) TopologySto
 			bwd_edge_refs.Add(_EdgeEntry{
 				EdgeID:  ref.EdgeID,
 				OtherID: ref.OtherID,
-				Type:    edge_types[ref.EdgeID],
 			})
 			bwd_count += 1
 		}
@@ -667,7 +663,7 @@ func CreateSkipShortcutTopology(graph *Graph, shortcuts *ShortcutStore) Topology
 		} else {
 			fwd_refs = fwd_ref_lists[shc.NodeA]
 		}
-		fwd_refs.Add(_EdgeEntry{EdgeID: int32(i), OtherID: shc.NodeB, Type: 101})
+		fwd_refs.Add(_EdgeEntry{EdgeID: int32(i), OtherID: shc.NodeB})
 		fwd_ref_lists[shc.NodeA] = fwd_refs
 
 		var bwd_refs List[_EdgeEntry]
@@ -676,7 +672,7 @@ func CreateSkipShortcutTopology(graph *Graph, shortcuts *ShortcutStore) Topology
 		} else {
 			bwd_refs = bwd_ref_lists[shc.NodeB]
 		}
-		bwd_refs.Add(_EdgeEntry{EdgeID: int32(i), OtherID: shc.NodeA, Type: 101})
+		bwd_refs.Add(_EdgeEntry{EdgeID: int32(i), OtherID: shc.NodeA})
 		bwd_ref_lists[shc.NodeB] = bwd_refs
 	}
 

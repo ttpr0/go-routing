@@ -22,8 +22,13 @@ type _NodeEntry struct {
 
 type _EdgeEntry struct {
 	EdgeID  int32
-	Type    byte
 	OtherID int32
+}
+
+type _TypedEdgeEntry struct {
+	EdgeID  int32
+	OtherID int32
+	Type    byte
 }
 
 //*******************************************
@@ -65,6 +70,18 @@ func (self *TopologyStore) GetAdjacentEdgeRefs(node int32, dir Direction) List[_
 
 func (self *TopologyStore) GetAccessor() TopologyAccessor {
 	return TopologyAccessor{
+		topology: self,
+	}
+}
+
+type TypedTopologyStore struct {
+	node_entries     Array[_NodeEntry]
+	fwd_edge_entries Array[_TypedEdgeEntry]
+	bwd_edge_entries Array[_TypedEdgeEntry]
+}
+
+func (self *TypedTopologyStore) GetAccessor() TypedTopologyAccessor {
+	return TypedTopologyAccessor{
 		topology: self,
 	}
 }
@@ -133,13 +150,11 @@ func (self *TopologyStore) _Store(filename string) {
 	for i := 0; i < fwd_edgerefcount; i++ {
 		edgeref := self.fwd_edge_entries.Get(i)
 		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.EdgeID)
-		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.Type)
 		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.OtherID)
 	}
 	for i := 0; i < bwd_edgerefcount; i++ {
 		edgeref := self.bwd_edge_entries.Get(i)
 		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.EdgeID)
-		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.Type)
 		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.OtherID)
 	}
 
@@ -182,11 +197,149 @@ func _LoadTopologyStore(file string, nodecount int) *TopologyStore {
 	for i := 0; i < int(fwd_edgerefcount); i++ {
 		var id int32
 		binary.Read(topologyreader, binary.LittleEndian, &id)
+		var nid int32
+		binary.Read(topologyreader, binary.LittleEndian, &nid)
+		fwd_edge_refs.Add(_EdgeEntry{
+			EdgeID:  id,
+			OtherID: nid,
+		})
+	}
+	for i := 0; i < int(bwd_edgerefcount); i++ {
+		var id int32
+		binary.Read(topologyreader, binary.LittleEndian, &id)
+		var nid int32
+		binary.Read(topologyreader, binary.LittleEndian, &nid)
+		bwd_edge_refs.Add(_EdgeEntry{
+			EdgeID:  id,
+			OtherID: nid,
+		})
+	}
+
+	return &TopologyStore{
+		node_entries:     Array[_NodeEntry](node_refs),
+		fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs),
+		bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs),
+	}
+}
+
+// reorders nodes in topologystore,
+// mapping: old id -> new id
+func _ReorderTypedTopology(store *TypedTopologyStore, mapping Array[int32]) {
+	node_refs := NewArray[_NodeEntry](store.node_entries.Length())
+	for i, id := range mapping {
+		node_refs[id] = store.node_entries[i]
+	}
+	store.node_entries = Array[_NodeEntry](node_refs)
+
+	fwd_edge_refs := NewList[_TypedEdgeEntry](store.fwd_edge_entries.Length())
+	bwd_edge_refs := NewList[_TypedEdgeEntry](store.bwd_edge_entries.Length())
+
+	fwd_start := 0
+	bwd_start := 0
+	for i := 0; i < node_refs.Length(); i++ {
+		node_ref := node_refs[i]
+		fwd_count := 0
+		fwd_edges := store.fwd_edge_entries[node_ref.FWDEdgeStart : node_ref.FWDEdgeStart+int32(node_ref.FWDEdgeCount)]
+		for _, ref := range fwd_edges {
+			ref.OtherID = mapping[ref.OtherID]
+			fwd_edge_refs.Add(ref)
+			fwd_count += 1
+		}
+
+		bwd_count := 0
+		bwd_edges := store.bwd_edge_entries[node_ref.BWDEdgeStart : node_ref.BWDEdgeStart+int32(node_ref.BWDEdgeCount)]
+		for _, ref := range bwd_edges {
+			ref.OtherID = mapping[ref.OtherID]
+			bwd_edge_refs.Add(ref)
+			bwd_count += 1
+		}
+
+		node_refs[i] = _NodeEntry{
+			FWDEdgeStart: int32(fwd_start),
+			FWDEdgeCount: int16(fwd_count),
+			BWDEdgeStart: int32(bwd_start),
+			BWDEdgeCount: int16(bwd_count),
+		}
+
+		fwd_start += fwd_count
+		bwd_start += bwd_count
+	}
+	store.fwd_edge_entries = Array[_TypedEdgeEntry](fwd_edge_refs)
+	store.bwd_edge_entries = Array[_TypedEdgeEntry](bwd_edge_refs)
+}
+
+func _StoreTypedTopology(store *TypedTopologyStore, filename string) {
+	topologybuffer := bytes.Buffer{}
+
+	fwd_edgerefcount := store.fwd_edge_entries.Length()
+	bwd_edgerefcount := store.bwd_edge_entries.Length()
+	binary.Write(&topologybuffer, binary.LittleEndian, int32(fwd_edgerefcount))
+	binary.Write(&topologybuffer, binary.LittleEndian, int32(bwd_edgerefcount))
+
+	for i := 0; i < store.node_entries.Length(); i++ {
+		node_ref := store.node_entries.Get(i)
+		binary.Write(&topologybuffer, binary.LittleEndian, node_ref.FWDEdgeStart)
+		binary.Write(&topologybuffer, binary.LittleEndian, node_ref.FWDEdgeCount)
+		binary.Write(&topologybuffer, binary.LittleEndian, node_ref.BWDEdgeStart)
+		binary.Write(&topologybuffer, binary.LittleEndian, node_ref.BWDEdgeCount)
+	}
+	for i := 0; i < fwd_edgerefcount; i++ {
+		edgeref := store.fwd_edge_entries.Get(i)
+		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.EdgeID)
+		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.Type)
+		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.OtherID)
+	}
+	for i := 0; i < bwd_edgerefcount; i++ {
+		edgeref := store.bwd_edge_entries.Get(i)
+		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.EdgeID)
+		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.Type)
+		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.OtherID)
+	}
+
+	topologyfile, _ := os.Create(filename)
+	defer topologyfile.Close()
+	topologyfile.Write(topologybuffer.Bytes())
+}
+
+func _LoadTypedTopology(file string, nodecount int) *TypedTopologyStore {
+	_, err := os.Stat(file)
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file)
+	}
+
+	topologydata, _ := os.ReadFile(file)
+	topologyreader := bytes.NewReader(topologydata)
+	var fwd_edgerefcount int32
+	binary.Read(topologyreader, binary.LittleEndian, &fwd_edgerefcount)
+	var bwd_edgerefcount int32
+	binary.Read(topologyreader, binary.LittleEndian, &bwd_edgerefcount)
+	node_refs := NewList[_NodeEntry](int(nodecount))
+	fwd_edge_refs := NewList[_TypedEdgeEntry](int(fwd_edgerefcount))
+	bwd_edge_refs := NewList[_TypedEdgeEntry](int(bwd_edgerefcount))
+	for i := 0; i < int(nodecount); i++ {
+		var s1 int32
+		binary.Read(topologyreader, binary.LittleEndian, &s1)
+		var c1 int16
+		binary.Read(topologyreader, binary.LittleEndian, &c1)
+		var s2 int32
+		binary.Read(topologyreader, binary.LittleEndian, &s2)
+		var c2 int16
+		binary.Read(topologyreader, binary.LittleEndian, &c2)
+		node_refs.Add(_NodeEntry{
+			FWDEdgeStart: s1,
+			FWDEdgeCount: c1,
+			BWDEdgeStart: s2,
+			BWDEdgeCount: c2,
+		})
+	}
+	for i := 0; i < int(fwd_edgerefcount); i++ {
+		var id int32
+		binary.Read(topologyreader, binary.LittleEndian, &id)
 		var t byte
 		binary.Read(topologyreader, binary.LittleEndian, &t)
 		var nid int32
 		binary.Read(topologyreader, binary.LittleEndian, &nid)
-		fwd_edge_refs.Add(_EdgeEntry{
+		fwd_edge_refs.Add(_TypedEdgeEntry{
 			EdgeID:  id,
 			Type:    t,
 			OtherID: nid,
@@ -199,19 +352,23 @@ func _LoadTopologyStore(file string, nodecount int) *TopologyStore {
 		binary.Read(topologyreader, binary.LittleEndian, &t)
 		var nid int32
 		binary.Read(topologyreader, binary.LittleEndian, &nid)
-		bwd_edge_refs.Add(_EdgeEntry{
+		bwd_edge_refs.Add(_TypedEdgeEntry{
 			EdgeID:  id,
 			Type:    t,
 			OtherID: nid,
 		})
 	}
 
-	return &TopologyStore{
+	return &TypedTopologyStore{
 		node_entries:     Array[_NodeEntry](node_refs),
-		fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs),
-		bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs),
+		fwd_edge_entries: Array[_TypedEdgeEntry](fwd_edge_refs),
+		bwd_edge_entries: Array[_TypedEdgeEntry](bwd_edge_refs),
 	}
 }
+
+//*******************************************
+// topology accessor
+//*******************************************
 
 type TopologyAccessor struct {
 	topology      *TopologyStore
@@ -257,4 +414,49 @@ func (self *TopologyAccessor) HasNext() bool {
 		return false
 	}
 	return true
+}
+
+type TypedTopologyAccessor struct {
+	topology      *TypedTopologyStore
+	state         int32
+	end           int32
+	edge_refs     Array[_TypedEdgeEntry]
+	curr_edge_id  int32
+	curr_other_id int32
+	curr_type     byte
+}
+
+func (self *TypedTopologyAccessor) SetBaseNode(node int32, dir Direction) {
+	ref := self.topology.node_entries[node]
+	if dir == FORWARD {
+		start, count := ref.FWDEdgeStart, int32(ref.FWDEdgeCount)
+		self.state = start
+		self.end = start + count
+		self.edge_refs = self.topology.fwd_edge_entries
+	} else {
+		start, count := ref.BWDEdgeStart, int32(ref.BWDEdgeCount)
+		self.state = start
+		self.end = start + count
+		self.edge_refs = self.topology.bwd_edge_entries
+	}
+}
+func (self *TypedTopologyAccessor) Next() bool {
+	if self.state == self.end {
+		return false
+	}
+	ref := self.edge_refs[self.state]
+	self.curr_edge_id = ref.EdgeID
+	self.curr_other_id = ref.OtherID
+	self.curr_type = ref.Type
+	self.state += 1
+	return true
+}
+func (self *TypedTopologyAccessor) GetEdgeID() int32 {
+	return self.curr_edge_id
+}
+func (self *TypedTopologyAccessor) GetOtherID() int32 {
+	return self.curr_other_id
+}
+func (self *TypedTopologyAccessor) Type() byte {
+	return self.curr_type
 }

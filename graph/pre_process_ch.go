@@ -234,11 +234,11 @@ func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 		bwd_refs := dg.ch_topology[i].BWDEdgeRefs
 
 		for _, ref := range fwd_refs {
-			fwd_edge_refs.Add(_EdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID, Type: ref._Type})
+			fwd_edge_refs.Add(_EdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID})
 			fwd_count += 1
 		}
 		for _, ref := range bwd_refs {
-			bwd_edge_refs.Add(_EdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID, Type: ref._Type})
+			bwd_edge_refs.Add(_EdgeEntry{EdgeID: ref.EdgeID, OtherID: ref.OtherID})
 			bwd_count += 1
 		}
 

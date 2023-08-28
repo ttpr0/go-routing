@@ -105,7 +105,6 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 			if edge.NodeA == int32(id) {
 				edgeref := _EdgeEntry{
 					EdgeID:  int32(index),
-					Type:    0,
 					OtherID: edge.NodeB,
 				}
 				fwd_edge_refs.Add(edgeref)
@@ -114,7 +113,6 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 					if edge.NodeB == int32(id) {
 						edgeref := _EdgeEntry{
 							EdgeID:  int32(index + 1),
-							Type:    0,
 							OtherID: edge.NodeA,
 						}
 						bwd_edge_refs.Add(edgeref)
@@ -123,7 +121,6 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 			} else if edge.NodeB == int32(id) {
 				edgeref := _EdgeEntry{
 					EdgeID:  int32(index),
-					Type:    0,
 					OtherID: edge.NodeA,
 				}
 				bwd_edge_refs.Add(edgeref)
@@ -132,7 +129,6 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 					if edge.NodeA == int32(id) {
 						edgeref := _EdgeEntry{
 							EdgeID:  int32(index + 1),
-							Type:    0,
 							OtherID: edge.NodeB,
 						}
 						fwd_edge_refs.Add(edgeref)
