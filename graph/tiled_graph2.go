@@ -4,90 +4,26 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
+//*******************************************
+// tiled-graph with border-interior index
+//******************************************
+
 type ITiledGraph2 interface {
-	GetGeometry() IGeometry
-	GetWeighting() IWeighting
-	GetDefaultExplorer() IGraphExplorer
-	GetGraphExplorer(weighting IWeighting) IGraphExplorer
-	GetNodeTile(node int32) int16
-	NodeCount() int32
-	EdgeCount() int32
-	TileCount() int16
-	IsNode(node int32) bool
-	GetNode(node int32) Node
-	GetEdge(edge int32) Edge
-	GetIndex() IGraphIndex
+	ITiledGraph
+
 	GetBorderNodes(tile int16) Array[int32]
 	GetTileRanges(tile int16, border_node int32) IIterator[Tuple[int32, float32]]
 }
 
 type TiledGraph2 struct {
-	nodes            NodeStore
-	node_tiles       NodeTileStore
-	topology         TopologyStore
-	edges            EdgeStore
-	edge_types       Array[byte]
-	geom             GeometryStore
-	weight           DefaultWeighting
-	index            KDTree[int32]
+	TiledGraph
+
+	// Storage for indexing sp within cells
 	border_nodes     Dict[int16, Array[int32]]
 	interior_nodes   Dict[int16, Array[int32]]
 	border_range_map Dict[int16, Dict[int32, Array[float32]]]
 }
 
-func (self *TiledGraph2) GetGeometry() IGeometry {
-	return &self.geom
-}
-func (self *TiledGraph2) GetWeighting() IWeighting {
-	return &self.weight
-}
-func (self *TiledGraph2) GetDefaultExplorer() IGraphExplorer {
-	return &TiledGraph2Explorer{
-		graph:    self,
-		accessor: self.topology.GetAccessor(),
-		weight:   &self.weight,
-	}
-}
-func (self *TiledGraph2) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
-	return &TiledGraph2Explorer{
-		graph:    self,
-		accessor: self.topology.GetAccessor(),
-		weight:   weighting,
-	}
-}
-func (self *TiledGraph2) GetNodeTile(node int32) int16 {
-	return self.node_tiles.GetNodeTile(node)
-}
-func (self *TiledGraph2) NodeCount() int32 {
-	return int32(self.nodes.NodeCount())
-}
-func (self *TiledGraph2) EdgeCount() int32 {
-	return int32(self.edges.EdgeCount())
-}
-func (self *TiledGraph2) TileCount() int16 {
-	max := int16(0)
-	for i := 0; i < int(self.NodeCount()); i++ {
-		tile := self.node_tiles.GetNodeTile(int32(i))
-		if tile > max {
-			max = tile
-		}
-	}
-	return max - 1
-}
-func (self *TiledGraph2) IsNode(node int32) bool {
-	return self.nodes.IsNode(node)
-}
-func (self *TiledGraph2) GetNode(node int32) Node {
-	return self.nodes.GetNode(node)
-}
-func (self *TiledGraph2) GetEdge(edge int32) Edge {
-	return self.edges.GetEdge(edge)
-}
-func (self *TiledGraph2) GetIndex() IGraphIndex {
-	return &BaseGraphIndex{
-		index: self.index,
-	}
-}
 func (self *TiledGraph2) GetBorderNodes(tile int16) Array[int32] {
 	return self.border_nodes[tile]
 }
@@ -112,34 +48,4 @@ func (self *BorderRangeIterator) Next() (Tuple[int32, float32], bool) {
 	dist := self.ranges[self.state]
 	self.state += 1
 	return MakeTuple(node, dist), true
-}
-
-type TiledGraph2Explorer struct {
-	graph    *TiledGraph2
-	accessor TopologyAccessor
-	weight   IWeighting
-}
-
-func (self *TiledGraph2Explorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	self.accessor.SetBaseNode(node, direction)
-	return &TiledEdgeRefIterator{
-		accessor:   &self.accessor,
-		edge_types: self.graph.edge_types,
-	}
-}
-func (self *TiledGraph2Explorer) GetEdgeWeight(edge EdgeRef) int32 {
-	return self.weight.GetEdgeWeight(edge.EdgeID)
-}
-func (self *TiledGraph2Explorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
-	return self.weight.GetTurnCost(from.EdgeID, via, to.EdgeID)
-}
-func (self *TiledGraph2Explorer) GetOtherNode(edge EdgeRef, node int32) int32 {
-	e := self.graph.GetEdge(edge.EdgeID)
-	if node == e.NodeA {
-		return e.NodeB
-	}
-	if node == e.NodeB {
-		return e.NodeA
-	}
-	return -1
 }

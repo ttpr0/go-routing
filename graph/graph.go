@@ -5,17 +5,21 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
+//*******************************************
+// graph interfaces
+//******************************************
+
 type IGraph interface {
-	GetGeometry() IGeometry
-	GetWeighting() IWeighting
 	GetDefaultExplorer() IGraphExplorer
 	GetGraphExplorer(weighting IWeighting) IGraphExplorer
-	NodeCount() int32
-	EdgeCount() int32
+	GetIndex() IGraphIndex
+	NodeCount() int
+	EdgeCount() int
 	IsNode(node int32) bool
 	GetNode(node int32) Node
 	GetEdge(edge int32) Edge
-	GetIndex() IGraphIndex
+	GetNodeGeom(node int32) geo.Coord
+	GetEdgeGeom(edge int32) geo.CoordArray
 }
 
 // not thread safe, use only one instance per thread
@@ -37,21 +41,17 @@ type IGraphIndex interface {
 	GetClosestNode(point geo.Coord) (int32, bool)
 }
 
+//*******************************************
+// base-graph
+//******************************************
+
 type Graph struct {
-	nodes    NodeStore
-	edges    EdgeStore
+	store    GraphStore
 	topology TopologyStore
-	geom     GeometryStore
 	weight   DefaultWeighting
 	index    KDTree[int32]
 }
 
-func (self *Graph) GetGeometry() IGeometry {
-	return &self.geom
-}
-func (self *Graph) GetWeighting() IWeighting {
-	return &self.weight
-}
 func (self *Graph) GetDefaultExplorer() IGraphExplorer {
 	return &BaseGraphExplorer{
 		graph:    self,
@@ -66,26 +66,36 @@ func (self *Graph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
 		weight:   weighting,
 	}
 }
-func (self *Graph) NodeCount() int32 {
-	return int32(self.nodes.NodeCount())
+func (self *Graph) NodeCount() int {
+	return self.store.NodeCount()
 }
-func (self *Graph) EdgeCount() int32 {
-	return int32(self.edges.EdgeCount())
+func (self *Graph) EdgeCount() int {
+	return self.store.EdgeCount()
 }
 func (self *Graph) IsNode(node int32) bool {
-	return self.nodes.IsNode(node)
+	return self.store.IsNode(node)
 }
 func (self *Graph) GetNode(node int32) Node {
-	return self.nodes.GetNode(node)
+	return self.store.GetNode(node)
 }
 func (self *Graph) GetEdge(edge int32) Edge {
-	return self.edges.GetEdge(edge)
+	return self.store.GetEdge(edge)
+}
+func (self *Graph) GetNodeGeom(node int32) geo.Coord {
+	return self.store.GetNodeGeom(node)
+}
+func (self *Graph) GetEdgeGeom(edge int32) geo.CoordArray {
+	return self.store.GetEdgeGeom(edge)
 }
 func (self *Graph) GetIndex() IGraphIndex {
 	return &BaseGraphIndex{
 		index: self.index,
 	}
 }
+
+//*******************************************
+// base-graph explorer
+//******************************************
 
 type BaseGraphExplorer struct {
 	graph    *Graph
@@ -94,10 +104,14 @@ type BaseGraphExplorer struct {
 }
 
 func (self *BaseGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	accessor := &self.accessor
-	accessor.SetBaseNode(node, direction)
-	return &EdgeRefIterator{
-		accessor: accessor,
+	if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
+		accessor := &self.accessor
+		accessor.SetBaseNode(node, direction)
+		return &EdgeRefIterator{
+			accessor: accessor,
+		}
+	} else {
+		panic("Adjacency-type not implemented for this graph.")
 	}
 }
 func (self *BaseGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
@@ -116,6 +130,10 @@ func (self *BaseGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 	}
 	return -1
 }
+
+//*******************************************
+// edge-ref iterators
+//******************************************
 
 type EdgeRefIterator struct {
 	accessor *TopologyAccessor

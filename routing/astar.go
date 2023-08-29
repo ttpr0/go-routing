@@ -20,15 +20,13 @@ type AStar struct {
 	end_id    int32
 	end_point geo.Coord
 	graph     graph.IGraph
-	geom      graph.IGeometry
-	weight    graph.IWeighting
 	flags     []flag_a
 }
 
 func NewAStar(graph graph.IGraph, start, end int32) *AStar {
-	d := AStar{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+	d := AStar{graph: graph, start_id: start, end_id: end}
 
-	d.end_point = d.geom.GetNode(end)
+	d.end_point = d.graph.GetNodeGeom(end)
 
 	flags := make([]flag_a, graph.NodeCount())
 	for i := 0; i < len(flags); i++ {
@@ -76,8 +74,8 @@ func (self *AStar) CalcShortestPath() bool {
 			if other_flag.visited {
 				continue
 			}
-			lambda := geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			lambda := geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
@@ -121,9 +119,9 @@ func (self *AStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 			if other_flag.visited {
 				continue
 			}
-			visitededges.Add(self.geom.GetEdge(edge_id))
-			lambda := geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			lambda := geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length

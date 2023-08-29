@@ -5,6 +5,10 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
+//*******************************************
+// dictionary graph
+//******************************************
+
 // Graph implementation using dictionaries.
 // Mainly for testing purposes.
 type DictGraph struct {
@@ -12,7 +16,8 @@ type DictGraph struct {
 	edges        Dict[int32, Edge]
 	fwd_edgerefs Dict[int32, List[EdgeRef]]
 	bwd_edgerefs Dict[int32, List[EdgeRef]]
-	geom         DictGeometry
+	node_geoms   Dict[int32, geo.Coord]
+	edge_geoms   Dict[int32, geo.CoordArray]
 	weight       DictWeighting
 
 	max_node_id int32
@@ -25,7 +30,8 @@ func NewDictGraph() *DictGraph {
 		edges:        NewDict[int32, Edge](10),
 		fwd_edgerefs: NewDict[int32, List[EdgeRef]](10),
 		bwd_edgerefs: NewDict[int32, List[EdgeRef]](10),
-		geom:         DictGeometry{nodes: NewDict[int32, geo.Coord](10), edges: NewDict[int32, geo.CoordArray](10)},
+		node_geoms:   NewDict[int32, geo.Coord](10),
+		edge_geoms:   NewDict[int32, geo.CoordArray](10),
 		weight:       DictWeighting{weights: NewDict[int32, int32](10)},
 
 		max_node_id: 0,
@@ -33,12 +39,6 @@ func NewDictGraph() *DictGraph {
 	}
 }
 
-func (self *DictGraph) GetGeometry() IGeometry {
-	return &self.geom
-}
-func (self *DictGraph) GetWeighting() IWeighting {
-	return &self.weight
-}
 func (self *DictGraph) GetDefaultExplorer() IGraphExplorer {
 	return &DictGraphExplorer{
 		graph:  self,
@@ -66,9 +66,15 @@ func (self *DictGraph) GetNode(node int32) Node {
 func (self *DictGraph) GetEdge(edge int32) Edge {
 	return self.edges[edge]
 }
+func (self *DictGraph) GetNodeGeom(node int32) geo.Coord {
+	return self.node_geoms[node]
+}
+func (self *DictGraph) GetEdgeGeom(edge int32) geo.CoordArray {
+	return self.edge_geoms[edge]
+}
 func (self *DictGraph) GetIndex() IGraphIndex {
 	return &DictGraphIndex{
-		nodes: self.geom.nodes,
+		nodes: self.node_geoms,
 	}
 }
 
@@ -80,7 +86,7 @@ func (self *DictGraph) AddNode(id int32, node Node, point geo.Coord) {
 		self.max_node_id = id + 1
 	}
 	self.nodes[id] = node
-	self.geom.nodes[id] = point
+	self.node_geoms[id] = point
 	self.fwd_edgerefs[id] = NewList[EdgeRef](2)
 	self.bwd_edgerefs[id] = NewList[EdgeRef](2)
 }
@@ -94,7 +100,7 @@ func (self *DictGraph) AddEdge(edge Edge, points geo.CoordArray) {
 	id := self.max_edge_id
 	self.max_edge_id = id + 1
 	self.edges[id] = edge
-	self.geom.edges[id] = points
+	self.edge_geoms[id] = points
 	self.weight.weights[id] = int32(edge.Length / float32(edge.Maxspeed))
 	fwd_edge_refs := self.fwd_edgerefs[edge.NodeA]
 	fwd_edge_refs.Add(EdgeRef{EdgeID: id, OtherID: edge.NodeB, _Type: 0})
@@ -116,7 +122,7 @@ func (self *DictGraph) AddDummyEdge(node_a, node_b int32, weight int32) {
 		NodeA: node_a,
 		NodeB: node_b,
 	}
-	self.geom.edges[id] = geo.CoordArray{}
+	self.edge_geoms[id] = geo.CoordArray{}
 	self.weight.weights[id] = weight
 	fwd_edge_refs := self.fwd_edgerefs[node_a]
 	fwd_edge_refs.Add(EdgeRef{EdgeID: id, OtherID: node_b, _Type: 0})
@@ -126,18 +132,26 @@ func (self *DictGraph) AddDummyEdge(node_a, node_b int32, weight int32) {
 	self.bwd_edgerefs[node_b] = bwd_edge_refs
 }
 
+//*******************************************
+// dict-graphs explorer
+//******************************************
+
 type DictGraphExplorer struct {
 	graph  *DictGraph
 	weight IWeighting
 }
 
 func (self *DictGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	if direction == FORWARD {
-		edge_refs := self.graph.fwd_edgerefs[node]
-		return NewListIterator(edge_refs)
+	if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
+		if direction == FORWARD {
+			edge_refs := self.graph.fwd_edgerefs[node]
+			return NewListIterator(edge_refs)
+		} else {
+			edge_refs := self.graph.bwd_edgerefs[node]
+			return NewListIterator(edge_refs)
+		}
 	} else {
-		edge_refs := self.graph.bwd_edgerefs[node]
-		return NewListIterator(edge_refs)
+		panic("Adjacency-type not implemented for this graph.")
 	}
 }
 func (self *DictGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
@@ -156,6 +170,10 @@ func (self *DictGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 	}
 	return -1
 }
+
+//*******************************************
+// others
+//******************************************
 
 type DictGraphIndex struct {
 	nodes Dict[int32, geo.Coord]
@@ -187,33 +205,4 @@ func (self *DictWeighting) GetEdgeWeight(edge int32) int32 {
 }
 func (self *DictWeighting) GetTurnCost(from, via, to int32) int32 {
 	return 0
-}
-
-type DictGeometry struct {
-	nodes Dict[int32, geo.Coord]
-	edges Dict[int32, geo.CoordArray]
-}
-
-func (self *DictGeometry) GetNode(node int32) geo.Coord {
-	return self.nodes[node]
-}
-
-func (self *DictGeometry) GetEdge(edge int32) geo.CoordArray {
-	return self.edges[edge]
-}
-
-func (self *DictGeometry) GetAllNodes() []geo.Coord {
-	nodes := make([]geo.Coord, 0, 10)
-	for _, coord := range self.nodes {
-		nodes = append(nodes, coord)
-	}
-	return nodes
-}
-
-func (self *DictGeometry) GetAllEdges() []geo.CoordArray {
-	edges := make([]geo.CoordArray, 0, 10)
-	for _, coords := range self.edges {
-		edges = append(edges, coords)
-	}
-	return edges
 }

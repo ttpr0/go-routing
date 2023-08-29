@@ -11,12 +11,11 @@ import (
 
 // computes node tiles based on geo-polygons
 func GeometricPartitioning(g graph.IGraph, features []geo.Feature) Array[int16] {
-	geom := g.GetGeometry()
-	node_coords := geom.GetAllNodes()
-	node_tiles := make([]int16, len(node_coords))
+	node_tiles := make([]int16, g.NodeCount())
 
 	c := 0
-	for i, node := range node_coords {
+	for i := 0; i < int(g.NodeCount()); i++ {
+		node := g.GetNodeGeom(int32(i))
 		if c%1000 == 0 {
 			fmt.Println("finished node ", c)
 		}

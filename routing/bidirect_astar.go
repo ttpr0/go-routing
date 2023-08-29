@@ -26,16 +26,14 @@ type BidirectAStar struct {
 	start_point geo.Coord
 	end_point   geo.Coord
 	graph       graph.IGraph
-	geom        graph.IGeometry
-	weight      graph.IWeighting
 	flags       []flag_ba
 }
 
 func NewBidirectAStar(graph graph.IGraph, start, end int32) *BidirectAStar {
-	d := BidirectAStar{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+	d := BidirectAStar{graph: graph, start_id: start, end_id: end}
 
-	d.end_point = d.geom.GetNode(end)
-	d.start_point = d.geom.GetNode(start)
+	d.end_point = d.graph.GetNodeGeom(end)
+	d.start_point = d.graph.GetNodeGeom(start)
 
 	flags := make([]flag_ba, graph.NodeCount())
 	for i := 0; i < len(flags); i++ {
@@ -86,10 +84,10 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			if other_flag.visited1 {
 				continue
 			}
-			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
 			lambda := (other_flag.lambda1-other_flag.lambda2)/2 + lambda_route/2
-			new_length := curr_flag.path_length1 + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length1 + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.visited2 {
 				shortest := new_length + other_flag.path_length2
 				top1, ok1 := self.startheap.Peek()
@@ -139,10 +137,10 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			if other_flag.visited2 {
 				continue
 			}
-			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
 			lambda := (other_flag.lambda2-other_flag.lambda1)/2 + lambda_route/2
-			new_length := curr_flag.path_length2 + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length2 + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.visited1 {
 				shortest := new_length + other_flag.path_length1
 				top1, ok1 := self.startheap.Peek()
@@ -201,11 +199,11 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 			if other_flag.visited1 {
 				continue
 			}
-			visitededges.Add(self.geom.GetEdge(edge_id))
-			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
 			lambda := (other_flag.lambda1-other_flag.lambda2)/2 + lambda_route/2
-			new_length := curr_flag.path_length1 + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length1 + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.visited2 {
 				shortest := new_length + other_flag.path_length2
 				top1, ok1 := self.startheap.Peek()
@@ -254,11 +252,11 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 			if other_flag.visited2 {
 				continue
 			}
-			visitededges.Add(self.geom.GetEdge(edge_id))
-			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
-			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.geom.GetNode(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
+			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
+			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
 			lambda := (other_flag.lambda2-other_flag.lambda1)/2 + lambda_route/2
-			new_length := curr_flag.path_length2 + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length2 + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.visited1 {
 				shortest := new_length + other_flag.path_length1
 				top1, ok1 := self.startheap.Peek()

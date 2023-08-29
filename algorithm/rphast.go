@@ -17,13 +17,11 @@ type RPHAST struct {
 	subset    Array[bool]
 	max_range float64
 	graph     graph.ICHGraph
-	geom      graph.IGeometry
-	weight    graph.IWeighting
 	flags     []FlagSPT
 }
 
 func NewRPHAST(graph graph.ICHGraph, graph_subset Array[bool]) *RPHAST {
-	d := RPHAST{graph: graph, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+	d := RPHAST{graph: graph}
 
 	d.subset = graph_subset
 
@@ -75,7 +73,7 @@ func (self *RPHAST) CalcSPT() {
 			if other_flag.Visited {
 				continue
 			}
-			new_length := curr_flag.PathLength + float64(self.weight.GetEdgeWeight(ref.EdgeID))
+			new_length := curr_flag.PathLength + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.PathLength > new_length {
 				other_flag.PrevEdge = edge_id
 				other_flag.PathLength = new_length
@@ -105,8 +103,8 @@ func (self *RPHAST) CalcSPT() {
 				continue
 			}
 			other_flag := self.flags[other_id]
-			if other_flag.PathLength > (curr_len + float64(self.weight.GetEdgeWeight(ref.EdgeID))) {
-				other_flag.PathLength = curr_len + float64(self.weight.GetEdgeWeight(ref.EdgeID))
+			if other_flag.PathLength > (curr_len + float64(explorer.GetEdgeWeight(ref))) {
+				other_flag.PathLength = curr_len + float64(explorer.GetEdgeWeight(ref))
 				self.flags[other_id] = other_flag
 			}
 		}

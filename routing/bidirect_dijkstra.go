@@ -24,13 +24,11 @@ type BidirectDijkstra struct {
 	start_id  int32
 	end_id    int32
 	graph     graph.IGraph
-	geom      graph.IGeometry
-	weight    graph.IWeighting
 	flags     []flag_bd
 }
 
 func NewBidirectDijkstra(graph graph.IGraph, start, end int32) *BidirectDijkstra {
-	d := BidirectDijkstra{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+	d := BidirectDijkstra{graph: graph, start_id: start, end_id: end}
 
 	flags := make([]flag_bd, graph.NodeCount())
 	for i := 0; i < len(flags); i++ {
@@ -83,7 +81,7 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 				continue
 			}
 
-			new_length := curr_flag.path_length1 + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length1 + float64(explorer.GetEdgeWeight(ref))
 
 			if other_flag.visited2 {
 				shortest := new_length + other_flag.path_length2
@@ -138,7 +136,7 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 				continue
 			}
 
-			new_length := curr_flag.path_length2 + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length2 + float64(explorer.GetEdgeWeight(ref))
 
 			if other_flag.visited1 {
 				shortest := new_length + other_flag.path_length1
@@ -193,8 +191,8 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *List[geo.CoordArray
 			if other_flag.visited1 {
 				continue
 			}
-			visitededges.Add(self.geom.GetEdge(edge_id))
-			new_length := curr_flag.path_length1 + float64(self.weight.GetEdgeWeight(edge_id))
+			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			new_length := curr_flag.path_length1 + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.visited2 {
 				shortest := new_length + other_flag.path_length2
 				top1, ok1 := self.startheap.Peek()
@@ -239,8 +237,8 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *List[geo.CoordArray
 			if other_flag.visited2 {
 				continue
 			}
-			visitededges.Add(self.geom.GetEdge(edge_id))
-			new_length := curr_flag.path_length2 + float64(self.weight.GetEdgeWeight(edge_id))
+			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			new_length := curr_flag.path_length2 + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.visited1 {
 				shortest := new_length + other_flag.path_length1
 				top1, ok1 := self.startheap.Peek()

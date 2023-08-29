@@ -17,14 +17,12 @@ type ShortestPathTree3 struct {
 	start_id     int32
 	max_range    float64
 	graph        graph.ITiledGraph
-	geom         graph.IGeometry
-	weight       graph.IWeighting
 	flags        []FlagSPT3
 	active_tiles Dict[int16, bool]
 }
 
 func NewSPT3(graph graph.ITiledGraph) *ShortestPathTree3 {
-	d := ShortestPathTree3{graph: graph, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+	d := ShortestPathTree3{graph: graph}
 
 	flags := make([]FlagSPT3, graph.NodeCount())
 	d.flags = flags
@@ -85,7 +83,7 @@ func (self *ShortestPathTree3) CalcSPT() {
 			if other_flag.Visited {
 				continue
 			}
-			new_length := curr_flag.PathLength + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.PathLength + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.PathLength > new_length {
 				if ref.IsCrossBorder() {
 					tile_id := self.graph.GetNodeTile(other_id)

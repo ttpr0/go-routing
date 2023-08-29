@@ -16,13 +16,11 @@ type ShortestPathTree2 struct {
 	start_id  int32
 	max_range float64
 	graph     graph.IGraph
-	geom      graph.IGeometry
-	weight    graph.IWeighting
 	flags     []FlagSPT
 }
 
 func NewSPT2(graph graph.IGraph) *ShortestPathTree2 {
-	d := ShortestPathTree2{graph: graph, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+	d := ShortestPathTree2{graph: graph}
 
 	flags := make([]FlagSPT, graph.NodeCount())
 	d.flags = flags
@@ -77,7 +75,7 @@ func (self *ShortestPathTree2) CalcSPT() {
 			if other_flag.Visited {
 				continue
 			}
-			new_length := curr_flag.PathLength + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.PathLength + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.PathLength > new_length {
 				other_flag.PrevEdge = edge_id
 				other_flag.PathLength = new_length

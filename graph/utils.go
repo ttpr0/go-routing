@@ -9,7 +9,7 @@ import (
 )
 
 func BuildGraphIndex(g *Graph) {
-	g.index = _BuildKDTreeIndex(g.geom.GetAllNodes())
+	g.index = _BuildKDTreeIndex(g.store.node_geoms)
 }
 
 func _BuildKDTreeIndex(node_geoms List[geo.Coord]) KDTree[int32] {
@@ -22,10 +22,8 @@ func _BuildKDTreeIndex(node_geoms List[geo.Coord]) KDTree[int32] {
 }
 
 func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollection) {
-	geom := graph.GetGeometry()
-
 	edges := NewList[geo.Feature](int(graph.EdgeCount()))
-	for i := 0; i < graph.edges.EdgeCount(); i++ {
+	for i := 0; i < graph.EdgeCount(); i++ {
 		edge := graph.GetEdge(int32(i))
 		if i%1000 == 0 {
 			fmt.Println("edge ", i)
@@ -36,7 +34,7 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 		} else {
 			edge_type = -10
 		}
-		line := geo.NewLineString(geom.GetEdge(int32(i)))
+		line := geo.NewLineString(graph.GetEdgeGeom(int32(i)))
 		edges.Add(geo.NewFeature(&line, map[string]any{"index": i, "nodeA": edge.NodeA, "nodeB": edge.NodeB, "type": edge_type}))
 	}
 
@@ -49,8 +47,8 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 		for j := 0; j < int(node.FWDEdgeCount); j++ {
 			e.Add(graph.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
 		}
-		node_tile := graph.node_tiles.GetNodeTile(int32(i))
-		point := geo.NewPoint(geom.GetNode(int32(i)))
+		node_tile := graph.GetNodeTile(int32(i))
+		point := geo.NewPoint(graph.GetNodeGeom(int32(i)))
 		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.FWDEdgeCount, "edges": e, "tile": node_tile}))
 	}
 
@@ -58,10 +56,8 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 }
 
 func GraphToGeoJSON2(graph *Graph, node_tiles Array[int16]) (geo.FeatureCollection, geo.FeatureCollection) {
-	geom := graph.GetGeometry()
-
 	edges := NewList[geo.Feature](int(graph.EdgeCount()))
-	for i := 0; i < graph.edges.EdgeCount(); i++ {
+	for i := 0; i < graph.EdgeCount(); i++ {
 		edge := graph.GetEdge(int32(i))
 		if i%1000 == 0 {
 			fmt.Println("edge ", i)
@@ -72,7 +68,7 @@ func GraphToGeoJSON2(graph *Graph, node_tiles Array[int16]) (geo.FeatureCollecti
 		} else {
 			edge_type = -10
 		}
-		line := geo.NewLineString(geom.GetEdge(int32(i)))
+		line := geo.NewLineString(graph.GetEdgeGeom(int32(i)))
 		edges.Add(geo.NewFeature(&line, map[string]any{"index": i, "nodeA": edge.NodeA, "nodeB": edge.NodeB, "type": edge_type}))
 	}
 
@@ -86,7 +82,7 @@ func GraphToGeoJSON2(graph *Graph, node_tiles Array[int16]) (geo.FeatureCollecti
 			e.Add(graph.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
 		}
 		node_tile := node_tiles[i]
-		point := geo.NewPoint(geom.GetNode(int32(i)))
+		point := geo.NewPoint(graph.GetNodeGeom(int32(i)))
 		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.FWDEdgeCount, "edges": e, "tile": node_tile}))
 	}
 
@@ -192,7 +188,7 @@ func CheckCHGraph(g ICHGraph) {
 func SortNodesByLevel(g *CHGraph) {
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), g.node_levels.GetNodeLevel(int32(i))))
+		indices.Add(MakeTuple(int32(i), g.GetNodeLevel(int32(i))))
 	}
 	sort.SliceStable(indices, func(i, j int) bool {
 		return indices[i].B > indices[j].B
@@ -211,14 +207,10 @@ func SortNodesByLevel(g *CHGraph) {
 }
 
 func ReorderCHGraph(g *CHGraph, node_mapping Array[int32]) {
-	g.nodes._ReorderNodes(node_mapping)
-	g.edges._ReorderNodes(node_mapping)
-	g.node_levels._ReorderNodes(node_mapping)
-	g.shortcuts._ReorderNodes(node_mapping)
+	g.store._ReorderNodes(node_mapping)
 	g.topology._ReorderNodes(node_mapping)
-	g.ch_topology._ReorderNodes(node_mapping)
-	g.geom._ReorderNodes(node_mapping)
 	g.weight._ReorderNodes(node_mapping)
-	g.sh_weight._ReorderNodes(node_mapping)
-	g.index = _BuildKDTreeIndex(g.geom.GetAllNodes())
+
+	g.ch_store._ReorderNodes(node_mapping)
+	g.ch_topology._ReorderNodes(node_mapping)
 }

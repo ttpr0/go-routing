@@ -21,8 +21,6 @@ type ShortestPathTree struct {
 	start_id int32
 	max_val  int32
 	graph    graph.IGraph
-	geom     graph.IGeometry
-	weight   graph.IWeighting
 	flags    []flag_spt
 	consumer ISPTConsumer
 }
@@ -32,8 +30,6 @@ func NewShortestPathTree(graph graph.IGraph, start, max_val int32, consumer ISPT
 		graph:    graph,
 		start_id: start,
 		max_val:  max_val,
-		geom:     graph.GetGeometry(),
-		weight:   graph.GetWeighting(),
 	}
 
 	flags := make([]flag_spt, graph.NodeCount())
@@ -65,7 +61,7 @@ func (self *ShortestPathTree) CalcShortestPathTree() {
 		if curr_flag.visited {
 			continue
 		}
-		self.consumer.ConsumePoint(self.geom.GetNode(curr_id), int(curr_flag.path_length))
+		self.consumer.ConsumePoint(self.graph.GetNodeGeom(curr_id), int(curr_flag.path_length))
 		curr_flag.visited = true
 		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
@@ -83,7 +79,7 @@ func (self *ShortestPathTree) CalcShortestPathTree() {
 			if other_flag.visited {
 				continue
 			}
-			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length

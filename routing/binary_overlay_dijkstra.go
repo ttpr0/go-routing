@@ -22,13 +22,11 @@ type BODijkstra struct {
 	start_id int32
 	end_id   int32
 	graph    graph.ITiledGraph
-	geom     graph.IGeometry
-	weight   graph.IWeighting
 	flags    Dict[int32, _FlagBOD]
 }
 
 func NewBODijkstra(graph graph.ITiledGraph, start, end int32) *BODijkstra {
-	d := BODijkstra{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+	d := BODijkstra{graph: graph, start_id: start, end_id: end}
 
 	flags := NewDict[int32, _FlagBOD](100)
 	d.flags = flags
@@ -150,9 +148,9 @@ func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) boo
 			}
 			if ref.IsShortcut() {
 			} else {
-				visitededges.Add(self.geom.GetEdge(edge_id))
+				visitededges.Add(self.graph.GetEdgeGeom(edge_id))
 			}
-			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {
 				if ref.IsCrossBorder() {
 					tile_id := self.graph.GetNodeTile(other_id)

@@ -38,4 +38,6 @@ const (
 	ADJACENT_SHORTCUTS Adjacency = 1
 	ADJACENT_ALL       Adjacency = 2
 	ADJACENT_SKIP      Adjacency = 3
+	ADJACENT_UPWARDS   Adjacency = 4
+	ADJACENT_DOWNWARDS Adjacency = 5
 )

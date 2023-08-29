@@ -27,9 +27,6 @@ type CH struct {
 	end_id      int32
 	path_length float64
 	graph       graph.ICHGraph
-	geom        graph.IGeometry
-	weight      graph.IWeighting
-	shweight    graph.IWeighting
 	flags       Dict[int32, flag_ch]
 }
 
@@ -51,9 +48,6 @@ func NewCH(graph graph.ICHGraph, start, end int32) *CH {
 		end_id:      end,
 		path_length: 100000000,
 		graph:       graph,
-		geom:        graph.GetGeometry(),
-		weight:      graph.GetWeighting(),
-		shweight:    graph.GetShortcutWeighting(),
 		flags:       flags,
 	}
 
@@ -172,7 +166,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 	defer func() {
 		fmt.Println("running")
 		for _, edge := range edges {
-			visitededges.Add(self.geom.GetEdge(edge))
+			visitededges.Add(self.graph.GetEdgeGeom(edge))
 		}
 	}()
 

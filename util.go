@@ -48,9 +48,8 @@ func GetClosestNode2(point geo.Coord, graph graph.IGraph) int32 {
 	distance := -1.0
 	id := 0
 	newdistance := 0.0
-	geom := graph.GetGeometry()
-	for i := 0; i < len(geom.GetAllNodes()); i++ {
-		p := geom.GetNode(int32(i))
+	for i := 0; i < int(graph.NodeCount()); i++ {
+		p := graph.GetNodeGeom(int32(i))
 		newdistance = math.Sqrt(math.Pow(float64(point[1])-float64(p[1]), 2) + math.Pow(float64(point[0])-float64(p[0]), 2))
 		if distance == -1 {
 			distance = newdistance

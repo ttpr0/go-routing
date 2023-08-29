@@ -19,13 +19,11 @@ type Dijkstra struct {
 	start_id int32
 	end_id   int32
 	graph    graph.IGraph
-	geom     graph.IGeometry
-	weight   graph.IWeighting
 	flags    []flag_d
 }
 
 func NewDijkstra(graph graph.IGraph, start, end int32) *Dijkstra {
-	d := Dijkstra{graph: graph, start_id: start, end_id: end, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+	d := Dijkstra{graph: graph, start_id: start, end_id: end}
 
 	flags := make([]flag_d, graph.NodeCount())
 	for i := 0; i < len(flags); i++ {
@@ -74,7 +72,7 @@ func (self *Dijkstra) CalcShortestPath() bool {
 			if other_flag.visited {
 				continue
 			}
-			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
@@ -119,8 +117,8 @@ func (self *Dijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool 
 			if other_flag.visited {
 				continue
 			}
-			visitededges.Add(self.geom.GetEdge(edge_id))
-			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length

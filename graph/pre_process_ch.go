@@ -24,10 +24,8 @@ type DynamicGraph struct {
 	sh_weight   List[int32]
 
 	// underlying base graph
-	nodes    NodeStore
-	edges    EdgeStore
+	store    GraphStore
 	topology TopologyStore
-	geom     GeometryStore
 	weight   DefaultWeighting
 	index    KDTree[int32]
 }
@@ -47,16 +45,16 @@ func (self *DynamicGraph) GetExplorer() *DynamicGraphExplorer {
 	}
 }
 func (self *DynamicGraph) NodeCount() int {
-	return self.nodes.NodeCount()
+	return self.store.NodeCount()
 }
 func (self *DynamicGraph) EdgeCount() int {
-	return self.edges.EdgeCount()
+	return self.store.EdgeCount()
 }
 func (self *DynamicGraph) GetNode(node int32) Node {
-	return self.nodes.GetNode(node)
+	return self.store.GetNode(node)
 }
 func (self *DynamicGraph) GetEdge(edge int32) Edge {
-	return self.edges.GetEdge(edge)
+	return self.store.GetEdge(edge)
 }
 func (self *DynamicGraph) GetShortcut(id int32) CHShortcut {
 	return self.shortcuts[id]
@@ -207,10 +205,10 @@ func (self *DynamicEdgeRefIterator) Next() (EdgeRef, bool) {
 //*******************************************
 
 func TransformToDynamicGraph(g *Graph) *DynamicGraph {
-	ch_topology := NewDynamicTopology(g.nodes.NodeCount())
-	node_levels := NewArray[int16](g.nodes.NodeCount())
+	ch_topology := NewDynamicTopology(g.NodeCount())
+	node_levels := NewArray[int16](g.NodeCount())
 
-	for i := 0; i < g.nodes.NodeCount(); i++ {
+	for i := 0; i < g.NodeCount(); i++ {
 		node_levels[i] = 0
 	}
 
@@ -219,10 +217,8 @@ func TransformToDynamicGraph(g *Graph) *DynamicGraph {
 		node_levels: node_levels,
 		shortcuts:   NewList[CHShortcut](100),
 		sh_weight:   NewList[int32](100),
-		nodes:       g.nodes,
-		edges:       g.edges,
+		store:       g.store,
 		topology:    g.topology,
-		geom:        g.geom,
 		weight:      g.weight,
 		index:       g.index,
 	}
@@ -232,16 +228,16 @@ func TransformToDynamicGraph(g *Graph) *DynamicGraph {
 
 func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 	g := CHGraph{
-		nodes:       dg.nodes,
-		edges:       dg.edges,
+		store:       dg.store,
 		topology:    dg.topology,
 		ch_topology: *DynamicToTopology(&dg.ch_topology),
-		shortcuts:   CHShortcutStore{Array[CHShortcut](dg.shortcuts)},
-		node_levels: CHLevelStore{dg.node_levels},
-		geom:        dg.geom,
-		weight:      dg.weight,
-		sh_weight:   DefaultWeighting{dg.sh_weight},
-		index:       dg.index,
+		ch_store: CHStore{
+			shortcuts:   Array[CHShortcut](dg.shortcuts),
+			node_levels: dg.node_levels,
+			sh_weight:   Array[int32](dg.sh_weight),
+		},
+		weight: dg.weight,
+		index:  dg.index,
 	}
 
 	return &g
@@ -600,8 +596,8 @@ func ShortestPathNodeOrdering(graph IGraph, n int) Array[int32] {
 		if c%100 == 0 {
 			fmt.Println(c, "/", n)
 		}
-		start := rand.Int31n(graph.NodeCount())
-		end := rand.Int31n(graph.NodeCount())
+		start := rand.Int31n(int32(graph.NodeCount()))
+		end := rand.Int31n(int32(graph.NodeCount()))
 		MarkNodesOnPath(start, end, sp_counts, graph, heap, flags)
 	}
 	fmt.Println("finished shortest paths")

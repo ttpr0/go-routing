@@ -52,8 +52,6 @@ type DistributedRoutingRunner struct {
 	start_id   int32
 	end_id     int32
 	graph      graph.ITiledGraph
-	geom       graph.IGeometry
-	weight     graph.IWeighting
 	flags      SafeDict[int32, flag_dd]
 	finished   bool
 	is_end     bool
@@ -78,8 +76,6 @@ func NewDistributedRoutingRunner(key int, handler IDistributedHandler, path_chan
 		start_id:   start,
 		end_id:     end,
 		graph:      graph,
-		geom:       graph.GetGeometry(),
-		weight:     graph.GetWeighting(),
 		finished:   false,
 		is_end:     false,
 		block:      NewBlock(),
@@ -179,7 +175,7 @@ func (self *DistributedRoutingRunner) RunRouting() {
 				continue
 			}
 			edge_id := ref.EdgeID
-			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if new_length > self.max_length {
 				continue
 			}
@@ -654,7 +650,7 @@ func (self *DistributedDijkstra) Steps(count int, visitededges *List[geo.CoordAr
 		if !ok {
 			return false
 		}
-		visitededges.Add(self.manager.graph.GetGeometry().GetEdge(edge_id))
+		visitededges.Add(self.manager.graph.GetEdgeGeom(edge_id))
 	}
 	return true
 }

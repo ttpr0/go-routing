@@ -9,32 +9,30 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-type CHShortcutStore struct {
-	shortcuts Array[CHShortcut]
+type CHStore struct {
+	shortcuts   Array[CHShortcut]
+	node_levels Array[int16]
+	sh_weight   Array[int32]
 }
 
-func (self *CHShortcutStore) GetShortcut(index int32) CHShortcut {
-	return self.shortcuts[index]
+func (self *CHStore) GetNodeLevel(node int32) int16 {
+	return self.node_levels[node]
 }
-func (self *CHShortcutStore) SetShortcut(index int32, shortcut CHShortcut) {
-	self.shortcuts[index] = shortcut
+
+func (self *CHStore) ShortcutCount() int {
+	return len(self.shortcuts)
 }
-func (self *CHShortcutStore) IsShortcut(index int32) bool {
-	if index < int32(len(self.shortcuts)) {
-		return true
-	} else {
-		return false
-	}
+
+func (self *CHStore) GetShortcut(shc int32) CHShortcut {
+	return self.shortcuts[shc]
 }
-func (self *CHShortcutStore) ShortcutCount() int {
-	return self.shortcuts.Length()
-}
-func (self *CHShortcutStore) GetEdgesFromShortcut(shc_id int32, reversed bool) List[int32] {
+
+func (self *CHStore) GetEdgesFromShortcut(shc_id int32, reversed bool) List[int32] {
 	edges := NewList[int32](2)
 	self._UnpackShortcutRecursive(&edges, shc_id, reversed)
 	return edges
 }
-func (self *CHShortcutStore) _UnpackShortcutRecursive(edges *List[int32], shc_id int32, reversed bool) {
+func (self *CHStore) _UnpackShortcutRecursive(edges *List[int32], shc_id int32, reversed bool) {
 	shortcut := self.GetShortcut(shc_id)
 	if reversed {
 		e := shortcut._Edges[1]
@@ -65,25 +63,57 @@ func (self *CHShortcutStore) _UnpackShortcutRecursive(edges *List[int32], shc_id
 	}
 }
 
-// reorders node information in shortcutstore,
+func _StoreCHStorage(store CHStore, file string) {
+	_StoreCHShortcuts(store.shortcuts, store.sh_weight, file+"-shortcut")
+	_StoreCHLevels(store.node_levels, file+"-level")
+}
+
+func _LoadCHStorage(file string, nodecount int) CHStore {
+	shortcuts, weights := _LoadCHShortcuts(file + "-shortcut")
+	node_levels := _LoadCHLevels(file+"-level", nodecount)
+
+	return CHStore{
+		shortcuts:   shortcuts,
+		node_levels: node_levels,
+		sh_weight:   weights,
+	}
+}
+
+//*******************************************
+// reorder nodes
+//*******************************************
+
+// reorders node information in edgestore,
 // mapping: old id -> new id
-func (self *CHShortcutStore) _ReorderNodes(mapping Array[int32]) {
+func (self *CHStore) _ReorderNodes(mapping Array[int32]) {
+	// shortcuts
 	for i := 0; i < self.ShortcutCount(); i++ {
 		edge := self.shortcuts[i]
 		edge.NodeA = mapping[edge.NodeA]
 		edge.NodeB = mapping[edge.NodeB]
 		self.shortcuts[i] = edge
 	}
+
+	// levels
+	new_levels := NewArray[int16](self.node_levels.Length())
+	for i, id := range mapping {
+		new_levels[id] = self.node_levels[i]
+	}
+	self.node_levels = new_levels
 }
 
-func _StoreCHShortcutStore(sh_store *CHShortcutStore, sh_weight *DefaultWeighting, filename string) {
+//*******************************************
+// load and store components
+//*******************************************
+
+func _StoreCHShortcuts(shortcuts Array[CHShortcut], sh_weight Array[int32], filename string) {
 	shcbuffer := bytes.Buffer{}
-	shortcutcount := sh_store.shortcuts.Length()
+	shortcutcount := shortcuts.Length()
 	binary.Write(&shcbuffer, binary.LittleEndian, int32(shortcutcount))
 
 	for i := 0; i < shortcutcount; i++ {
-		shortcut := sh_store.shortcuts.Get(i)
-		weight := sh_weight.GetEdgeWeight(int32(i))
+		shortcut := shortcuts.Get(i)
+		weight := sh_weight[i]
 		binary.Write(&shcbuffer, binary.LittleEndian, int32(shortcut.NodeA))
 		binary.Write(&shcbuffer, binary.LittleEndian, int32(shortcut.NodeB))
 		binary.Write(&shcbuffer, binary.LittleEndian, uint32(weight))
@@ -98,7 +128,7 @@ func _StoreCHShortcutStore(sh_store *CHShortcutStore, sh_weight *DefaultWeightin
 	shcfile.Write(shcbuffer.Bytes())
 }
 
-func _LoadCHShortcutStore(file string) (*CHShortcutStore, *DefaultWeighting) {
+func _LoadCHShortcuts(file string) (Array[CHShortcut], Array[int32]) {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -137,11 +167,35 @@ func _LoadCHShortcutStore(file string) (*CHShortcutStore, *DefaultWeighting) {
 		shortcut_weights.Add(int32(weight))
 	}
 
-	shortcut_store := &CHShortcutStore{
-		shortcuts: Array[CHShortcut](shortcuts),
+	return Array[CHShortcut](shortcuts), Array[int32](shortcut_weights)
+}
+
+func _StoreCHLevels(ch_levels Array[int16], filename string) {
+	lvlbuffer := bytes.Buffer{}
+	nodecount := ch_levels.Length()
+	for i := 0; i < nodecount; i++ {
+		binary.Write(&lvlbuffer, binary.LittleEndian, ch_levels[i])
 	}
-	weight := &DefaultWeighting{
-		edge_weights: shortcut_weights,
+
+	lvlfile, _ := os.Create(filename)
+	defer lvlfile.Close()
+	lvlfile.Write(lvlbuffer.Bytes())
+}
+
+func _LoadCHLevels(file string, nodecount int) Array[int16] {
+	_, err := os.Stat(file)
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file)
 	}
-	return shortcut_store, weight
+
+	leveldata, _ := os.ReadFile(file)
+	levelreader := bytes.NewReader(leveldata)
+	levels := NewList[int16](int(nodecount))
+	for i := 0; i < int(nodecount); i++ {
+		var l int16
+		binary.Read(levelreader, binary.LittleEndian, &l)
+		levels.Add(l)
+	}
+
+	return Array[int16](levels)
 }

@@ -16,14 +16,12 @@ func SortNodes(g graph.IGraph, coord_func func(geo.Coord) float32) Array[int32] 
 		nodes[i] = int32(i)
 	}
 
-	geom := g.GetGeometry()
-
 	sort.Slice(nodes, func(i, j int) bool {
 		node_a := nodes[i]
-		coord_a := geom.GetNode(node_a)
+		coord_a := g.GetNodeGeom(node_a)
 		val_a := coord_func(coord_a)
 		node_b := nodes[j]
-		coord_b := geom.GetNode(node_b)
+		coord_b := g.GetNodeGeom(node_b)
 		val_b := coord_func(coord_b)
 		return val_a < val_b
 	})
