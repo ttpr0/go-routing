@@ -46,9 +46,13 @@ func (self *ShortcutStore) IsShortcut(index int32) bool {
 func (self *ShortcutStore) ShortcutCount() int {
 	return self.shortcuts.Length()
 }
-func (self *ShortcutStore) GetEdgesFromShortcut(shc int32) List[Tuple[int32, byte]] {
-	shortcut := self.shortcuts[shc]
-	return self.edge_refs[shortcut._EdgeRefStart : shortcut._EdgeRefStart+int32(shortcut._EdgeRefCount)]
+func (self *ShortcutStore) GetEdgesFromShortcut(shc_id int32, reversed bool) List[int32] {
+	edges := NewList[int32](2)
+	shortcut := self.shortcuts[shc_id]
+	for _, ref := range self.edge_refs[shortcut._EdgeRefStart : shortcut._EdgeRefStart+int32(shortcut._EdgeRefCount)] {
+		edges.Add(ref.A)
+	}
+	return edges
 }
 
 // reorders node information in edgestore,

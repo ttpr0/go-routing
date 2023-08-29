@@ -46,33 +46,15 @@ type TopologyStore struct {
 	bwd_edge_entries Array[_EdgeEntry]
 }
 
-func (self *TopologyStore) GetNodeRef(index int32, dir Direction) (int32, int16) {
-	ref := self.node_entries[index]
+// return the node degree for given direction
+func (self *TopologyStore) GetDegree(node int32, dir Direction) int16 {
+	ref := self.node_entries[node]
 	if dir == FORWARD {
-		return ref.FWDEdgeStart, ref.FWDEdgeCount
+		return ref.FWDEdgeCount
 	} else {
-		return ref.BWDEdgeStart, ref.BWDEdgeCount
+		return ref.BWDEdgeCount
 	}
 }
-func (self *TopologyStore) GetEdgeRefs(dir Direction) Array[_EdgeEntry] {
-	if dir == FORWARD {
-		return self.fwd_edge_entries
-	} else {
-		return self.bwd_edge_entries
-	}
-}
-
-// used in ch preprocessing
-func (self *TopologyStore) GetAdjacentEdgeRefs(node int32, dir Direction) List[_EdgeEntry] {
-	if dir == FORWARD {
-		ref := self.node_entries[node]
-		return List[_EdgeEntry](self.fwd_edge_entries[ref.FWDEdgeStart : ref.FWDEdgeStart+int32(ref.FWDEdgeCount)])
-	} else {
-		ref := self.node_entries[node]
-		return List[_EdgeEntry](self.bwd_edge_entries[ref.BWDEdgeStart : ref.BWDEdgeStart+int32(ref.BWDEdgeCount)])
-	}
-}
-
 func (self *TopologyStore) GetAccessor() TopologyAccessor {
 	return TopologyAccessor{
 		topology: self,
@@ -83,6 +65,16 @@ type TypedTopologyStore struct {
 	node_entries     Array[_NodeEntry]
 	fwd_edge_entries Array[_TypedEdgeEntry]
 	bwd_edge_entries Array[_TypedEdgeEntry]
+}
+
+// return the node degree for given direction
+func (self *TypedTopologyStore) GetDegree(index int32, dir Direction) int16 {
+	ref := self.node_entries[index]
+	if dir == FORWARD {
+		return ref.FWDEdgeCount
+	} else {
+		return ref.BWDEdgeCount
+	}
 }
 
 func (self *TypedTopologyStore) GetAccessor() TypedTopologyAccessor {
@@ -107,6 +99,16 @@ func NewDynamicTopology(node_count int) DynamicTopologyStore {
 
 	return DynamicTopologyStore{
 		node_entries: topology,
+	}
+}
+
+// return the node degree for given direction
+func (self *DynamicTopologyStore) GetDegree(index int32, dir Direction) int16 {
+	ref := self.node_entries[index]
+	if dir == FORWARD {
+		return int16(ref.FWDEdges.Length())
+	} else {
+		return int16(ref.BWDEdges.Length())
 	}
 }
 

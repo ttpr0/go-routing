@@ -29,6 +29,41 @@ func (self *CHShortcutStore) IsShortcut(index int32) bool {
 func (self *CHShortcutStore) ShortcutCount() int {
 	return self.shortcuts.Length()
 }
+func (self *CHShortcutStore) GetEdgesFromShortcut(shc_id int32, reversed bool) List[int32] {
+	edges := NewList[int32](2)
+	self._UnpackShortcutRecursive(&edges, shc_id, reversed)
+	return edges
+}
+func (self *CHShortcutStore) _UnpackShortcutRecursive(edges *List[int32], shc_id int32, reversed bool) {
+	shortcut := self.GetShortcut(shc_id)
+	if reversed {
+		e := shortcut._Edges[1]
+		if e.B == 2 || e.B == 3 {
+			self._UnpackShortcutRecursive(edges, e.A, reversed)
+		} else {
+			edges.Add(e.A)
+		}
+		e = shortcut._Edges[0]
+		if e.B == 2 || e.B == 3 {
+			self._UnpackShortcutRecursive(edges, e.A, reversed)
+		} else {
+			edges.Add(e.A)
+		}
+	} else {
+		e := shortcut._Edges[0]
+		if e.B == 2 || e.B == 3 {
+			self._UnpackShortcutRecursive(edges, e.A, reversed)
+		} else {
+			edges.Add(e.A)
+		}
+		e = shortcut._Edges[1]
+		if e.B == 2 || e.B == 3 {
+			self._UnpackShortcutRecursive(edges, e.A, reversed)
+		} else {
+			edges.Add(e.A)
+		}
+	}
+}
 
 // reorders node information in shortcutstore,
 // mapping: old id -> new id

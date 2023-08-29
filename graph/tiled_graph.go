@@ -94,8 +94,8 @@ func (self *TiledGraph) GetShortcut(shc int32) Shortcut {
 	return self.skip_edges.GetShortcut(shc)
 }
 func (self *TiledGraph) GetEdgesFromShortcut(edges *List[int32], shortcut_id int32) {
-	for _, ref := range self.skip_edges.GetEdgesFromShortcut(shortcut_id) {
-		edges.Add(ref.A)
+	for _, ref := range self.skip_edges.GetEdgesFromShortcut(shortcut_id, false) {
+		edges.Add(ref)
 	}
 }
 func (self *TiledGraph) GetIndex() IGraphIndex {
