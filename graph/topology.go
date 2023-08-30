@@ -128,6 +128,32 @@ func (self *DynamicTopologyStore) AddEdgeEntries(node_a, node_b, edge_id int32, 
 	})
 	self.node_entries[node_b].BWDEdges = bwd_edges
 }
+
+// adds forward entry to adjacency
+//
+// refers to edge between node_a and node_b, entry will be added at node_a
+func (self *DynamicTopologyStore) AddFWDEntry(node_a, node_b, edge_id int32, edge_typ byte) {
+	fwd_edges := self.node_entries[node_a].FWDEdges
+	fwd_edges.Add(_TypedEdgeEntry{
+		EdgeID:  edge_id,
+		OtherID: node_b,
+		Type:    edge_typ,
+	})
+	self.node_entries[node_a].FWDEdges = fwd_edges
+}
+
+// adds backward entry to adjacency
+//
+// refers to edge between node_a and node_b, entry will be added at node_b
+func (self *DynamicTopologyStore) AddBWDEntry(node_a, node_b, edge_id int32, edge_typ byte) {
+	bwd_edges := self.node_entries[node_b].BWDEdges
+	bwd_edges.Add(_TypedEdgeEntry{
+		EdgeID:  edge_id,
+		OtherID: node_a,
+		Type:    edge_typ,
+	})
+	self.node_entries[node_b].BWDEdges = bwd_edges
+}
 func (self *DynamicTopologyStore) GetAccessor() DynamicTopologyAccessor {
 	return DynamicTopologyAccessor{
 		topology: self,

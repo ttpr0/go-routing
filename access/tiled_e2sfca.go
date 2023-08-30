@@ -11,7 +11,7 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func CalcTiledEnhanced2SFCA(g graph.ITiledGraph2, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcTiled2SFCA(g graph.ITiledGraph2, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	index := g.GetIndex()
 	population_nodes := NewArray[int32](dem.PointCount())
 	node_flag := NewArray[bool](int(g.NodeCount()))

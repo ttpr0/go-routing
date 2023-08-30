@@ -1,90 +1,12 @@
 package access
 
 import (
-	"sync"
-
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/decay"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/view"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/algorithm"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
-
-func CalcEnhanced2SFCA(g graph.IGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
-	index := g.GetIndex()
-	population_nodes := NewArray[int32](dem.PointCount())
-	for i := 0; i < dem.PointCount(); i++ {
-		loc := dem.GetCoordinate(i)
-		id, ok := index.GetClosestNode(loc)
-		if ok {
-			population_nodes[i] = id
-		} else {
-			population_nodes[i] = -1
-		}
-	}
-	facility_chan := make(chan Tuple[geo.Coord, float32], sup.PointCount())
-	for i := 0; i < sup.PointCount(); i++ {
-		loc := sup.GetCoordinate(i)
-		w := sup.GetWeight(i)
-		facility_chan <- MakeTuple(loc, float32(w))
-	}
-
-	max_range := dec.GetMaxDistance()
-
-	access := NewArray[float32](dem.PointCount())
-	wg := sync.WaitGroup{}
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			spt := routing.NewSPT2(g)
-			for {
-				if len(facility_chan) == 0 {
-					break
-				}
-				temp := <-facility_chan
-				facility := temp.A
-				weight := temp.B
-				id, ok := index.GetClosestNode(facility)
-				if !ok {
-					continue
-				}
-				spt.Init(id, float64(max_range))
-				spt.CalcSPT()
-				flags := spt.GetSPT()
-
-				facility_weight := float32(0.0)
-				for i, node := range population_nodes {
-					if node == -1 {
-						continue
-					}
-					flag := flags[node]
-					if !flag.Visited {
-						continue
-					}
-					distance_decay := dec.GetDistanceWeight(float32(flag.PathLength))
-					facility_weight += float32(dem.GetWeight(i)) * distance_decay
-				}
-				for i, node := range population_nodes {
-					if node == -1 {
-						continue
-					}
-					flag := flags[node]
-					if !flag.Visited {
-						continue
-					}
-					distance_decay := dec.GetDistanceWeight(float32(flag.PathLength))
-					access[i] += (weight / facility_weight) * distance_decay
-				}
-			}
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-
-	return access
-}
 
 /**
  * Computes the enhanced two-step-floating-catchment-area accessibility
@@ -102,7 +24,7 @@ func CalcEnhanced2SFCA(g graph.IGraph, dem view.IPointView, sup view.IPointView,
  * @return enhanced two-step-floating-catchment-area value for every demand
  *         point.
  */
-func CalcEnhanced2SFCA2(g graph.IGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcEnhanced2SFCA(g graph.IGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	populationWeights := NewArray[float32](dem.PointCount())
 	facilityWeights := NewArray[float32](sup.PointCount())
 
