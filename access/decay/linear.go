@@ -21,7 +21,3 @@ func (self LinearDecay) GetDistanceWeight(distance float32) float32 {
 func (self LinearDecay) GetMaxDistance() float32 {
 	return self.max_distance
 }
-
-func (self LinearDecay) GetDistances() []float32 {
-	return nil
-}

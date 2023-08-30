@@ -10,7 +10,6 @@ import (
 	"os"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/decay"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/provider"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/view"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/algorithm/partitioning"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
@@ -99,22 +98,6 @@ func WriteResponse[T any](w http.ResponseWriter, resp T, status int) {
 	data, _ := json.Marshal(resp)
 	w.WriteHeader(status)
 	w.Write(data)
-}
-
-func GetRoutingProvider(param RoutingRequestParams) provider.IRoutingProvider {
-	prov := provider.NewRoutingProvider(GRAPH)
-
-	if param.Profile != "" {
-		prov.SetProfile(param.Profile)
-	}
-	if param.RangeType != "" {
-		prov.SetRangeType(param.RangeType)
-	}
-	if param.LocationType != "" {
-		prov.SetParameter("location_type", param.LocationType)
-	}
-
-	return prov
 }
 
 func GetDemandView(param DemandRequestParams) view.IPointView {

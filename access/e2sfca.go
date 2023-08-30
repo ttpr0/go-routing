@@ -4,18 +4,19 @@ import (
 	"sync"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/decay"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/provider"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/view"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/algorithm"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func CalcEnhanced2SFCA(g graph.IGraph, supply_locs, demand_locs Array[geo.Coord], supply_weights, demand_weights Array[int32], max_range float32) []float32 {
+func CalcEnhanced2SFCA(g graph.IGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	index := g.GetIndex()
-	population_nodes := NewArray[int32](len(demand_locs))
-	for i, loc := range demand_locs {
+	population_nodes := NewArray[int32](dem.PointCount())
+	for i := 0; i < dem.PointCount(); i++ {
+		loc := dem.GetCoordinate(i)
 		id, ok := index.GetClosestNode(loc)
 		if ok {
 			population_nodes[i] = id
@@ -23,12 +24,16 @@ func CalcEnhanced2SFCA(g graph.IGraph, supply_locs, demand_locs Array[geo.Coord]
 			population_nodes[i] = -1
 		}
 	}
-	facility_chan := make(chan Tuple[geo.Coord, float32], len(supply_locs))
-	for i, facility := range supply_locs {
-		facility_chan <- MakeTuple(facility, float32(supply_weights[i]))
+	facility_chan := make(chan Tuple[geo.Coord, float32], sup.PointCount())
+	for i := 0; i < sup.PointCount(); i++ {
+		loc := sup.GetCoordinate(i)
+		w := sup.GetWeight(i)
+		facility_chan <- MakeTuple(loc, float32(w))
 	}
 
-	access := NewArray[float32](len(demand_locs))
+	max_range := dec.GetMaxDistance()
+
+	access := NewArray[float32](dem.PointCount())
 	wg := sync.WaitGroup{}
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
@@ -58,8 +63,8 @@ func CalcEnhanced2SFCA(g graph.IGraph, supply_locs, demand_locs Array[geo.Coord]
 					if !flag.Visited {
 						continue
 					}
-					distance_decay := float32(1 - flag.PathLength/float64(max_range))
-					facility_weight += float32(demand_weights[i]) * distance_decay
+					distance_decay := dec.GetDistanceWeight(float32(flag.PathLength))
+					facility_weight += float32(dem.GetWeight(i)) * distance_decay
 				}
 				for i, node := range population_nodes {
 					if node == -1 {
@@ -69,7 +74,7 @@ func CalcEnhanced2SFCA(g graph.IGraph, supply_locs, demand_locs Array[geo.Coord]
 					if !flag.Visited {
 						continue
 					}
-					distance_decay := float32(1 - flag.PathLength/float64(max_range))
+					distance_decay := dec.GetDistanceWeight(float32(flag.PathLength))
 					access[i] += (weight / facility_weight) * distance_decay
 				}
 			}
@@ -77,19 +82,6 @@ func CalcEnhanced2SFCA(g graph.IGraph, supply_locs, demand_locs Array[geo.Coord]
 		}()
 	}
 	wg.Wait()
-	max_val := float32(0.0)
-	for _, val := range access {
-		if val > max_val {
-			max_val = val
-		}
-	}
-	for i, val := range access {
-		if val == 0 {
-			access[i] = -9999
-		} else {
-			access[i] = val * 100 / max_val
-		}
-	}
 
 	return access
 }
@@ -103,29 +95,47 @@ func CalcEnhanced2SFCA(g graph.IGraph, supply_locs, demand_locs Array[geo.Coord]
  * demand point $i$ and $w_{ij} ~ d_{ij}$ the travel-friction (distance decay)
  * between them.
  *
+ * @param g        Graph-Instance.
  * @param demand   Demand locations and weights ($D_i$).
  * @param supply   Supply locations and weights ($S_j$).
  * @param decay    Distance decay.
- * @param provider Routing API provider.
- * @param options  Computation mode ("isochrones", "matrix") and Ranges of
- *                 isochrones used in computation of distances $d_{ij}$.
  * @return enhanced two-step-floating-catchment-area value for every demand
  *         point.
  */
-func CalcEnhanced2SFCA2(dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay, prov provider.IRoutingProvider, options provider.RoutingOptions) []float32 {
+func CalcEnhanced2SFCA2(g graph.IGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	populationWeights := NewArray[float32](dem.PointCount())
 	facilityWeights := NewArray[float32](sup.PointCount())
 
+	max_range := dec.GetMaxDistance()
 	invertedMapping := NewDict[int, List[Tuple[int, float32]]](10)
 
-	matrix := prov.RequestTDMatrix(dem, sup, options)
-	if matrix == nil {
-		return populationWeights
+	index := g.GetIndex()
+	demand_nodes := NewArray[int32](dem.PointCount())
+	for i := 0; i < dem.PointCount(); i++ {
+		loc := dem.GetCoordinate(i)
+		id, ok := index.GetClosestNode(loc)
+		if ok {
+			demand_nodes[i] = id
+		} else {
+			demand_nodes[i] = -1
+		}
 	}
+	supply_nodes := NewArray[int32](sup.PointCount())
+	for i := 0; i < sup.PointCount(); i++ {
+		loc := sup.GetCoordinate(i)
+		id, ok := index.GetClosestNode(loc)
+		if ok {
+			supply_nodes[i] = id
+		} else {
+			supply_nodes[i] = -1
+		}
+	}
+	matrix := algorithm.DijkstraTDMatrix(g, supply_nodes, demand_nodes, max_range)
+
 	for f := 0; f < sup.PointCount(); f++ {
 		weight := float32(0)
 		for p := 0; p < dem.PointCount(); p++ {
-			dist := matrix.GetRange(f, p)
+			dist := matrix.Get(f, p)
 			if dist < 0 {
 				continue
 			}

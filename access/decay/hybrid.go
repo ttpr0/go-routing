@@ -46,7 +46,3 @@ func (self HybridDecay) GetDistanceWeight(distance float32) float32 {
 func (self HybridDecay) GetMaxDistance() float32 {
 	return self.distances[len(self.distances)-1]
 }
-
-func (self HybridDecay) GetDistances() []float32 {
-	return self.distances
-}

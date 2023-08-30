@@ -10,11 +10,4 @@ type IDistanceDecay interface {
 	 * @return maximum distance
 	 */
 	GetMaxDistance() float32
-
-	/**
-	 * Returns the internally used distances (currently only hybrid decay)
-	 *
-	 * @return distances (if available) or null
-	 */
-	GetDistances() []float32
 }

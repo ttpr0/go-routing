@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/provider"
 )
 
 type FCARequest struct {
@@ -34,29 +33,24 @@ func HandleFCARequest(w http.ResponseWriter, r *http.Request) {
 		WriteResponse(w, NewErrorResponse("2sfca/enhanced", "failed to get supply-view, parameters are invalid"), http.StatusBadRequest)
 		return
 	}
-	routing_provider := GetRoutingProvider(req.Routing)
 	distance_decay := GetDistanceDecay(req.DistanceDecay)
 	if distance_decay == nil {
 		WriteResponse(w, NewErrorResponse("2sfca/enhanced", "failed to get distance-decay, parameters are invalid"), http.StatusBadRequest)
 		return
 	}
-	options := provider.RoutingOptions{
-		Mode:     "dijkstra",
-		MaxRange: distance_decay.GetMaxDistance(),
-	}
 
 	var weights []float32
 	if req.Mode == "tiled" {
 		fmt.Println("run tiled fca")
-		weights = access.CalcEnhanced2SFCA(GRAPH, req.Supply.Locations, req.Demand.Locations, req.Supply.Weights, req.Demand.Weights, options.MaxRange)
+		weights = access.CalcEnhanced2SFCA(GRAPH, demand_view, supply_view, distance_decay)
 	} else if req.Mode == "ch" {
 		fmt.Println("run ch fca")
-		// weights = access.CalcRPHASTEnhanced2SFCA(GRAPH, req.Supply.Locations, req.Demand.Locations, req.Supply.Weights, req.Demand.Weights, options.MaxRange)
+		// weights = access.CalcRPHASTEnhanced2SFCA(GRAPH, demand_view, supply_view, distance_decay)
 	} else if req.Mode == "default" {
 		fmt.Println("run default fca")
-		weights = access.CalcEnhanced2SFCA(GRAPH, req.Supply.Locations, req.Demand.Locations, req.Supply.Weights, req.Demand.Weights, options.MaxRange)
+		weights = access.CalcEnhanced2SFCA(GRAPH, demand_view, supply_view, distance_decay)
 	} else {
-		weights = access.CalcEnhanced2SFCA2(demand_view, supply_view, distance_decay, routing_provider, options)
+		weights = access.CalcEnhanced2SFCA2(GRAPH, demand_view, supply_view, distance_decay)
 	}
 
 	max_weight := float32(0)
