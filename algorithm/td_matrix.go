@@ -4,14 +4,23 @@ import (
 	"sync"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 func DijkstraTDMatrix(g graph.IGraph, sources Array[int32], destinations Array[int32], max_range float32) Matrix[float32] {
-	facility_chan := make(chan Tuple[int, int32], sources.Length())
+	source_chan := make(chan Tuple[int, int32], sources.Length())
 	for i := 0; i < sources.Length(); i++ {
-		facility_chan <- MakeTuple(i, sources[i])
+		source_chan <- MakeTuple(i, sources[i])
+	}
+	close(source_chan)
+	is_destination := NewArray[bool](g.NodeCount())
+	destination_count := 0
+	for i := 0; i < destinations.Length(); i++ {
+		node := destinations[i]
+		if node != -1 {
+			is_destination[node] = true
+			destination_count += 1
+		}
 	}
 
 	matrix := NewMatrix[float32](sources.Length(), destinations.Length())
@@ -19,35 +28,87 @@ func DijkstraTDMatrix(g graph.IGraph, sources Array[int32], destinations Array[i
 	for i := 0; i < 8; i++ {
 		wg.Add(1)
 		go func() {
-			spt := routing.NewSPT2(g)
+			// init routing components
+			visited := NewArray[bool](g.NodeCount())
+			dist := NewArray[int32](g.NodeCount())
+			heap := NewPriorityQueue[int32, int32](100)
+			explorer := g.GetDefaultExplorer()
+
 			for {
-				if len(facility_chan) == 0 {
+				// read supply entry from chan
+				temp, ok := <-source_chan
+				if !ok {
 					break
 				}
-				temp := <-facility_chan
-				f := temp.A
-				f_node := temp.B
-				if f_node == -1 {
+				s := temp.A
+				s_node := temp.B
+
+				// if no node set all distances to -1
+				if s_node == -1 {
 					for i := 0; i < destinations.Length(); i++ {
-						matrix.Set(f, i, -1)
+						matrix.Set(s, i, -1)
 					}
 					continue
 				}
-				spt.Init(f_node, float64(max_range))
-				spt.CalcSPT()
-				flags := spt.GetSPT()
 
-				for p, p_node := range destinations {
-					if p_node == -1 {
-						matrix.Set(f, p, -1)
+				// clear for routing
+				heap.Clear()
+				heap.Enqueue(s_node, 0)
+				for i := 0; i < visited.Length(); i++ {
+					visited[i] = false
+					dist[i] = 1000000000
+				}
+				dist[s_node] = 0
+
+				// routing loop
+				visited_count := 0
+				for {
+					curr_id, ok := heap.Dequeue()
+					if !ok {
+						break
+					}
+					if visited[curr_id] {
 						continue
 					}
-					flag := flags[p_node]
-					if !flag.Visited {
-						matrix.Set(f, p, -1)
+					visited[curr_id] = true
+					if is_destination[curr_id] {
+						visited_count += 1
+						if visited_count >= destination_count {
+							break
+						}
+					}
+					edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES)
+					for {
+						ref, ok := edges.Next()
+						if !ok {
+							break
+						}
+						other_id := ref.OtherID
+						if visited[other_id] {
+							continue
+						}
+						new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
+						if new_length > int32(max_range) {
+							continue
+						}
+						if dist[other_id] > new_length {
+							dist[other_id] = new_length
+							heap.Enqueue(other_id, new_length)
+						}
+					}
+				}
+
+				// set distances in matrix
+				for d, d_node := range destinations {
+					if d_node == -1 {
+						matrix.Set(s, d, -1)
 						continue
 					}
-					matrix.Set(f, p, float32(flag.PathLength))
+					if !visited[d_node] {
+						matrix.Set(s, d, -1)
+						continue
+					}
+					matrix.Set(s, d, float32(dist[d_node]))
 				}
 			}
 			wg.Done()
