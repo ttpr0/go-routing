@@ -149,7 +149,7 @@ func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView
 				}
 				// downwards sweep
 				for i := 0; i < len(down_edges_subset); i++ {
-					edge := down_edges[i]
+					edge := down_edges_subset[i]
 					curr_len := dist[edge.From]
 					new_len := curr_len + edge.Weight
 					if dist[edge.To] > new_len {
@@ -163,10 +163,11 @@ func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView
 					if d_node == -1 {
 						continue
 					}
-					if !visited[d_node] {
+					d_dist := dist[d_node]
+					if d_dist >= 1000000000 {
 						continue
 					}
-					distance_decay := dec.GetDistanceWeight(float32(dist[d_node]))
+					distance_decay := dec.GetDistanceWeight(float32(d_dist))
 					demand_sum += float32(dem.GetWeight(i)) * distance_decay
 				}
 				R := s_weight / demand_sum
@@ -175,10 +176,11 @@ func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView
 					if d_node == -1 {
 						continue
 					}
-					if !visited[d_node] {
+					d_dist := dist[d_node]
+					if d_dist >= 1000000000 {
 						continue
 					}
-					distance_decay := dec.GetDistanceWeight(float32(dist[d_node]))
+					distance_decay := dec.GetDistanceWeight(float32(d_dist))
 					access[i] += R * distance_decay
 				}
 			}
@@ -312,10 +314,11 @@ func CalcRPHAST2SFCA2(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 					if d_node == -1 {
 						continue
 					}
-					if !visited[d_node] {
+					d_dist := dist[d_node]
+					if d_dist >= 1000000000 {
 						continue
 					}
-					distance_decay := dec.GetDistanceWeight(float32(dist[d_node]))
+					distance_decay := dec.GetDistanceWeight(float32(d_dist))
 					demand_sum += float32(dem.GetWeight(i)) * distance_decay
 				}
 				R := s_weight / demand_sum
@@ -324,10 +327,11 @@ func CalcRPHAST2SFCA2(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 					if d_node == -1 {
 						continue
 					}
-					if !visited[d_node] {
+					d_dist := dist[d_node]
+					if d_dist >= 1000000000 {
 						continue
 					}
-					distance_decay := dec.GetDistanceWeight(float32(dist[d_node]))
+					distance_decay := dec.GetDistanceWeight(float32(d_dist))
 					access[i] += R * distance_decay
 				}
 			}
@@ -482,7 +486,7 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 				}
 				// downwards sweep
 				for i := 0; i < len(down_edges_subset); i++ {
-					edge := down_edges[i]
+					edge := down_edges_subset[i]
 					curr_len := dist[edge.From]
 					if curr_len > max_range {
 						continue
@@ -499,10 +503,11 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 					if d_node == -1 {
 						continue
 					}
-					if !visited[d_node] {
+					d_dist := dist[d_node]
+					if d_dist >= 1000000000 {
 						continue
 					}
-					distance_decay := dec.GetDistanceWeight(float32(dist[d_node]))
+					distance_decay := dec.GetDistanceWeight(float32(d_dist))
 					demand_sum += float32(dem.GetWeight(i)) * distance_decay
 				}
 				R := s_weight / demand_sum
@@ -511,10 +516,11 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 					if d_node == -1 {
 						continue
 					}
-					if !visited[d_node] {
+					d_dist := dist[d_node]
+					if d_dist >= 1000000000 {
 						continue
 					}
-					distance_decay := dec.GetDistanceWeight(float32(dist[d_node]))
+					distance_decay := dec.GetDistanceWeight(float32(d_dist))
 					access[i] += R * distance_decay
 				}
 			}
@@ -680,7 +686,7 @@ func CalcRPHAST2SFCA4(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 				}
 				// downwards sweep
 				for i := 0; i < len(down_edges_subset); i++ {
-					edge := down_edges[i]
+					edge := down_edges_subset[i]
 					curr_len := dist[edge.From]
 					if curr_len > max_range {
 						continue
@@ -697,10 +703,11 @@ func CalcRPHAST2SFCA4(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 					if d_node == -1 {
 						continue
 					}
-					if !visited[d_node] {
+					d_dist := dist[d_node]
+					if d_dist >= 1000000000 {
 						continue
 					}
-					distance_decay := dec.GetDistanceWeight(float32(dist[d_node]))
+					distance_decay := dec.GetDistanceWeight(float32(d_dist))
 					demand_sum += float32(dem.GetWeight(i)) * distance_decay
 				}
 				R := s_weight / demand_sum
@@ -709,10 +716,11 @@ func CalcRPHAST2SFCA4(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 					if d_node == -1 {
 						continue
 					}
-					if !visited[d_node] {
+					d_dist := dist[d_node]
+					if d_dist >= 1000000000 {
 						continue
 					}
-					distance_decay := dec.GetDistanceWeight(float32(dist[d_node]))
+					distance_decay := dec.GetDistanceWeight(float32(d_dist))
 					access[i] += R * distance_decay
 				}
 			}
