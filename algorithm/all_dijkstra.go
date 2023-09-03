@@ -5,18 +5,13 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-type _FlagD struct {
-	path_length int32
-	prev_edge   int32
-	visited     bool
-}
-
-func CalcAllDijkstra(g graph.IGraph, start int32, max_range int32) {
-	flags := make([]_FlagD, g.NodeCount())
-	for i := 0; i < len(flags); i++ {
-		flags[i].path_length = 1000000000
+func CalcAllDijkstra(g graph.IGraph, start int32, max_range int32) Array[int32] {
+	dist := NewArray[int32](g.NodeCount())
+	visited := NewArray[bool](g.NodeCount())
+	for i := 0; i < g.NodeCount(); i++ {
+		dist[i] = 1000000000
 	}
-	flags[start].path_length = 0
+	dist[start] = 0
 
 	heap := NewPriorityQueue[int32, int32](100)
 	heap.Enqueue(start, 0)
@@ -28,12 +23,10 @@ func CalcAllDijkstra(g graph.IGraph, start int32, max_range int32) {
 		if !ok {
 			break
 		}
-		//curr := (*d.graph).GetNode(curr_id)
-		curr_flag := flags[curr_id]
-		if curr_flag.visited {
+		if visited[curr_id] {
 			continue
 		}
-		curr_flag.visited = true
+		visited[curr_id] = true
 		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
@@ -43,24 +36,20 @@ func CalcAllDijkstra(g graph.IGraph, start int32, max_range int32) {
 			if ref.IsShortcut() {
 				continue
 			}
-			edge_id := ref.EdgeID
 			other_id := ref.OtherID
-			//other := (*d.graph).GetNode(other_id)
-			other_flag := flags[other_id]
-			if other_flag.visited {
+			if visited[other_id] {
 				continue
 			}
-			new_length := curr_flag.path_length + explorer.GetEdgeWeight(ref)
+			new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 			if new_length > max_range {
 				continue
 			}
-			if other_flag.path_length > new_length {
-				other_flag.prev_edge = edge_id
-				other_flag.path_length = new_length
+			if dist[other_id] > new_length {
+				dist[other_id] = new_length
 				heap.Enqueue(other_id, new_length)
 			}
-			flags[other_id] = other_flag
 		}
-		flags[curr_id] = curr_flag
 	}
+
+	return dist
 }

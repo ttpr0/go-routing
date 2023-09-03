@@ -11,12 +11,13 @@ type _FlagPH struct {
 	visited     bool
 }
 
-func CalcPHAST(g graph.ICHGraph, start int32) {
-	flags := make([]_FlagPH, g.NodeCount())
-	for i := 0; i < len(flags); i++ {
-		flags[i].path_length = 1000000000
+func CalcPHAST(g graph.ICHGraph, start int32) Array[int32] {
+	dist := NewArray[int32](g.NodeCount())
+	visited := NewArray[bool](g.NodeCount())
+	for i := 0; i < g.NodeCount(); i++ {
+		dist[i] = 1000000000
 	}
-	flags[start].path_length = 0
+	dist[start] = 0
 
 	heap := NewPriorityQueue[int32, int32](100)
 	heap.Enqueue(start, 0)
@@ -28,40 +29,33 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 		if !ok {
 			break
 		}
-		//curr := (*d.graph).GetNode(curr_id)
-		curr_flag := flags[curr_id]
-		if curr_flag.visited {
+		if visited[curr_id] {
 			continue
 		}
-		curr_flag.visited = true
+		visited[curr_id] = true
 		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
 			if !ok {
 				break
 			}
-			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			if g.GetNodeLevel(other_id) <= g.GetNodeLevel(curr_id) {
 				continue
 			}
-			other_flag := flags[other_id]
-			if other_flag.visited {
+			if visited[other_id] {
 				continue
 			}
-			new_length := curr_flag.path_length + explorer.GetEdgeWeight(ref)
-			if other_flag.path_length > new_length {
-				other_flag.prev_edge = edge_id
-				other_flag.path_length = new_length
+			new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
+			if dist[other_id] > new_length {
+				dist[other_id] = new_length
 				heap.Enqueue(other_id, new_length)
 			}
-			flags[other_id] = other_flag
 		}
-		flags[curr_id] = curr_flag
 	}
 
-	for i := 0; i < len(flags); i++ {
-		curr_len := flags[i].path_length
+	for i := 0; i < len(dist); i++ {
+		curr_len := dist[i]
 		edges := explorer.GetAdjacentEdges(int32(i), graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
@@ -72,11 +66,11 @@ func CalcPHAST(g graph.ICHGraph, start int32) {
 			if g.GetNodeLevel(other_id) >= g.GetNodeLevel(int32(i)) {
 				continue
 			}
-			other_flag := flags[other_id]
-			if other_flag.path_length > (curr_len + explorer.GetEdgeWeight(ref)) {
-				other_flag.path_length = curr_len + explorer.GetEdgeWeight(ref)
-				flags[other_id] = other_flag
+			if dist[other_id] > (curr_len + explorer.GetEdgeWeight(ref)) {
+				dist[other_id] = curr_len + explorer.GetEdgeWeight(ref)
 			}
 		}
 	}
+
+	return dist
 }

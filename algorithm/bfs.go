@@ -2,23 +2,13 @@ package algorithm
 
 import (
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-type _FlagB struct {
-	path_length float64
-	prev_edge   int32
-	visited     bool
-}
+func CalcBreathFirstSearch(g graph.IGraph, start int32) Array[bool] {
+	visited := NewArray[bool](g.NodeCount())
 
-func CalcBreathFirstSearch(g graph.IGraph, start int32) {
-	flags := make([]_FlagD, g.NodeCount())
-	for i := 0; i < len(flags); i++ {
-		flags[i].path_length = 1000000000
-	}
-	flags[start].path_length = 0
-
-	queue := util.NewQueue[int32]()
+	queue := NewQueue[int32]()
 	queue.Push(start)
 
 	explorer := g.GetDefaultExplorer()
@@ -26,14 +16,12 @@ func CalcBreathFirstSearch(g graph.IGraph, start int32) {
 	for {
 		curr_id, ok := queue.Pop()
 		if !ok {
-			return
+			break
 		}
-		//curr := (*d.graph).GetNode(curr_id)
-		curr_flag := flags[curr_id]
-		if curr_flag.visited {
+		if visited[curr_id] {
 			continue
 		}
-		curr_flag.visited = true
+		visited[curr_id] = true
 		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
 		for {
 			ref, ok := edges.Next()
@@ -44,13 +32,12 @@ func CalcBreathFirstSearch(g graph.IGraph, start int32) {
 				continue
 			}
 			other_id := ref.OtherID
-			//other := (*d.graph).GetNode(other_id)
-			other_flag := flags[other_id]
-			if other_flag.visited {
+			if visited[other_id] {
 				continue
 			}
 			queue.Push(other_id)
 		}
-		flags[curr_id] = curr_flag
 	}
+
+	return visited
 }

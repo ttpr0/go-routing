@@ -5,9 +5,9 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func CalcPHAST2(g *graph.CHGraph3, start int32, max_range int32) {
-	visited := make([]bool, g.NodeCount())
-	dist := make([]int32, g.NodeCount())
+func CalcPHAST2(g *graph.CHGraph3, start int32, max_range int32) Array[int32] {
+	visited := NewArray[bool](g.NodeCount())
+	dist := NewArray[int32](g.NodeCount())
 	for i := 0; i < len(dist); i++ {
 		dist[i] = 1000000000
 	}
@@ -64,4 +64,6 @@ func CalcPHAST2(g *graph.CHGraph3, start int32, max_range int32) {
 			dist[edge.To] = new_len
 		}
 	}
+
+	return dist
 }
