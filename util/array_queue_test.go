@@ -49,3 +49,29 @@ func TestArrayQueue(t *testing.T) {
 		val += 1
 	}
 }
+
+func TestArrayQueueCopy(t *testing.T) {
+	init_queue := NewArrayQueue[int](10)
+
+	for i := 0; i < 100; i++ {
+		init_queue.Push(i)
+	}
+
+	init_queue.Pop()
+	init_queue.Pop()
+	init_queue.Pop()
+
+	queue := init_queue.Copy()
+
+	val := 3
+	for {
+		v, ok := queue.Pop()
+		if !ok {
+			break
+		}
+		if v != val {
+			t.Errorf("queue should return %d, but got %d", val, v)
+		}
+		val += 1
+	}
+}

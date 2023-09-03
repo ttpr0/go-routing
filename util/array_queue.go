@@ -25,7 +25,7 @@ func NewArrayQueue[T any](cap int) ArrayQueue[T] {
 func (self *ArrayQueue[T]) Push(value T) {
 	self.lock.Lock()
 	defer self.lock.Unlock()
-	if self.start+self.length < len(self.data) {
+	if self.start+self.length < cap(self.data) {
 		self.data = append(self.data, value)
 		self.length += 1
 	} else {
@@ -63,11 +63,11 @@ func (self *ArrayQueue[T]) Size() int {
 
 // copies the entire queue
 func (self *ArrayQueue[T]) Copy() ArrayQueue[T] {
-	new_data := make([]T, len(self.data))
-	copy(new_data, self.data)
+	new_data := make([]T, self.length)
+	copy(new_data, self.data[self.start:self.start+self.length])
 	return ArrayQueue[T]{
 		data:   new_data,
-		start:  self.start,
+		start:  0,
 		length: self.length,
 		lock:   sync.Mutex{},
 	}
