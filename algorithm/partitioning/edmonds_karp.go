@@ -70,15 +70,12 @@ func (self *EdmondsKarp) ComputeMaxFlow() int {
 }
 
 func (self *EdmondsKarp) ComputeMinCut() {
-	//queue := self.source_queue.Copy()
-
-	queue := NewQueue[int32]()
+	queue := self.source_queue.Copy()
 	visited := NewArray[bool](int(self.g.NodeCount()))
 
 	// clear visited
 	for i := 0; i < int(self.g.NodeCount()); i++ {
 		if self.node_tiles[i] == self.source_tile {
-			queue.Push(int32(i))
 			visited[i] = true
 		}
 	}
@@ -150,17 +147,14 @@ type _Flag struct {
 
 // computed bfs on residual graph and returns new flow
 func (self *EdmondsKarp) BFS() int {
-	// queue := self.source_queue.Copy()
 	flags := self.bfs_flags
 	visited := self.visited
-
-	queue := NewQueue[int32]()
+	queue := self.source_queue.Copy()
 
 	// clear visited
 	for i := 0; i < visited.Length(); i++ {
 		if self.node_tiles[i] == self.source_tile {
 			visited[i] = true
-			queue.Push(int32(i))
 		} else {
 			visited[i] = false
 		}

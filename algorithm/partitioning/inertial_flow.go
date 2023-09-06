@@ -35,16 +35,12 @@ func CreateOrders(g graph.IGraph) List[Array[int32]] {
 	factors := []Tuple[float32, float32]{
 		// vertical
 		{1, 0},
-		{-1, 0},
 		// horizontal
 		{0, 1},
-		{0, -1},
 		// diagonal ll to ur
 		{-sin_45, cos_45},
-		{sin_45, -cos_45},
 		// diagonal ul to lr
 		{sin_45, cos_45},
-		{-sin_45, -cos_45},
 	}
 	orders := NewList[Array[int32]](8)
 	for _, factor := range factors {
