@@ -20,7 +20,7 @@ func LoadGraph(file string) IGraph {
 	edgecount := store.EdgeCount()
 	topology := _LoadTopologyStore(file+"-graph", nodecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
-	index := _BuildKDTreeIndex(store.node_geoms)
+	index := _BuildKDTreeIndex(store)
 
 	return &Graph{
 		store:    store,
@@ -46,7 +46,7 @@ func LoadCHGraph(file string) ICHGraph {
 		weight:      *weights,
 	}
 	SortNodesByLevel(chg)
-	chg.index = _BuildKDTreeIndex(chg.store.node_geoms)
+	chg.index = _BuildKDTreeIndex(chg.store)
 	return chg
 }
 
@@ -59,7 +59,7 @@ func LoadTiledGraph(file string) ITiledGraph {
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
 	skip_store := _LoadTiledStorage(file, nodecount, edgecount)
 	fmt.Println("start buidling index")
-	index := _BuildKDTreeIndex(store.node_geoms)
+	index := _BuildKDTreeIndex(store)
 	fmt.Println("finished building index")
 
 	return &TiledGraph{

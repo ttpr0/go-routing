@@ -12,16 +12,7 @@ import (
 )
 
 func BuildGraphIndex(g *Graph) {
-	g.index = _BuildKDTreeIndex(g.store.node_geoms)
-}
-
-func _BuildKDTreeIndex(node_geoms List[geo.Coord]) KDTree[int32] {
-	tree := NewKDTree[int32](2)
-	for i := 0; i < node_geoms.Length(); i++ {
-		geom := node_geoms[i]
-		tree.Insert(geom[:], int32(i))
-	}
-	return tree
+	g.index = _BuildKDTreeIndex(g.store)
 }
 
 func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollection) {
