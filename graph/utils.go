@@ -2,7 +2,10 @@ package graph
 
 import (
 	"fmt"
+	"os"
 	"sort"
+	"strconv"
+	"strings"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
@@ -213,4 +216,116 @@ func ReorderCHGraph(g *CHGraph, node_mapping Array[int32]) {
 
 	g.ch_store._ReorderNodes(node_mapping)
 	g.ch_topology._ReorderNodes(node_mapping)
+}
+
+func GraphToMETIS(g IGraph) string {
+	n := g.NodeCount()
+	m := 0
+	adj := NewArray[List[int32]](n)
+
+	for i := 0; i < g.EdgeCount(); i++ {
+		edge := g.GetEdge(int32(i))
+
+		adj_a := adj[edge.NodeA]
+		if !Contains(adj_a, edge.NodeB+1) {
+			adj_a.Add(edge.NodeB + 1)
+			m += 1
+		}
+		adj[edge.NodeA] = adj_a
+
+		adj_b := adj[edge.NodeB]
+		if !Contains(adj_b, edge.NodeA+1) {
+			adj_b.Add(edge.NodeA + 1)
+			m += 1
+		}
+		adj[edge.NodeB] = adj_b
+	}
+	m = m / 2
+
+	builder := strings.Builder{}
+	builder.WriteString(fmt.Sprintln(n, m))
+	for i := 0; i < adj.Length(); i++ {
+		adj_nodes := adj[i]
+		for _, node := range adj_nodes {
+			builder.WriteString(fmt.Sprint(node, " "))
+		}
+		builder.WriteString("\n")
+	}
+	return builder.String()
+}
+
+func StoreNodeTiles(filename string, node_tiles Array[int16]) {
+	file, err := os.Create(filename)
+	if err != nil {
+		fmt.Println("failed to create tile-file")
+		return
+	}
+	defer file.Close()
+
+	var builder strings.Builder
+	for i := 0; i < node_tiles.Length(); i++ {
+		builder.WriteString(fmt.Sprintln(node_tiles[i]))
+	}
+	file.Write([]byte(builder.String()))
+}
+func ReadNodeTiles(filename string) Array[int16] {
+	file, err := os.Open(filename)
+	if err != nil {
+		fmt.Println("failed to open csv file")
+		return nil
+	}
+	defer file.Close()
+	stat, _ := file.Stat()
+	data := make([]byte, stat.Size())
+	file.Read(data)
+	s := string(data)
+	tokens := strings.Split(s, "\r\n")
+
+	tiles := NewArray[int16](len(tokens))
+	for i := 0; i < tiles.Length(); i++ {
+		val, _ := strconv.Atoi(tokens[i])
+		tiles[i] = int16(val)
+	}
+	return tiles
+}
+
+func StoreNodeOrdering(filename string, contraction_order Array[int32]) {
+	file, err := os.Create(filename)
+	if err != nil {
+		fmt.Println("failed to create csv file")
+		return
+	}
+	defer file.Close()
+
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintln(contraction_order.Length()))
+	for i := 0; i < contraction_order.Length()-1; i++ {
+		builder.WriteString(fmt.Sprint(contraction_order[i]) + ",")
+	}
+	builder.WriteString(fmt.Sprint(contraction_order[contraction_order.Length()-1]))
+	file.Write([]byte(builder.String()))
+}
+func ReadNodeOrdering(filename string) Array[int32] {
+	file, err := os.Open(filename)
+	if err != nil {
+		fmt.Println("failed to open csv file")
+		return nil
+	}
+	defer file.Close()
+	stat, _ := file.Stat()
+	data := make([]byte, stat.Size())
+	file.Read(data)
+	s := string(data)
+	tokens := strings.Split(s, "\r\n")
+
+	num_nodes, _ := strconv.Atoi(tokens[0])
+	ordering := NewArray[int32](num_nodes)
+
+	for i := 1; i <= ordering.Length(); i++ {
+		fields := strings.Fields(tokens[i])
+		val1, _ := strconv.Atoi(fields[0])
+		val2, _ := strconv.Atoi(fields[1])
+		ordering[val2-1] = int32(val1 - 1)
+	}
+	return ordering
 }

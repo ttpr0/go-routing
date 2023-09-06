@@ -620,42 +620,6 @@ func ShortestPathNodeOrdering(graph IGraph, n int) Array[int32] {
 	return nodes
 }
 
-func StoreNodeOrdering(filename string, contraction_order Array[int32]) {
-	file, err := os.Create(filename)
-	if err != nil {
-		fmt.Println("failed to create csv file")
-		return
-	}
-	defer file.Close()
-
-	var builder strings.Builder
-	for i := 0; i < contraction_order.Length()-1; i++ {
-		builder.WriteString(fmt.Sprint(contraction_order[i]) + ",")
-	}
-	builder.WriteString(fmt.Sprint(contraction_order[contraction_order.Length()-1]))
-	file.Write([]byte(builder.String()))
-}
-func ReadNodeOrdering(filename string) Array[int32] {
-	file, err := os.Open(filename)
-	if err != nil {
-		fmt.Println("failed to open csv file")
-		return nil
-	}
-	defer file.Close()
-	stat, _ := file.Stat()
-	data := make([]byte, stat.Size())
-	file.Read(data)
-	s := string(data)
-	tokens := strings.Split(s, ",")
-
-	ordering := NewArray[int32](len(tokens))
-	for i := 0; i < ordering.Length(); i++ {
-		val, _ := strconv.Atoi(tokens[i])
-		ordering[i] = int32(val)
-	}
-	return ordering
-}
-
 type flag_d struct {
 	path_length float64
 	prev_edge   int32
