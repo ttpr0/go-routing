@@ -188,6 +188,85 @@ func CheckCHGraph(g ICHGraph) {
 	}
 }
 
+// checks graph topology
+func CheckTiledGraph(g ITiledGraph) {
+	explorer := g.GetDefaultExplorer()
+
+	// check edges
+	for i := 0; i < int(g.NodeCount()); i++ {
+		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL)
+		for {
+			ref, ok := adj_edges.Next()
+			if !ok {
+				break
+			}
+			if ref.IsShortcut() {
+				fmt.Println("error 23")
+			} else {
+				edge := g.GetEdge(ref.EdgeID)
+				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) && !ref.IsCrossBorder() {
+					fmt.Println("error 24")
+				}
+			}
+		}
+		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL)
+		for {
+			ref, ok := adj_edges.Next()
+			if !ok {
+				break
+			}
+			if ref.IsShortcut() {
+				fmt.Println("error 25")
+			} else {
+				edge := g.GetEdge(ref.EdgeID)
+				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) && !ref.IsCrossBorder() {
+					fmt.Println("error 26")
+				}
+			}
+		}
+	}
+
+	// check skip
+	for i := 0; i < int(g.NodeCount()); i++ {
+		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_SKIP)
+		for {
+			ref, ok := adj_edges.Next()
+			if !ok {
+				break
+			}
+			if ref.IsShortcut() {
+				edge := g.GetShortcut(ref.EdgeID)
+				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) {
+					fmt.Println("error 33")
+				}
+			} else {
+				edge := g.GetEdge(ref.EdgeID)
+				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) && !ref.IsCrossBorder() {
+					fmt.Println("error 34")
+				}
+			}
+		}
+		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_SKIP)
+		for {
+			ref, ok := adj_edges.Next()
+			if !ok {
+				break
+			}
+			if ref.IsShortcut() {
+				edge := g.GetShortcut(ref.EdgeID)
+				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) {
+					fmt.Println("error 35")
+				}
+			} else {
+				edge := g.GetEdge(ref.EdgeID)
+				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) && !ref.IsCrossBorder() {
+					fmt.Println("error 36")
+				}
+			}
+		}
+	}
+}
+
 func SortNodesByLevel(g *CHGraph) {
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
