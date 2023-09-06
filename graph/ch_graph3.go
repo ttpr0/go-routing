@@ -12,6 +12,7 @@ func CreateCHGraph3(g *CHGraph) *CHGraph3 {
 	for i := 0; i < g.NodeCount(); i++ {
 		this_id := int32(i)
 		edges := explorer.GetAdjacentEdges(this_id, FORWARD, ADJACENT_DOWNWARDS)
+		count := 0
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -23,8 +24,16 @@ func CreateCHGraph3(g *CHGraph) *CHGraph3 {
 				To:     other_id,
 				Weight: explorer.GetEdgeWeight(ref),
 			})
+			count += 1
 		}
+		for j := fwd_down_edges.Length() - count; j < fwd_down_edges.Length(); j++ {
+			ch_edge := fwd_down_edges[j]
+			ch_edge.Count = int32(count)
+			fwd_down_edges[j] = ch_edge
+		}
+
 		edges = explorer.GetAdjacentEdges(this_id, BACKWARD, ADJACENT_DOWNWARDS)
+		count = 0
 		for {
 			ref, ok := edges.Next()
 			if !ok {
@@ -36,6 +45,12 @@ func CreateCHGraph3(g *CHGraph) *CHGraph3 {
 				To:     other_id,
 				Weight: explorer.GetEdgeWeight(ref),
 			})
+			count += 1
+		}
+		for j := bwd_down_edges.Length() - count; j < bwd_down_edges.Length(); j++ {
+			ch_edge := bwd_down_edges[j]
+			ch_edge.Count = int32(count)
+			bwd_down_edges[j] = ch_edge
 		}
 	}
 
@@ -68,4 +83,5 @@ type CHEdge struct {
 	From   int32
 	To     int32
 	Weight int32
+	Count  int32
 }

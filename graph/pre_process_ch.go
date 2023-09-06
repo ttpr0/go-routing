@@ -3,10 +3,7 @@ package graph
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
 
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
@@ -40,8 +37,6 @@ func (self *DynamicGraph) GetExplorer() *DynamicGraphExplorer {
 		graph:       self,
 		accessor:    self.topology.GetAccessor(),
 		sh_accessor: self.ch_topology.GetAccessor(),
-		weight:      &self.weight,
-		sh_weight:   self.sh_weight,
 	}
 }
 func (self *DynamicGraph) NodeCount() int {
@@ -117,8 +112,6 @@ type DynamicGraphExplorer struct {
 	graph       *DynamicGraph
 	accessor    TopologyAccessor
 	sh_accessor DynamicTopologyAccessor
-	weight      IWeighting
-	sh_weight   List[int32]
 }
 
 func (self *DynamicGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
@@ -131,11 +124,7 @@ func (self *DynamicGraphExplorer) GetAdjacentEdges(node int32, direction Directi
 	}
 }
 func (self *DynamicGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
-	if edge.IsCHShortcut() {
-		return self.sh_weight[edge.EdgeID]
-	} else {
-		return self.weight.GetEdgeWeight(edge.EdgeID)
-	}
+	return self.graph.GetWeight(edge.EdgeID, edge.IsCHShortcut())
 }
 func (self *DynamicGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
 	return 0
@@ -280,13 +269,13 @@ func FindNeighbours(explorer *DynamicGraphExplorer, id int32, is_contracted Arra
 			break
 		}
 		other_id := ref.OtherID
-		if other_id == id || Contains(out_neigbours, other_id) {
+		if other_id == id || Contains(in_neigbours, other_id) {
 			continue
 		}
 		if is_contracted[other_id] {
 			continue
 		}
-		out_neigbours.Add(other_id)
+		in_neigbours.Add(other_id)
 	}
 
 	return in_neigbours, out_neigbours
