@@ -30,11 +30,13 @@ func StoreTiledGraph(graph *TiledGraph, filename string) {
 }
 
 func StoreTiledGraph2(graph *TiledGraph2, filename string) {
-	graph.topology._Store(filename + "-graph")
-	_StoreGraphStorage(graph.store, filename)
-	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
-	_StoreTiledStorage(graph.skip_store, filename)
+	StoreTiledGraph(&graph.TiledGraph, filename)
 	_StoreTileRanges(graph.border_nodes, graph.interior_nodes, graph.border_range_map, filename+"-tileranges")
+}
+
+func StoreTiledGraph3(graph *TiledGraph3, filename string) {
+	StoreTiledGraph(&graph.TiledGraph, filename)
+	_StoreTileRanges2(graph.tile_ranges, graph.index_edges, filename+"-tileranges")
 }
 
 func StoreCHGraph(graph *CHGraph, filename string) {

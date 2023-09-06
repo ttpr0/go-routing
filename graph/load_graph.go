@@ -84,6 +84,17 @@ func LoadTiledGraph2(file string) ITiledGraph2 {
 	}
 }
 
+func LoadTiledGraph3(file string) *TiledGraph3 {
+	tg := LoadTiledGraph(file).(*TiledGraph)
+	tile_ranges, index_edges := _LoadTileRanges2(file + "-tileranges")
+
+	return &TiledGraph3{
+		TiledGraph:  *tg,
+		tile_ranges: tile_ranges,
+		index_edges: index_edges,
+	}
+}
+
 //*******************************************
 // load graph information
 //*******************************************
