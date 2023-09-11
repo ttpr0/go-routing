@@ -40,13 +40,14 @@ func run_benchmark() {
 	g1 := graph.LoadGraph("./graphs/niedersachsen")
 	_g := graph.LoadCHGraph("./graphs/test_order")
 	g2 := graph.CreateCHGraph3(_g.(*graph.CHGraph))
-	// g3 := graph.LoadTiledGraph("./graphs/niedersachsen")
+	g3 := graph.LoadTiledGraph3("./graphs/test_tiles_ch_index")
+	g4 := graph.TransformToTiled5(g3)
 
 	// prepare benchmark data
 	fmt.Println("Preparing benchmark data ...")
 	const VALUE_COUNT = 11
 	const REPEAT_COUNT = 1
-	distance_decay := decay.NewLinearDecay(3600)
+	distance_decay := decay.NewLinearDecay(1800)
 	demand_view := view.NewPointView(demand_locs, demand_weights)
 	supply_views := NewDict[int, List[view.IPointView]](VALUE_COUNT)
 	counts := []int{50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550}
@@ -78,7 +79,7 @@ func run_benchmark() {
 		t = time.Now()
 		for j := 0; j < REPEAT_COUNT; j++ {
 			view := views[j]
-			access.CalcDijkstra2SFCA2(g1, demand_view, view, distance_decay)
+			access.CalcRPHAST2SFCA(g2, demand_view, view, distance_decay)
 		}
 		dt = time.Since(t)
 		r2 := int(dt.Milliseconds() / REPEAT_COUNT)
@@ -86,7 +87,7 @@ func run_benchmark() {
 		t = time.Now()
 		for j := 0; j < REPEAT_COUNT; j++ {
 			view := views[j]
-			access.CalcRPHAST2SFCA(g2, demand_view, view, distance_decay)
+			access.CalcRPHAST2SFCA2(g2, demand_view, view, distance_decay)
 		}
 		dt = time.Since(t)
 		r3 := int(dt.Milliseconds() / REPEAT_COUNT)
@@ -94,7 +95,7 @@ func run_benchmark() {
 		t = time.Now()
 		for j := 0; j < REPEAT_COUNT; j++ {
 			view := views[j]
-			access.CalcRPHAST2SFCA2(g2, demand_view, view, distance_decay)
+			access.CalcRPHAST2SFCA3(g2, demand_view, view, distance_decay)
 		}
 		dt = time.Since(t)
 		r4 := int(dt.Milliseconds() / REPEAT_COUNT)
@@ -102,7 +103,7 @@ func run_benchmark() {
 		t = time.Now()
 		for j := 0; j < REPEAT_COUNT; j++ {
 			view := views[j]
-			access.CalcRPHAST2SFCA3(g2, demand_view, view, distance_decay)
+			access.CalcRPHAST2SFCA4(g2, demand_view, view, distance_decay)
 		}
 		dt = time.Since(t)
 		r5 := int(dt.Milliseconds() / REPEAT_COUNT)
@@ -110,20 +111,36 @@ func run_benchmark() {
 		t = time.Now()
 		for j := 0; j < REPEAT_COUNT; j++ {
 			view := views[j]
-			access.CalcRPHAST2SFCA4(g2, demand_view, view, distance_decay)
+			access.CalcTiled2SFCA(g3, demand_view, view, distance_decay)
 		}
 		dt = time.Since(t)
 		r6 := int(dt.Milliseconds() / REPEAT_COUNT)
 
+		t = time.Now()
+		for j := 0; j < REPEAT_COUNT; j++ {
+			view := views[j]
+			access.CalcTiled2SFCA2(g3, demand_view, view, distance_decay)
+		}
+		dt = time.Since(t)
+		r7 := int(dt.Milliseconds() / REPEAT_COUNT)
+
+		t = time.Now()
+		for j := 0; j < REPEAT_COUNT; j++ {
+			view := views[j]
+			access.CalcTiled2SFCA3(g4, demand_view, view, distance_decay)
+		}
+		dt = time.Since(t)
+		r8 := int(dt.Milliseconds() / REPEAT_COUNT)
+
 		results[i] = Result{
 			value: count,
-			times: []int{r1, r2, r3, r4, r5, r6},
+			times: []int{r1, r2, r3, r4, r5, r6, r7, r8},
 		}
 	}
 
 	// write results to csv file
 	fmt.Println("Write results to file ...")
-	headers := []string{"Standortanzahl (Angebot)", "Range-Dijkstra", "Range-Dijkstra2", "RPHAST", "Range-PHAST", "Range-RPHAST", "Range-RPHAST2"}
+	headers := []string{"Standortanzahl (Angebot)", "Range-Dijkstra", "RPHAST", "Range-PHAST", "Range-RPHAST", "Range-RPHAST2", "Tiled-Dijkstra", "Index-Dijkstra", "Index-Dijkstra2"}
 	write_results("./results.csv", results, headers)
 }
 
