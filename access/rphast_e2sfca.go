@@ -58,20 +58,15 @@ func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView
 		}
 		graph_subset[node] = true
 		node_level := g.GetNodeLevel(node)
-		edges := explorer.GetAdjacentEdges(node, graph.BACKWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(node, graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if graph_subset[ref.OtherID] {
-				continue
+				return
 			}
 			if node_level >= g.GetNodeLevel(ref.OtherID) {
-				continue
+				return
 			}
 			node_queue.Push(ref.OtherID)
-		}
+		})
 	}
 	// selecting subset of downward edges for linear sweep
 	down_edges_subset := NewList[graph.CHEdge](dem.PointCount())
@@ -130,22 +125,17 @@ func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView
 						continue
 					}
 					visited[curr_id] = true
-					edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_UPWARDS)
-					for {
-						ref, ok := edges.Next()
-						if !ok {
-							break
-						}
+					explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_UPWARDS, func(ref graph.EdgeRef) {
 						other_id := ref.OtherID
 						if visited[other_id] {
-							continue
+							return
 						}
 						new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 						if dist[other_id] > new_length {
 							dist[other_id] = new_length
 							heap.Enqueue(other_id, new_length)
 						}
-					}
+					})
 				}
 				// downwards sweep
 				for i := 0; i < len(down_edges_subset); i++ {
@@ -274,25 +264,20 @@ func CalcRPHAST2SFCA2(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 						continue
 					}
 					visited[curr_id] = true
-					edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_UPWARDS)
-					for {
-						ref, ok := edges.Next()
-						if !ok {
-							break
-						}
+					explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_UPWARDS, func(ref graph.EdgeRef) {
 						other_id := ref.OtherID
 						if visited[other_id] {
-							continue
+							return
 						}
 						new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 						if new_length > max_range {
-							continue
+							return
 						}
 						if dist[other_id] > new_length {
 							dist[other_id] = new_length
 							heap.Enqueue(other_id, new_length)
 						}
-					}
+					})
 				}
 				// downwards sweep
 				down_edges := g.GetDownEdges(graph.FORWARD)
@@ -392,20 +377,15 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 		}
 		graph_subset[node] = true
 		node_level := g.GetNodeLevel(node)
-		edges := explorer.GetAdjacentEdges(node, graph.BACKWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(node, graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if graph_subset[ref.OtherID] {
-				continue
+				return
 			}
 			if node_level >= g.GetNodeLevel(ref.OtherID) {
-				continue
+				return
 			}
 			node_queue.Push(ref.OtherID)
-		}
+		})
 	}
 	// selecting subset of downward edges for linear sweep
 	down_edges_subset := NewList[graph.CHEdge](dem.PointCount())
@@ -464,25 +444,20 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 						continue
 					}
 					visited[curr_id] = true
-					edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_UPWARDS)
-					for {
-						ref, ok := edges.Next()
-						if !ok {
-							break
-						}
+					explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_UPWARDS, func(ref graph.EdgeRef) {
 						other_id := ref.OtherID
 						if visited[other_id] {
-							continue
+							return
 						}
 						new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 						if new_length > max_range {
-							continue
+							return
 						}
 						if dist[other_id] > new_length {
 							dist[other_id] = new_length
 							heap.Enqueue(other_id, new_length)
 						}
-					}
+					})
 				}
 				// downwards sweep
 				for i := 0; i < len(down_edges_subset); i++ {
@@ -586,27 +561,22 @@ func CalcRPHAST2SFCA4(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 		graph_subset[node] = true
 		node_level := g.GetNodeLevel(node)
 		node_len := lengths[node]
-		edges := explorer.GetAdjacentEdges(node, graph.BACKWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(node, graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if graph_subset[ref.OtherID] {
-				continue
+				return
 			}
 			if node_level >= g.GetNodeLevel(ref.OtherID) {
-				continue
+				return
 			}
 			new_len := node_len + explorer.GetEdgeWeight(ref)
 			if new_len > max_range {
-				continue
+				return
 			}
 			if new_len < lengths[ref.OtherID] {
 				lengths[ref.OtherID] = new_len
 				node_queue.Enqueue(ref.OtherID, new_len)
 			}
-		}
+		})
 	}
 	// selecting subset of downward edges for linear sweep
 	down_edges_subset := NewList[graph.CHEdge](dem.PointCount())
@@ -664,25 +634,20 @@ func CalcRPHAST2SFCA4(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 						continue
 					}
 					visited[curr_id] = true
-					edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_UPWARDS)
-					for {
-						ref, ok := edges.Next()
-						if !ok {
-							break
-						}
+					explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_UPWARDS, func(ref graph.EdgeRef) {
 						other_id := ref.OtherID
 						if visited[other_id] {
-							continue
+							return
 						}
 						new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 						if new_length > max_range {
-							continue
+							return
 						}
 						if dist[other_id] > new_length {
 							dist[other_id] = new_length
 							heap.Enqueue(other_id, new_length)
 						}
-					}
+					})
 				}
 				// downwards sweep
 				for i := 0; i < len(down_edges_subset); i++ {

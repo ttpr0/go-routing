@@ -42,16 +42,10 @@ func ComputeMaxFlow(g graph.IGraph, source, sink int32) int {
 				break
 			}
 
-			edges := explorer.GetAdjacentEdges(curr, graph.FORWARD, graph.ADJACENT_EDGES)
-			for {
-				ref, ok := edges.Next()
-				if !ok {
-					break
-				}
-
+			explorer.ForAdjacentEdges(curr, graph.FORWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
 				// check if edge should stil be traversed
 				if visited[ref.OtherID] || edge_flow[ref.EdgeID] == 1 {
-					continue
+					return
 				}
 
 				other_flag := flags[ref.OtherID]
@@ -61,17 +55,11 @@ func ComputeMaxFlow(g graph.IGraph, source, sink int32) int {
 				flags[ref.OtherID] = other_flag
 				queue.Push(ref.OtherID)
 				visited[ref.OtherID] = true
-			}
-			edges = explorer.GetAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES)
-			for {
-				ref, ok := edges.Next()
-				if !ok {
-					break
-				}
-
+			})
+			explorer.ForAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
 				// check if edge should stil be traversed
 				if visited[ref.OtherID] || edge_flow[ref.EdgeID] == 0 {
-					continue
+					return
 				}
 
 				other_flag := flags[ref.OtherID]
@@ -81,7 +69,7 @@ func ComputeMaxFlow(g graph.IGraph, source, sink int32) int {
 				flags[ref.OtherID] = other_flag
 				queue.Push(ref.OtherID)
 				visited[ref.OtherID] = true
-			}
+			})
 		}
 
 		if end == -1 {

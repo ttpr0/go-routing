@@ -168,6 +168,110 @@ func (self *CHGraphExplorer) GetAdjacentEdges(node int32, direction Direction, t
 		panic("Adjacency-type not implemented for this graph.")
 	}
 }
+func (self *CHGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
+	if typ == ADJACENT_ALL {
+		self.accessor.SetBaseNode(node, direction)
+		self.sh_accessor.SetBaseNode(node, direction)
+		for self.accessor.Next() {
+			edge_id := self.accessor.GetEdgeID()
+			other_id := self.accessor.GetOtherID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   0,
+			})
+		}
+		for self.sh_accessor.Next() {
+			edge_id := self.sh_accessor.GetEdgeID()
+			other_id := self.sh_accessor.GetOtherID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   100,
+			})
+		}
+	} else if typ == ADJACENT_EDGES {
+		self.accessor.SetBaseNode(node, direction)
+		for self.accessor.Next() {
+			edge_id := self.accessor.GetEdgeID()
+			other_id := self.accessor.GetOtherID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   0,
+			})
+		}
+	} else if typ == ADJACENT_SHORTCUTS {
+		self.sh_accessor.SetBaseNode(node, direction)
+		for self.sh_accessor.Next() {
+			edge_id := self.sh_accessor.GetEdgeID()
+			other_id := self.sh_accessor.GetOtherID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   100,
+			})
+		}
+	} else if typ == ADJACENT_UPWARDS {
+		self.accessor.SetBaseNode(node, direction)
+		self.sh_accessor.SetBaseNode(node, direction)
+		this_level := self.graph.GetNodeLevel(node)
+		for self.accessor.Next() {
+			other_id := self.accessor.GetOtherID()
+			if this_level >= self.graph.GetNodeLevel(other_id) {
+				continue
+			}
+			edge_id := self.accessor.GetEdgeID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   0,
+			})
+		}
+		for self.sh_accessor.Next() {
+			other_id := self.sh_accessor.GetOtherID()
+			if this_level >= self.graph.GetNodeLevel(other_id) {
+				continue
+			}
+			edge_id := self.sh_accessor.GetEdgeID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   100,
+			})
+		}
+	} else if typ == ADJACENT_DOWNWARDS {
+		self.accessor.SetBaseNode(node, direction)
+		self.sh_accessor.SetBaseNode(node, direction)
+		this_level := self.graph.GetNodeLevel(node)
+		for self.accessor.Next() {
+			other_id := self.accessor.GetOtherID()
+			if this_level >= self.graph.GetNodeLevel(other_id) {
+				continue
+			}
+			edge_id := self.accessor.GetEdgeID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   0,
+			})
+		}
+		for self.sh_accessor.Next() {
+			other_id := self.sh_accessor.GetOtherID()
+			if this_level >= self.graph.GetNodeLevel(other_id) {
+				continue
+			}
+			edge_id := self.sh_accessor.GetEdgeID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   100,
+			})
+		}
+	} else {
+		panic("Adjacency-type not implemented for this graph.")
+	}
+}
 func (self *CHGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
 	if edge.IsCHShortcut() {
 		return self.sh_weight.GetEdgeWeight(edge.EdgeID)

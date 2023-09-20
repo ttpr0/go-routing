@@ -77,25 +77,20 @@ func DijkstraTDMatrix(g graph.IGraph, sources Array[int32], destinations Array[i
 							break
 						}
 					}
-					edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES)
-					for {
-						ref, ok := edges.Next()
-						if !ok {
-							break
-						}
+					explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
 						other_id := ref.OtherID
 						if visited[other_id] {
-							continue
+							return
 						}
 						new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 						if new_length > int32(max_range) {
-							continue
+							return
 						}
 						if dist[other_id] > new_length {
 							dist[other_id] = new_length
 							heap.Enqueue(other_id, new_length)
 						}
-					}
+					})
 				}
 
 				// set distances in matrix

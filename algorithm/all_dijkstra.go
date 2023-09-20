@@ -27,28 +27,23 @@ func CalcAllDijkstra(g graph.IGraph, start int32, max_range int32) Array[int32] 
 			continue
 		}
 		visited[curr_id] = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if ref.IsShortcut() {
-				continue
+				return
 			}
 			other_id := ref.OtherID
 			if visited[other_id] {
-				continue
+				return
 			}
 			new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 			if new_length > max_range {
-				continue
+				return
 			}
 			if dist[other_id] > new_length {
 				dist[other_id] = new_length
 				heap.Enqueue(other_id, new_length)
 			}
-		}
+		})
 	}
 
 	return dist

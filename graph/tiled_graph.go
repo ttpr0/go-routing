@@ -132,6 +132,35 @@ func (self *TiledGraphExplorer) GetAdjacentEdges(node int32, direction Direction
 		panic("Adjacency-type not implemented for this graph.")
 	}
 }
+func (self *TiledGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
+	if typ == ADJACENT_SKIP {
+		self.skip_accessor.SetBaseNode(node, direction)
+		for self.skip_accessor.Next() {
+			edge_id := self.skip_accessor.GetEdgeID()
+			other_id := self.skip_accessor.GetOtherID()
+			typ := self.skip_accessor.GetType()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   typ,
+			})
+		}
+	} else if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
+		self.accessor.SetBaseNode(node, direction)
+		for self.accessor.Next() {
+			edge_id := self.accessor.GetEdgeID()
+			other_id := self.accessor.GetOtherID()
+			typ := self.graph.skip_store.edge_types[edge_id]
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   typ,
+			})
+		}
+	} else {
+		panic("Adjacency-type not implemented for this graph.")
+	}
+}
 func (self *TiledGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
 	if edge.IsShortcut() {
 		return self.skip_weight.GetEdgeWeight(edge.EdgeID)

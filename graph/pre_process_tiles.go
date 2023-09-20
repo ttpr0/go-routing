@@ -131,29 +131,27 @@ func GetInOutNodes(graph *Graph, skip_store *TiledStore, tile_id int16) (List[in
 		if tile != tile_id {
 			continue
 		}
-		iter := explorer.GetAdjacentEdges(int32(id), BACKWARD, ADJACENT_ALL)
-		for {
-			ref, ok := iter.Next()
-			if !ok {
-				break
+		is_added := false
+		explorer.ForAdjacentEdges(int32(id), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
+			if is_added {
+				return
 			}
 			if skip_store.GetEdgeType(ref.EdgeID) == 10 {
 				in_list.Add(int32(id))
-				break
+				is_added = true
 			}
-		}
+		})
 
-		iter = explorer.GetAdjacentEdges(int32(id), FORWARD, ADJACENT_ALL)
-		for {
-			ref, ok := iter.Next()
-			if !ok {
-				break
+		is_added = false
+		explorer.ForAdjacentEdges(int32(id), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
+			if is_added {
+				return
 			}
 			if skip_store.GetEdgeType(ref.EdgeID) == 10 {
 				out_list.Add(int32(id))
-				break
+				is_added = true
 			}
-		}
+		})
 	}
 	return in_list, out_list
 }
@@ -198,18 +196,13 @@ func CalcSkipEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_store 
 				continue
 			}
 			curr_flag.visited = true
-			iter := explorer.GetAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL)
-			for {
-				ref, ok := iter.Next()
-				if !ok {
-					break
-				}
+			explorer.ForAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 				if !ref.IsEdge() {
-					continue
+					return
 				}
 				edge_id := ref.EdgeID
 				if skip_store.GetEdgeType(edge_id) == 10 {
-					continue
+					return
 				}
 				other_id := explorer.GetOtherNode(ref, curr_id)
 				var other_flag _Flag
@@ -219,7 +212,7 @@ func CalcSkipEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_store 
 					other_flag = _Flag{pathlength: 10000000, visited: false, prevEdge: -1}
 				}
 				if other_flag.visited {
-					continue
+					return
 				}
 				weight := explorer.GetEdgeWeight(ref)
 				newlength := curr_flag.pathlength + weight
@@ -229,7 +222,7 @@ func CalcSkipEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_store 
 					heap.Enqueue(other_id, newlength)
 				}
 				flags[other_id] = other_flag
-			}
+			})
 			flags[curr_id] = curr_flag
 		}
 
@@ -270,18 +263,13 @@ func CalcShortcutEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_st
 				continue
 			}
 			curr_flag.visited = true
-			iter := explorer.GetAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL)
-			for {
-				ref, ok := iter.Next()
-				if !ok {
-					break
-				}
+			explorer.ForAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 				if !ref.IsEdge() {
-					continue
+					return
 				}
 				edge_id := ref.EdgeID
 				if skip_store.GetEdgeType(edge_id) == 10 {
-					continue
+					return
 				}
 				other_id := ref.OtherID
 				var other_flag _Flag
@@ -291,7 +279,7 @@ func CalcShortcutEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_st
 					other_flag = _Flag{pathlength: 10000000, visited: false, prevEdge: -1}
 				}
 				if other_flag.visited {
-					continue
+					return
 				}
 				weight := explorer.GetEdgeWeight(ref)
 				newlength := curr_flag.pathlength + weight
@@ -301,7 +289,7 @@ func CalcShortcutEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_st
 					heap.Enqueue(other_id, newlength)
 				}
 				flags[other_id] = other_flag
-			}
+			})
 			flags[curr_id] = curr_flag
 		}
 
@@ -419,19 +407,16 @@ func GetBorderNodes(graph *TiledGraph, tile_id int16) (Array[int32], Array[int32
 		if tile != tile_id {
 			continue
 		}
-		iter := explorer.GetAdjacentEdges(int32(id), BACKWARD, ADJACENT_ALL)
 		is_border := false
-		for {
-			ref, ok := iter.Next()
-			if !ok {
-				break
+		explorer.ForAdjacentEdges(int32(id), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
+			if is_border {
+				return
 			}
 			if ref.IsCrossBorder() {
 				border.Add(int32(id))
 				is_border = true
-				break
 			}
-		}
+		})
 		if !is_border {
 			interior.Add(int32(id))
 		}
@@ -456,14 +441,9 @@ func CalcFullSPT(graph *TiledGraph, start int32, flags Dict[int32, _Flag]) {
 			continue
 		}
 		curr_flag.visited = true
-		iter := explorer.GetAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL)
-		for {
-			ref, ok := iter.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if !ref.IsEdge() || ref.IsCrossBorder() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
@@ -474,7 +454,7 @@ func CalcFullSPT(graph *TiledGraph, start int32, flags Dict[int32, _Flag]) {
 				other_flag = _Flag{pathlength: 10000000, visited: false, prevEdge: -1}
 			}
 			if other_flag.visited {
-				continue
+				return
 			}
 			weight := explorer.GetEdgeWeight(ref)
 			newlength := curr_flag.pathlength + weight
@@ -484,7 +464,7 @@ func CalcFullSPT(graph *TiledGraph, start int32, flags Dict[int32, _Flag]) {
 				heap.Enqueue(other_id, newlength)
 			}
 			flags[other_id] = other_flag
-		}
+		})
 		flags[curr_id] = curr_flag
 	}
 }

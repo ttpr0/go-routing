@@ -11,13 +11,8 @@ func CreateCHGraph3(g *CHGraph) *CHGraph3 {
 	explorer := g.GetDefaultExplorer()
 	for i := 0; i < g.NodeCount(); i++ {
 		this_id := int32(i)
-		edges := explorer.GetAdjacentEdges(this_id, FORWARD, ADJACENT_DOWNWARDS)
 		count := 0
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(this_id, FORWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
 			other_id := ref.OtherID
 			fwd_down_edges.Add(CHEdge{
 				From:   this_id,
@@ -25,20 +20,15 @@ func CreateCHGraph3(g *CHGraph) *CHGraph3 {
 				Weight: explorer.GetEdgeWeight(ref),
 			})
 			count += 1
-		}
+		})
 		for j := fwd_down_edges.Length() - count; j < fwd_down_edges.Length(); j++ {
 			ch_edge := fwd_down_edges[j]
 			ch_edge.Count = int32(count)
 			fwd_down_edges[j] = ch_edge
 		}
 
-		edges = explorer.GetAdjacentEdges(this_id, BACKWARD, ADJACENT_DOWNWARDS)
 		count = 0
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(this_id, BACKWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
 			other_id := ref.OtherID
 			bwd_down_edges.Add(CHEdge{
 				From:   this_id,
@@ -46,7 +36,7 @@ func CreateCHGraph3(g *CHGraph) *CHGraph3 {
 				Weight: explorer.GetEdgeWeight(ref),
 			})
 			count += 1
-		}
+		})
 		for j := bwd_down_edges.Length() - count; j < bwd_down_edges.Length(); j++ {
 			ch_edge := bwd_down_edges[j]
 			ch_edge.Count = int32(count)

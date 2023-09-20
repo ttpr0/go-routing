@@ -101,33 +101,23 @@ func _CreateTCWeighting(graph *Graph) *TCWeighting {
 	explorer := graph.GetDefaultExplorer()
 	for i := 0; i < int(graph.NodeCount()); i++ {
 		fwd_index := 0
-		iter := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL)
-		for {
-			ref, ok := iter.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			edge_indices[int(edge_id)].A = byte(fwd_index)
 			fwd_index += 1
-		}
+		})
 		bwd_index := 0
-		iter = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL)
-		for {
-			ref, ok := iter.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			edge_indices[int(edge_id)].B = byte(bwd_index)
 			bwd_index += 1
-		}
+		})
 		turn_cost_ref[i].B = byte(bwd_index)
 		turn_cost_ref[i].C = byte(fwd_index)
 		turn_cost_ref[i].A = size

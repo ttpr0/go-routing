@@ -131,6 +131,51 @@ func (self *DictGraph) AddDummyEdge(node_a, node_b int32, weight int32) {
 	bwd_edge_refs.Add(EdgeRef{EdgeID: id, OtherID: node_a, _Type: 0})
 	self.bwd_edgerefs[node_b] = bwd_edge_refs
 }
+func (self *DictGraph) RemoveNode(id int32) {
+	if !self.nodes.ContainsKey(id) {
+		panic("node doesn't exists")
+	}
+	self.nodes.Delete(id)
+	self.node_geoms.Delete(id)
+	for _, ref := range self.fwd_edgerefs[id] {
+		self.RemoveEdge(ref.EdgeID)
+	}
+	self.fwd_edgerefs.Delete(id)
+	for _, ref := range self.bwd_edgerefs[id] {
+		self.RemoveEdge(ref.EdgeID)
+	}
+	self.bwd_edgerefs.Delete(id)
+}
+func (self *DictGraph) RemoveEdge(id int32) {
+	if !self.edges.ContainsKey(id) {
+		panic("edge doesn't exists")
+	}
+	edge := self.edges[id]
+	// remove fwd edgeref
+	fwd_edgerefs := self.fwd_edgerefs[edge.NodeA]
+	var index int
+	for i, ref := range fwd_edgerefs {
+		if ref.EdgeID == id {
+			index = i
+			break
+		}
+	}
+	fwd_edgerefs.Remove(index)
+	self.fwd_edgerefs[edge.NodeA] = fwd_edgerefs
+	// remove bwd edgeref
+	bwd_edgerefs := self.bwd_edgerefs[edge.NodeB]
+	for i, ref := range bwd_edgerefs {
+		if ref.EdgeID == id {
+			index = i
+			break
+		}
+	}
+	bwd_edgerefs.Remove(index)
+	self.bwd_edgerefs[edge.NodeB] = bwd_edgerefs
+	// remove edge
+	self.edges.Delete(id)
+	self.edge_geoms.Delete(id)
+}
 
 //*******************************************
 // dict-graphs explorer
@@ -149,6 +194,23 @@ func (self *DictGraphExplorer) GetAdjacentEdges(node int32, direction Direction,
 		} else {
 			edge_refs := self.graph.bwd_edgerefs[node]
 			return NewListIterator(edge_refs)
+		}
+	} else {
+		panic("Adjacency-type not implemented for this graph.")
+	}
+}
+func (self *DictGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
+	if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
+		if direction == FORWARD {
+			edge_refs := self.graph.fwd_edgerefs[node]
+			for _, ref := range edge_refs {
+				callback(ref)
+			}
+		} else {
+			edge_refs := self.graph.bwd_edgerefs[node]
+			for _, ref := range edge_refs {
+				callback(ref)
+			}
 		}
 	} else {
 		panic("Adjacency-type not implemented for this graph.")

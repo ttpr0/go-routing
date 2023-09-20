@@ -28,28 +28,23 @@ func CalcPHAST2(g *graph.CHGraph3, start int32, max_range int32) Array[int32] {
 			continue
 		}
 		visited[curr_id] = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			other_id := ref.OtherID
 			if g.GetNodeLevel(other_id) <= g.GetNodeLevel(curr_id) {
-				continue
+				return
 			}
 			if visited[other_id] {
-				continue
+				return
 			}
 			new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 			if new_length > max_range {
-				continue
+				return
 			}
 			if dist[other_id] > new_length {
 				dist[other_id] = new_length
 				heap.Enqueue(other_id, new_length)
 			}
-		}
+		})
 	}
 
 	down_edges := g.GetDownEdges(graph.FORWARD)

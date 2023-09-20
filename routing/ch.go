@@ -83,16 +83,11 @@ func (self *CH) CalcShortestPath() bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-			for {
-				ref, ok := edges.Next()
-				if !ok {
-					break
-				}
+			explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 				edge_id := ref.EdgeID
 				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
-					continue
+					return
 				}
 				var other_flag flag_ch
 				if self.flags.ContainsKey(other_id) {
@@ -109,7 +104,7 @@ func (self *CH) CalcShortestPath() bool {
 					self.startheap.Enqueue(other_id, new_length)
 				}
 				self.flags[other_id] = other_flag
-			}
+			})
 			self.flags[curr_id] = curr_flag
 		}
 
@@ -125,16 +120,11 @@ func (self *CH) CalcShortestPath() bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			edges := explorer.GetAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL)
-			for {
-				ref, ok := edges.Next()
-				if !ok {
-					break
-				}
+			explorer.ForAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 				edge_id := ref.EdgeID
 				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
-					continue
+					return
 				}
 				var other_flag flag_ch
 				if self.flags.ContainsKey(other_id) {
@@ -151,7 +141,7 @@ func (self *CH) CalcShortestPath() bool {
 					self.endheap.Enqueue(other_id, new_length)
 				}
 				self.flags[other_id] = other_flag
-			}
+			})
 			self.flags[curr_id] = curr_flag
 		}
 	}
@@ -196,16 +186,11 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			shortcuts := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-			for {
-				ref, ok := shortcuts.Next()
-				if !ok {
-					break
-				}
+			explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 				edge_id := ref.EdgeID
 				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
-					continue
+					return
 				}
 				var other_flag flag_ch
 				if self.flags.ContainsKey(other_id) {
@@ -229,7 +214,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 					self.startheap.Enqueue(other_id, new_length)
 				}
 				self.flags[other_id] = other_flag
-			}
+			})
 			self.flags[curr_id] = curr_flag
 		}
 
@@ -248,16 +233,11 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			shortcuts := explorer.GetAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL)
-			for {
-				ref, ok := shortcuts.Next()
-				if !ok {
-					break
-				}
+			explorer.ForAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 				edge_id := ref.EdgeID
 				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
-					continue
+					return
 				}
 				var other_flag flag_ch
 				if self.flags.ContainsKey(other_id) {
@@ -279,7 +259,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 					self.endheap.Enqueue(other_id, new_length)
 				}
 				self.flags[other_id] = other_flag
-			}
+			})
 			self.flags[curr_id] = curr_flag
 		}
 	}

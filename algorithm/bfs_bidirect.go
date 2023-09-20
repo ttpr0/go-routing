@@ -23,21 +23,16 @@ func CalcBidirectBFS(g graph.IGraph, start int32) Array[bool] {
 			continue
 		}
 		visited_fwd[curr_id] = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
 			if ref.IsShortcut() {
-				continue
+				return
 			}
 			other_id := ref.OtherID
 			if visited_fwd[other_id] {
-				continue
+				return
 			}
 			queue.Push(other_id)
-		}
+		})
 	}
 
 	// bwd search
@@ -53,21 +48,16 @@ func CalcBidirectBFS(g graph.IGraph, start int32) Array[bool] {
 			continue
 		}
 		visited_bwd[curr_id] = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_EDGES)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
 			if ref.IsShortcut() {
-				continue
+				return
 			}
 			other_id := ref.OtherID
 			if visited_bwd[other_id] {
-				continue
+				return
 			}
 			queue.Push(other_id)
-		}
+		})
 	}
 
 	// combine results

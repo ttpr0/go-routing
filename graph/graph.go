@@ -32,6 +32,8 @@ type IGraphExplorer interface {
 	//
 	// typ is basically a hint to tell which edges/sub-graph will be traversed
 	GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef]
+	// Iterates through the adjacency of a node calling the callback for every edge.
+	ForAdjacentEdges(node int32, dir Direction, typ Adjacency, callback func(EdgeRef))
 	GetEdgeWeight(edge EdgeRef) int32
 	GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32
 	GetOtherNode(edge EdgeRef, node int32) int32
@@ -109,6 +111,22 @@ func (self *BaseGraphExplorer) GetAdjacentEdges(node int32, direction Direction,
 		accessor.SetBaseNode(node, direction)
 		return &EdgeRefIterator{
 			accessor: accessor,
+		}
+	} else {
+		panic("Adjacency-type not implemented for this graph.")
+	}
+}
+func (self *BaseGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
+	if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
+		self.accessor.SetBaseNode(node, direction)
+		for self.accessor.Next() {
+			edge_id := self.accessor.GetEdgeID()
+			other_id := self.accessor.GetOtherID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   0,
+			})
 		}
 	} else {
 		panic("Adjacency-type not implemented for this graph.")

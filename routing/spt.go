@@ -63,21 +63,16 @@ func (self *ShortestPathTree) CalcShortestPathTree() {
 		}
 		self.consumer.ConsumePoint(self.graph.GetNodeGeom(curr_id), int(curr_flag.path_length))
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited {
-				continue
+				return
 			}
 			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {
@@ -86,7 +81,7 @@ func (self *ShortestPathTree) CalcShortestPathTree() {
 				self.heap.Enqueue(other_id, new_length)
 			}
 			self.flags[other_id] = other_flag
-		}
+		})
 		self.flags[curr_id] = curr_flag
 	}
 }

@@ -114,13 +114,35 @@ type DynamicGraphExplorer struct {
 	sh_accessor DynamicTopologyAccessor
 }
 
-func (self *DynamicGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
+func (self *DynamicGraphExplorer) _GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
 	self.accessor.SetBaseNode(node, direction)
 	self.sh_accessor.SetBaseNode(node, direction)
 	return &DynamicEdgeRefIterator{
 		accessor:    &self.accessor,
 		sh_accessor: &self.sh_accessor,
 		typ:         0,
+	}
+}
+func (self *DynamicGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
+	self.accessor.SetBaseNode(node, direction)
+	self.sh_accessor.SetBaseNode(node, direction)
+	for self.accessor.Next() {
+		edge_id := self.accessor.GetEdgeID()
+		other_id := self.accessor.GetOtherID()
+		callback(EdgeRef{
+			EdgeID:  edge_id,
+			OtherID: other_id,
+			_Type:   0,
+		})
+	}
+	for self.sh_accessor.Next() {
+		edge_id := self.sh_accessor.GetEdgeID()
+		other_id := self.sh_accessor.GetOtherID()
+		callback(EdgeRef{
+			EdgeID:  edge_id,
+			OtherID: other_id,
+			_Type:   100,
+		})
 	}
 }
 func (self *DynamicGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
@@ -244,39 +266,29 @@ func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 func FindNeighbours(explorer *DynamicGraphExplorer, id int32, is_contracted Array[bool]) ([]int32, []int32) {
 	// compute out-going neighbours
 	out_neigbours := NewList[int32](4)
-	edges := explorer.GetAdjacentEdges(id, FORWARD, ADJACENT_ALL)
-	for {
-		ref, ok := edges.Next()
-		if !ok {
-			break
-		}
+	explorer.ForAdjacentEdges(id, FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 		other_id := ref.OtherID
 		if other_id == id || Contains(out_neigbours, other_id) {
-			continue
+			return
 		}
 		if is_contracted[other_id] {
-			continue
+			return
 		}
 		out_neigbours.Add(other_id)
-	}
+	})
 
 	// compute in-going neighbours
 	in_neigbours := NewList[int32](4)
-	edges = explorer.GetAdjacentEdges(id, BACKWARD, ADJACENT_ALL)
-	for {
-		ref, ok := edges.Next()
-		if !ok {
-			break
-		}
+	explorer.ForAdjacentEdges(id, BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
 		other_id := ref.OtherID
 		if other_id == id || Contains(in_neigbours, other_id) {
-			continue
+			return
 		}
 		if is_contracted[other_id] {
-			continue
+			return
 		}
 		in_neigbours.Add(other_id)
-	}
+	})
 
 	return in_neigbours, out_neigbours
 }
@@ -311,16 +323,11 @@ func CalcShortcut(start, end, contract int32, graph *DynamicGraph, explorer *Dyn
 		curr_flag.visited = true
 		flags[curr_id] = curr_flag
 		// curr_node := graph.GetNode(curr_id)
-		edges := explorer.GetAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			if is_contracted[other_id] {
-				continue
+				return
 			}
 			var other_flag FlagSH
 			if flags.ContainsKey(other_id) {
@@ -331,7 +338,7 @@ func CalcShortcut(start, end, contract int32, graph *DynamicGraph, explorer *Dyn
 			weight := explorer.GetEdgeWeight(ref)
 			newlength := curr_flag.pathlength + weight
 			if newlength > max_weight {
-				continue
+				return
 			}
 			if newlength < other_flag.pathlength {
 				other_flag.pathlength = newlength
@@ -340,7 +347,7 @@ func CalcShortcut(start, end, contract int32, graph *DynamicGraph, explorer *Dyn
 				heap.Enqueue(other_id, newlength)
 			}
 			flags[other_id] = other_flag
-		}
+		})
 	}
 
 	curr_id = end
@@ -641,20 +648,15 @@ func MarkNodesOnPath(start, end int32, sp_counts Array[int32], graph IGraph, hea
 			continue
 		}
 		curr_flag.visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			other_flag := flags[other_id]
 			if other_flag.visited {
-				continue
+				return
 			}
 			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {
@@ -663,7 +665,7 @@ func MarkNodesOnPath(start, end int32, sp_counts Array[int32], graph IGraph, hea
 				heap.Enqueue(other_id, new_length)
 			}
 			flags[other_id] = other_flag
-		}
+		})
 		flags[curr_id] = curr_flag
 	}
 

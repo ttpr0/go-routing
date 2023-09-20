@@ -58,20 +58,15 @@ func (self *RPHAST) CalcSPT() {
 			continue
 		}
 		curr_flag.Visited = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
-				continue
+				return
 			}
 			other_flag := self.flags[other_id]
 			if other_flag.Visited {
-				continue
+				return
 			}
 			new_length := curr_flag.PathLength + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.PathLength > new_length {
@@ -80,7 +75,7 @@ func (self *RPHAST) CalcSPT() {
 				self.heap.Enqueue(other_id, new_length)
 			}
 			self.flags[other_id] = other_flag
-		}
+		})
 		self.flags[curr_id] = curr_flag
 	}
 
@@ -89,25 +84,20 @@ func (self *RPHAST) CalcSPT() {
 		if curr_len > self.max_range {
 			continue
 		}
-		edges := explorer.GetAdjacentEdges(int32(i), graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			other_id := ref.OtherID
 			if !self.subset[other_id] {
-				continue
+				return
 			}
 			if self.graph.GetNodeLevel(other_id) >= self.graph.GetNodeLevel(int32(i)) {
-				continue
+				return
 			}
 			other_flag := self.flags[other_id]
 			if other_flag.PathLength > (curr_len + float64(explorer.GetEdgeWeight(ref))) {
 				other_flag.PathLength = curr_len + float64(explorer.GetEdgeWeight(ref))
 				self.flags[other_id] = other_flag
 			}
-		}
+		})
 	}
 }
 

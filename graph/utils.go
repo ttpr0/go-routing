@@ -87,14 +87,9 @@ func GraphToGeoJSON2(graph *Graph, node_tiles Array[int16]) (geo.FeatureCollecti
 func CheckGraph(g IGraph) {
 	explorer := g.GetDefaultExplorer()
 	for i := 0; i < int(g.NodeCount()); i++ {
-		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL)
-		for {
-			ref, ok := adj_edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if ref.IsShortcut() {
-				continue
+				return
 			}
 			edge := g.GetEdge(ref.EdgeID)
 			if edge.NodeA != int32(i) {
@@ -103,15 +98,10 @@ func CheckGraph(g IGraph) {
 			if edge.NodeB != ref.OtherID {
 				fmt.Println("error 84")
 			}
-		}
-		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL)
-		for {
-			ref, ok := adj_edges.Next()
-			if !ok {
-				break
-			}
+		})
+		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if ref.IsShortcut() {
-				continue
+				return
 			}
 			edge := g.GetEdge(ref.EdgeID)
 			if edge.NodeB != int32(i) {
@@ -120,7 +110,7 @@ func CheckGraph(g IGraph) {
 			if edge.NodeA != ref.OtherID {
 				fmt.Println("error 98")
 			}
-		}
+		})
 	}
 }
 
@@ -128,12 +118,7 @@ func CheckGraph(g IGraph) {
 func CheckCHGraph(g ICHGraph) {
 	explorer := g.GetDefaultExplorer()
 	for i := 0; i < int(g.NodeCount()); i++ {
-		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL)
-		for {
-			ref, ok := adj_edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				edge := g.GetShortcut(ref.EdgeID)
 				if edge.NodeA != int32(i) {
@@ -151,13 +136,8 @@ func CheckCHGraph(g ICHGraph) {
 					fmt.Println("error 4")
 				}
 			}
-		}
-		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL)
-		for {
-			ref, ok := adj_edges.Next()
-			if !ok {
-				break
-			}
+		})
+		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				edge := g.GetShortcut(ref.EdgeID)
 				if edge.NodeB != int32(i) {
@@ -175,7 +155,7 @@ func CheckCHGraph(g ICHGraph) {
 					fmt.Println("error 8")
 				}
 			}
-		}
+		})
 	}
 }
 
@@ -185,12 +165,7 @@ func CheckTiledGraph(g ITiledGraph) {
 
 	// check edges
 	for i := 0; i < int(g.NodeCount()); i++ {
-		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL)
-		for {
-			ref, ok := adj_edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				fmt.Println("error 23")
 			} else {
@@ -199,13 +174,8 @@ func CheckTiledGraph(g ITiledGraph) {
 					fmt.Println("error 24")
 				}
 			}
-		}
-		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL)
-		for {
-			ref, ok := adj_edges.Next()
-			if !ok {
-				break
-			}
+		})
+		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				fmt.Println("error 25")
 			} else {
@@ -214,17 +184,12 @@ func CheckTiledGraph(g ITiledGraph) {
 					fmt.Println("error 26")
 				}
 			}
-		}
+		})
 	}
 
 	// check skip
 	for i := 0; i < int(g.NodeCount()); i++ {
-		adj_edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_SKIP)
-		for {
-			ref, ok := adj_edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_SKIP, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				edge := g.GetShortcut(ref.EdgeID)
 				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) {
@@ -236,13 +201,8 @@ func CheckTiledGraph(g ITiledGraph) {
 					fmt.Println("error 34")
 				}
 			}
-		}
-		adj_edges = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_SKIP)
-		for {
-			ref, ok := adj_edges.Next()
-			if !ok {
-				break
-			}
+		})
+		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_SKIP, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				edge := g.GetShortcut(ref.EdgeID)
 				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) {
@@ -254,7 +214,7 @@ func CheckTiledGraph(g ITiledGraph) {
 					fmt.Println("error 36")
 				}
 			}
-		}
+		})
 	}
 }
 

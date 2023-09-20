@@ -59,17 +59,7 @@ func (self *BODijkstra) CalcShortestPath() bool {
 		}
 		curr_flag.visited = true
 		self.flags.Set(curr_id, curr_flag)
-		var edges IIterator[graph.EdgeRef]
-		if curr_flag.skip {
-			edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP)
-		} else {
-			edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		}
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		handler := func(ref graph.EdgeRef) {
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			var other_flag _FlagBOD
@@ -79,7 +69,7 @@ func (self *BODijkstra) CalcShortestPath() bool {
 				other_flag = _FlagBOD{curr_node: other_id, path_length: 1000000, prev_edge: -1}
 			}
 			if other_flag.visited {
-				continue
+				return
 			}
 			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {
@@ -100,6 +90,11 @@ func (self *BODijkstra) CalcShortestPath() bool {
 				self.heap.Enqueue(other_flag, new_length)
 			}
 			self.flags[other_id] = other_flag
+		}
+		if curr_flag.skip {
+			explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP, handler)
+		} else {
+			explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, handler)
 		}
 	}
 }
@@ -124,17 +119,7 @@ func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) boo
 		}
 		curr_flag.visited = true
 		self.flags.Set(curr_id, curr_flag)
-		var edges IIterator[graph.EdgeRef]
-		if curr_flag.skip {
-			edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP)
-		} else {
-			edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		}
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		handler := func(ref graph.EdgeRef) {
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			var other_flag _FlagBOD
@@ -144,7 +129,7 @@ func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) boo
 				other_flag = _FlagBOD{curr_node: other_id, path_length: 1000000, prev_edge: -1}
 			}
 			if other_flag.visited {
-				continue
+				return
 			}
 			if ref.IsShortcut() {
 			} else {
@@ -169,6 +154,11 @@ func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) boo
 				self.heap.Enqueue(other_flag, new_length)
 			}
 			self.flags[other_id] = other_flag
+		}
+		if curr_flag.skip {
+			explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP, handler)
+		} else {
+			explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, handler)
 		}
 	}
 	return true

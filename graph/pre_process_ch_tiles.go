@@ -235,14 +235,9 @@ func CreateCHSkipTopology2(dg *DynamicGraph, border_nodes Array[bool], node_tile
 		if !border_nodes[i] {
 			continue
 		}
-		edges := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if !border_nodes[ref.OtherID] {
-				continue
+				return
 			}
 			if ref.IsShortcut() {
 				shc := dg.GetShortcut(ref.EdgeID)
@@ -261,7 +256,7 @@ func CreateCHSkipTopology2(dg *DynamicGraph, border_nodes Array[bool], node_tile
 					dyn_top.AddEdgeEntries(edge.NodeA, edge.NodeB, ref.EdgeID, 20)
 				}
 			}
-		}
+		})
 	}
 
 	return DynamicToTypedTopology(&dyn_top), shortcuts, shortcut_weights
@@ -279,28 +274,16 @@ func GetBorderNodes2(graph ITiledGraph, tile_id int16) (Array[int32], Array[int3
 			continue
 		}
 		is_border := false
-		iter := explorer.GetAdjacentEdges(int32(i), FORWARD, ADJACENT_EDGES)
-		for {
-			ref, ok := iter.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_EDGES, func(ref EdgeRef) {
 			if ref.IsCrossBorder() {
 				is_border = true
-				break
 			}
-		}
-		iter = explorer.GetAdjacentEdges(int32(i), BACKWARD, ADJACENT_EDGES)
-		for {
-			ref, ok := iter.Next()
-			if !ok {
-				break
-			}
+		})
+		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_EDGES, func(ref EdgeRef) {
 			if ref.IsCrossBorder() {
 				is_border = true
-				break
 			}
-		}
+		})
 		if is_border {
 			border.Add(int32(i))
 		} else {

@@ -64,24 +64,19 @@ func (self *ShortestPathTree3) CalcSPT() {
 		if curr_flag.PathLength > self.max_range {
 			return
 		}
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			if curr_flag.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.Visited {
-				continue
+				return
 			}
 			new_length := curr_flag.PathLength + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.PathLength > new_length {
@@ -101,7 +96,7 @@ func (self *ShortestPathTree3) CalcSPT() {
 				self.heap.Enqueue(other_id, new_length)
 			}
 			self.flags[other_id] = other_flag
-		}
+		})
 	}
 }
 func (self *ShortestPathTree3) GetSPT() []FlagSPT3 {

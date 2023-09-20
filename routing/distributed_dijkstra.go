@@ -162,22 +162,17 @@ func (self *DistributedRoutingRunner) RunRouting() {
 			self.handler.SendStopRequest(self.key, curr_flag.path_length)
 		}
 		self.flags.Set(curr_id, curr_flag)
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			if self.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if new_length > self.max_length {
-				continue
+				return
 			}
 			other_id := ref.OtherID
 			var other_flag flag_dd
@@ -209,7 +204,7 @@ func (self *DistributedRoutingRunner) RunRouting() {
 				}
 			}
 			self.flags.Set(other_id, other_flag)
-		}
+		})
 	}
 }
 

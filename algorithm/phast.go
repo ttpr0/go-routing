@@ -33,43 +33,33 @@ func CalcPHAST(g graph.ICHGraph, start int32) Array[int32] {
 			continue
 		}
 		visited[curr_id] = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			other_id := ref.OtherID
 			if g.GetNodeLevel(other_id) <= g.GetNodeLevel(curr_id) {
-				continue
+				return
 			}
 			if visited[other_id] {
-				continue
+				return
 			}
 			new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 			if dist[other_id] > new_length {
 				dist[other_id] = new_length
 				heap.Enqueue(other_id, new_length)
 			}
-		}
+		})
 	}
 
 	for i := 0; i < len(dist); i++ {
 		curr_len := dist[i]
-		edges := explorer.GetAdjacentEdges(int32(i), graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(int32(i), graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			other_id := ref.OtherID
 			if g.GetNodeLevel(other_id) >= g.GetNodeLevel(int32(i)) {
-				continue
+				return
 			}
 			if dist[other_id] > (curr_len + explorer.GetEdgeWeight(ref)) {
 				dist[other_id] = curr_len + explorer.GetEdgeWeight(ref)
 			}
-		}
+		})
 	}
 
 	return dist

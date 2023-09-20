@@ -93,14 +93,9 @@ func (self *EdmondsKarp) ComputeMinCut() {
 			self.node_tiles[curr] = self.source_tile
 		}
 
-		edges := explorer.GetAdjacentEdges(curr, graph.FORWARD, graph.ADJACENT_EDGES)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr, graph.FORWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
 			if visited[ref.OtherID] || self.node_tiles[ref.OtherID] != self.base_tile {
-				continue
+				return
 			}
 
 			flow := self.edge_flow[ref.EdgeID]
@@ -108,15 +103,10 @@ func (self *EdmondsKarp) ComputeMinCut() {
 				queue.Push(ref.OtherID)
 				visited[ref.OtherID] = true
 			}
-		}
-		edges = explorer.GetAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		})
+		explorer.ForAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
 			if visited[ref.OtherID] || self.node_tiles[ref.OtherID] != self.base_tile {
-				continue
+				return
 			}
 
 			flow := self.edge_flow[ref.EdgeID]
@@ -124,7 +114,7 @@ func (self *EdmondsKarp) ComputeMinCut() {
 				queue.Push(ref.OtherID)
 				visited[ref.OtherID] = true
 			}
-		}
+		})
 	}
 
 	for i := 0; i < int(self.g.NodeCount()); i++ {
@@ -173,20 +163,15 @@ func (self *EdmondsKarp) BFS() int {
 			break
 		}
 
-		edges := explorer.GetAdjacentEdges(curr, graph.FORWARD, graph.ADJACENT_EDGES)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr, graph.FORWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
 			// check if edge should stil be traversed
 			if visited[ref.OtherID] {
-				continue
+				return
 			}
 			// check if node is part of subgraph
 			tile := self.node_tiles[ref.OtherID]
 			if tile != self.base_tile && tile != self.source_tile && tile != self.sink_tile {
-				continue
+				return
 			}
 
 			flow := self.edge_flow[ref.EdgeID]
@@ -209,21 +194,16 @@ func (self *EdmondsKarp) BFS() int {
 				queue.Push(ref.OtherID)
 				visited[ref.OtherID] = true
 			}
-		}
-		edges = explorer.GetAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		})
+		explorer.ForAdjacentEdges(curr, graph.BACKWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
 			// check if edge should stil be traversed
 			if visited[ref.OtherID] {
-				continue
+				return
 			}
 			// check if node is part of subgraph
 			tile := self.node_tiles[ref.OtherID]
 			if tile != self.base_tile && tile != self.source_tile && tile != self.sink_tile {
-				continue
+				return
 			}
 
 			flow := self.edge_flow[ref.EdgeID]
@@ -246,7 +226,7 @@ func (self *EdmondsKarp) BFS() int {
 				queue.Push(ref.OtherID)
 				visited[ref.OtherID] = true
 			}
-		}
+		})
 	}
 
 	if end == -1 {

@@ -22,21 +22,16 @@ func CalcBreathFirstSearch(g graph.IGraph, start int32) Array[bool] {
 			continue
 		}
 		visited[curr_id] = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if ref.IsShortcut() {
-				continue
+				return
 			}
 			other_id := ref.OtherID
 			if visited[other_id] {
-				continue
+				return
 			}
 			queue.Push(other_id)
-		}
+		})
 	}
 
 	return visited

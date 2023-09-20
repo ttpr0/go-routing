@@ -68,21 +68,16 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited1 = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited1 {
-				continue
+				return
 			}
 			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
 			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
@@ -98,7 +93,6 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 					self.flags[other_id] = other_flag
 					self.mid_id = other_id
 					finished = true
-					break
 				}
 			}
 			if other_flag.path_length1 > new_length {
@@ -107,7 +101,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 				self.startheap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
-		}
+		})
 		self.flags[curr_id] = curr_flag
 
 		if finished {
@@ -121,21 +115,16 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 			continue
 		}
 		curr_flag.visited2 = true
-		edges = explorer.GetAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited2 {
-				continue
+				return
 			}
 			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
 			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
@@ -151,7 +140,6 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 					self.flags[other_id] = other_flag
 					self.mid_id = other_id
 					finished = true
-					break
 				}
 			}
 			if other_flag.path_length2 > new_length {
@@ -160,7 +148,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 				self.endheap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
-		}
+		})
 		self.flags[curr_id] = curr_flag
 	}
 
@@ -171,6 +159,7 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 	explorer := self.graph.GetDefaultExplorer()
 
 	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
+	is_finished := false
 	for c := 0; c < count; c++ {
 		curr_id, _ := self.startheap.Dequeue()
 		//curr := (*d.graph).GetNode(curr_id)
@@ -180,24 +169,19 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 		}
 		if curr_flag.visited2 {
 			self.mid_id = curr_id
-			return false
+			is_finished = true
 		}
 		curr_flag.visited1 = true
-		edges := explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited1 {
-				continue
+				return
 			}
 			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
 			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
@@ -213,7 +197,7 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 					other_flag.path_length1 = new_length
 					self.flags[other_id] = other_flag
 					self.mid_id = other_id
-					return false
+					is_finished = true
 				}
 			}
 			if other_flag.path_length1 > new_length {
@@ -222,8 +206,11 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 				self.startheap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
-		}
+		})
 		self.flags[curr_id] = curr_flag
+		if is_finished {
+			break
+		}
 
 		curr_id, _ = self.endheap.Dequeue()
 		//curr := (*d.graph).GetNode(curr_id)
@@ -236,21 +223,16 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 			return false
 		}
 		curr_flag.visited2 = true
-		edges = explorer.GetAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			if !ref.IsEdge() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.visited2 {
-				continue
+				return
 			}
 			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
 			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
@@ -266,7 +248,7 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 					other_flag.path_length2 = new_length
 					self.flags[other_id] = other_flag
 					self.mid_id = other_id
-					return false
+					is_finished = true
 				}
 			}
 			if other_flag.path_length2 > new_length {
@@ -275,8 +257,14 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 				self.endheap.Enqueue(other_id, new_length+lambda)
 			}
 			self.flags[other_id] = other_flag
-		}
+		})
 		self.flags[curr_id] = curr_flag
+		if is_finished {
+			break
+		}
+	}
+	if is_finished {
+		return false
 	}
 	return true
 }

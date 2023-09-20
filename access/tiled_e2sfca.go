@@ -91,29 +91,24 @@ func CalcTiled2SFCA(g graph.ITiledGraph, dem view.IPointView, sup view.IPointVie
 					}
 					visited[curr_id] = true
 					curr_tile := g.GetNodeTile(curr_id)
-					var edges IIterator[graph.EdgeRef]
-					if curr_tile == s_tile || active_tiles[curr_tile] {
-						edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES)
-					} else {
-						edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP)
-					}
-					for {
-						ref, ok := edges.Next()
-						if !ok {
-							break
-						}
+					handler := func(ref graph.EdgeRef) {
 						other_id := ref.OtherID
 						if visited[other_id] {
-							continue
+							return
 						}
 						new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 						if new_length > max_range {
-							continue
+							return
 						}
 						if dist[other_id] > new_length {
 							dist[other_id] = new_length
 							heap.Enqueue(other_id, new_length)
 						}
+					}
+					if curr_tile == s_tile || active_tiles[curr_tile] {
+						explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES, handler)
+					} else {
+						explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP, handler)
 					}
 				}
 
@@ -237,30 +232,25 @@ func CalcTiled2SFCA2(g *graph.TiledGraph3, dem view.IPointView, sup view.IPointV
 					}
 					visited[curr_id] = true
 					curr_tile := g.GetNodeTile(curr_id)
-					var edges IIterator[graph.EdgeRef]
-					if curr_tile == s_tile {
-						edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES)
-					} else {
-						found_tiles[curr_tile] = true
-						edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP)
-					}
-					for {
-						ref, ok := edges.Next()
-						if !ok {
-							break
-						}
+					handler := func(ref graph.EdgeRef) {
 						other_id := ref.OtherID
 						if visited[other_id] {
-							continue
+							return
 						}
 						new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 						if new_length > max_range {
-							continue
+							return
 						}
 						if dist[other_id] > new_length {
 							dist[other_id] = new_length
 							heap.Enqueue(other_id, new_length)
 						}
+					}
+					if curr_tile == s_tile {
+						explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES, handler)
+					} else {
+						found_tiles[curr_tile] = true
+						explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP, handler)
 					}
 				}
 
@@ -365,17 +355,12 @@ func CalcTiled2SFCA3(g *graph.TiledGraph4, dem view.IPointView, sup view.IPointV
 			continue
 		}
 		graph_subset[node] = true
-		edges := explorer.GetAdjacentEdges(node, graph.BACKWARD, graph.ADJACENT_UPWARDS)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
+		explorer.ForAdjacentEdges(node, graph.BACKWARD, graph.ADJACENT_UPWARDS, func(ref graph.EdgeRef) {
 			if graph_subset[ref.OtherID] {
-				continue
+				return
 			}
 			node_queue.Push(ref.OtherID)
-		}
+		})
 	}
 	// selecting subset of downward edges for linear sweep
 	down_edges_subset := NewDict[int16, List[graph.TiledSHEdge]](int(tilecount))
@@ -447,30 +432,25 @@ func CalcTiled2SFCA3(g *graph.TiledGraph4, dem view.IPointView, sup view.IPointV
 					}
 					visited[curr_id] = true
 					curr_tile := g.GetNodeTile(curr_id)
-					var edges IIterator[graph.EdgeRef]
-					if curr_tile == s_tile {
-						edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES)
-					} else {
-						found_tiles[curr_tile] = true
-						edges = explorer.GetAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP)
-					}
-					for {
-						ref, ok := edges.Next()
-						if !ok {
-							break
-						}
+					handler := func(ref graph.EdgeRef) {
 						other_id := ref.OtherID
 						if visited[other_id] {
-							continue
+							return
 						}
 						new_length := dist[curr_id] + explorer.GetEdgeWeight(ref)
 						if new_length > max_range {
-							continue
+							return
 						}
 						if dist[other_id] > new_length {
 							dist[other_id] = new_length
 							heap.Enqueue(other_id, new_length)
 						}
+					}
+					if curr_tile == s_tile {
+						explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES, handler)
+					} else {
+						found_tiles[curr_tile] = true
+						explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_SKIP, handler)
 					}
 				}
 
