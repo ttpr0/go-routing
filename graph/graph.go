@@ -24,15 +24,11 @@ type IGraph interface {
 
 // not thread safe, use only one instance per thread
 type IGraphExplorer interface {
-	// multiple calls to this will overwrite underlying iterator object
-	//
-	// use only one instance at a time
+	// Iterates through the adjacency of a node calling the callback for every edge.
 	//
 	// direction tells the traversel direction (FORWARD meand outgoing edges, BACKWARD ingoing edges)
 	//
 	// typ is basically a hint to tell which edges/sub-graph will be traversed
-	GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef]
-	// Iterates through the adjacency of a node calling the callback for every edge.
 	ForAdjacentEdges(node int32, dir Direction, typ Adjacency, callback func(EdgeRef))
 	GetEdgeWeight(edge EdgeRef) int32
 	GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32
@@ -105,17 +101,6 @@ type BaseGraphExplorer struct {
 	weight   IWeighting
 }
 
-func (self *BaseGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
-		accessor := &self.accessor
-		accessor.SetBaseNode(node, direction)
-		return &EdgeRefIterator{
-			accessor: accessor,
-		}
-	} else {
-		panic("Adjacency-type not implemented for this graph.")
-	}
-}
 func (self *BaseGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
 	if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
 		self.accessor.SetBaseNode(node, direction)
@@ -150,27 +135,8 @@ func (self *BaseGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 }
 
 //*******************************************
-// edge-ref iterators
+// graph index
 //******************************************
-
-type EdgeRefIterator struct {
-	accessor *TopologyAccessor
-}
-
-func (self *EdgeRefIterator) Next() (EdgeRef, bool) {
-	ok := self.accessor.Next()
-	if !ok {
-		var t EdgeRef
-		return t, false
-	}
-	edge_id := self.accessor.GetEdgeID()
-	other_id := self.accessor.GetOtherID()
-	return EdgeRef{
-		EdgeID:  edge_id,
-		OtherID: other_id,
-		_Type:   0,
-	}, true
-}
 
 type BaseGraphIndex struct {
 	index KDTree[int32]

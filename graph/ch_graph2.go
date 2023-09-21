@@ -1,9 +1,5 @@
 package graph
 
-import (
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
-)
-
 func CreateCHGraph2(g *CHGraph) *CHGraph2 {
 	up_top := NewDynamicTopology(g.NodeCount())
 	down_top := NewDynamicTopology(g.NodeCount())
@@ -83,39 +79,6 @@ type CHGraph2Explorer struct {
 	sh_weight     IWeighting
 }
 
-func (self *CHGraph2Explorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	if typ == ADJACENT_ALL {
-		self.accessor.SetBaseNode(node, direction)
-		self.sh_accessor.SetBaseNode(node, direction)
-		return &CHEdgeRefIterator{
-			accessor:    &self.accessor,
-			ch_accessor: &self.sh_accessor,
-			typ:         0,
-		}
-	} else if typ == ADJACENT_EDGES {
-		self.accessor.SetBaseNode(node, direction)
-		return &EdgeRefIterator{
-			accessor: &self.accessor,
-		}
-	} else if typ == ADJACENT_SHORTCUTS {
-		self.sh_accessor.SetBaseNode(node, direction)
-		return &EdgeRefIterator{
-			accessor: &self.sh_accessor,
-		}
-	} else if typ == ADJACENT_UPWARDS {
-		self.up_accessor.SetBaseNode(node, direction)
-		return &TypedEdgeRefIterator{
-			accessor: &self.up_accessor,
-		}
-	} else if typ == ADJACENT_DOWNWARDS {
-		self.down_accessor.SetBaseNode(node, direction)
-		return &TypedEdgeRefIterator{
-			accessor: &self.down_accessor,
-		}
-	} else {
-		panic("Adjacency-type not implemented for this graph.")
-	}
-}
 func (self *CHGraph2Explorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
 	if typ == ADJACENT_ALL {
 		self.accessor.SetBaseNode(node, direction)

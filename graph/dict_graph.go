@@ -186,19 +186,6 @@ type DictGraphExplorer struct {
 	weight IWeighting
 }
 
-func (self *DictGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
-		if direction == FORWARD {
-			edge_refs := self.graph.fwd_edgerefs[node]
-			return NewListIterator(edge_refs)
-		} else {
-			edge_refs := self.graph.bwd_edgerefs[node]
-			return NewListIterator(edge_refs)
-		}
-	} else {
-		panic("Adjacency-type not implemented for this graph.")
-	}
-}
 func (self *DictGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
 	if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
 		if direction == FORWARD {

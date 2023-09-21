@@ -1,9 +1,5 @@
 package graph
 
-import (
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
-)
-
 //*******************************************
 // tiled-graph with up topology for rphast
 //******************************************
@@ -35,27 +31,6 @@ type TiledGraph4Explorer struct {
 	skip_weight   IWeighting
 }
 
-func (self *TiledGraph4Explorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	if typ == ADJACENT_SKIP {
-		self.skip_accessor.SetBaseNode(node, direction)
-		return &TypedEdgeRefIterator{
-			accessor: &self.skip_accessor,
-		}
-	} else if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
-		self.accessor.SetBaseNode(node, direction)
-		return &TiledEdgeRefIterator{
-			accessor:   &self.accessor,
-			edge_types: self.graph.skip_store.edge_types,
-		}
-	} else if typ == ADJACENT_UPWARDS {
-		self.up_accessor.SetBaseNode(node, direction)
-		return &TypedEdgeRefIterator{
-			accessor: &self.up_accessor,
-		}
-	} else {
-		panic("Adjacency-type not implemented for this graph.")
-	}
-}
 func (self *TiledGraph4Explorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
 	if typ == ADJACENT_SKIP {
 		self.skip_accessor.SetBaseNode(node, direction)

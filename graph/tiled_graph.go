@@ -116,22 +116,6 @@ type TiledGraphExplorer struct {
 	skip_weight   IWeighting
 }
 
-func (self *TiledGraphExplorer) GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	if typ == ADJACENT_SKIP {
-		self.skip_accessor.SetBaseNode(node, direction)
-		return &TypedEdgeRefIterator{
-			accessor: &self.skip_accessor,
-		}
-	} else if typ == ADJACENT_ALL || typ == ADJACENT_EDGES {
-		self.accessor.SetBaseNode(node, direction)
-		return &TiledEdgeRefIterator{
-			accessor:   &self.accessor,
-			edge_types: self.graph.skip_store.edge_types,
-		}
-	} else {
-		panic("Adjacency-type not implemented for this graph.")
-	}
-}
 func (self *TiledGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
 	if typ == ADJACENT_SKIP {
 		self.skip_accessor.SetBaseNode(node, direction)
@@ -191,47 +175,4 @@ func (self *TiledGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 		}
 		return -1
 	}
-}
-
-//*******************************************
-// edge-ref iterators
-//******************************************
-
-type TiledEdgeRefIterator struct {
-	accessor   *TopologyAccessor
-	edge_types Array[byte]
-}
-
-func (self *TiledEdgeRefIterator) Next() (EdgeRef, bool) {
-	ok := self.accessor.Next()
-	if !ok {
-		return EdgeRef{}, false
-	}
-	edge_id := self.accessor.GetEdgeID()
-	other_id := self.accessor.GetOtherID()
-	typ := self.edge_types[edge_id]
-	return EdgeRef{
-		EdgeID:  edge_id,
-		OtherID: other_id,
-		_Type:   typ,
-	}, true
-}
-
-type TypedEdgeRefIterator struct {
-	accessor *TypedTopologyAccessor
-}
-
-func (self *TypedEdgeRefIterator) Next() (EdgeRef, bool) {
-	ok := self.accessor.Next()
-	if !ok {
-		return EdgeRef{}, false
-	}
-	edge_id := self.accessor.GetEdgeID()
-	other_id := self.accessor.GetOtherID()
-	typ := self.accessor.GetType()
-	return EdgeRef{
-		EdgeID:  edge_id,
-		OtherID: other_id,
-		_Type:   typ,
-	}, true
 }
