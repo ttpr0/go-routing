@@ -22,7 +22,7 @@ func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 		weight:   graph.weight,
 		index:    graph.index,
 	}
-	dg := TransformToDynamicGraph(g)
+	dg := TransformToCHPreprocGraph(g)
 	CalcContraction2(dg, contraction_order)
 
 	fmt.Println("Set border nodes to maxlevel:")
@@ -224,7 +224,7 @@ func CreateCHSkipTopology(graph *TiledGraph, ch_shortcuts List[CHShortcut], ch_w
 }
 
 // creates topology with cross-border edges (type 10), skip-edges (type 20) and shortcuts (type 100)
-func CreateCHSkipTopology2(dg *DynamicGraph, border_nodes Array[bool], node_tiles Array[int16]) (*TypedTopologyStore, List[Shortcut], List[int32]) {
+func CreateCHSkipTopology2(dg *CHPreprocGraph, border_nodes Array[bool], node_tiles Array[int16]) (*TypedTopologyStore, List[Shortcut], List[int32]) {
 	dyn_top := NewDynamicTopology(dg.NodeCount())
 	shortcuts := NewList[Shortcut](100)
 	shortcut_weights := NewList[int32](100)

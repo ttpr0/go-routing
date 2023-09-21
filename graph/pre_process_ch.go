@@ -10,10 +10,10 @@ import (
 )
 
 //*******************************************
-// dynamic graph
+// preprocessing graph
 //*******************************************
 
-type DynamicGraph struct {
+type CHPreprocGraph struct {
 	// added attributes to build ch
 	ch_topology DynamicTopologyStore
 	node_levels Array[int16]
@@ -32,42 +32,42 @@ type DynamicNodeRef struct {
 	BWDEdgeRefs List[EdgeRef]
 }
 
-func (self *DynamicGraph) GetExplorer() *DynamicGraphExplorer {
-	return &DynamicGraphExplorer{
+func (self *CHPreprocGraph) GetExplorer() *CHPreprocGraphExplorer {
+	return &CHPreprocGraphExplorer{
 		graph:       self,
 		accessor:    self.topology.GetAccessor(),
 		sh_accessor: self.ch_topology.GetAccessor(),
 	}
 }
-func (self *DynamicGraph) NodeCount() int {
+func (self *CHPreprocGraph) NodeCount() int {
 	return self.store.NodeCount()
 }
-func (self *DynamicGraph) EdgeCount() int {
+func (self *CHPreprocGraph) EdgeCount() int {
 	return self.store.EdgeCount()
 }
-func (self *DynamicGraph) GetNode(node int32) Node {
+func (self *CHPreprocGraph) GetNode(node int32) Node {
 	return self.store.GetNode(node)
 }
-func (self *DynamicGraph) GetEdge(edge int32) Edge {
+func (self *CHPreprocGraph) GetEdge(edge int32) Edge {
 	return self.store.GetEdge(edge)
 }
-func (self *DynamicGraph) GetShortcut(id int32) CHShortcut {
+func (self *CHPreprocGraph) GetShortcut(id int32) CHShortcut {
 	return self.shortcuts[id]
 }
-func (self *DynamicGraph) GetWeight(id int32, is_shortcut bool) int32 {
+func (self *CHPreprocGraph) GetWeight(id int32, is_shortcut bool) int32 {
 	if is_shortcut {
 		return self.sh_weight[id]
 	} else {
 		return self.weight.GetEdgeWeight(id)
 	}
 }
-func (self *DynamicGraph) GetNodeLevel(id int32) int16 {
+func (self *CHPreprocGraph) GetNodeLevel(id int32) int16 {
 	return self.node_levels[id]
 }
-func (self *DynamicGraph) SetNodeLevel(id int32, level int16) {
+func (self *CHPreprocGraph) SetNodeLevel(id int32, level int16) {
 	self.node_levels[id] = level
 }
-func (self *DynamicGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int32, byte]) {
+func (self *CHPreprocGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int32, byte]) {
 	if node_a == node_b {
 		return
 	}
@@ -86,44 +86,14 @@ func (self *DynamicGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int32
 
 	self.ch_topology.AddEdgeEntries(node_a, node_b, int32(shc_id), 100)
 }
-func (self *DynamicGraph) GetWeightBetween(from, to int32) int32 {
-	accessor := self.topology.GetAccessor()
-	accessor.SetBaseNode(from, FORWARD)
-	for accessor.Next() {
-		edge_id := accessor.GetEdgeID()
-		other_id := accessor.GetOtherID()
-		if other_id == to {
-			return self.weight.GetEdgeWeight(edge_id)
-		}
-	}
-	ch_accessor := self.ch_topology.GetAccessor()
-	ch_accessor.SetBaseNode(from, FORWARD)
-	for ch_accessor.Next() {
-		edge_id := ch_accessor.GetEdgeID()
-		other_id := ch_accessor.GetOtherID()
-		if other_id == to {
-			return self.sh_weight[edge_id]
-		}
-	}
-	return -1
-}
 
-type DynamicGraphExplorer struct {
-	graph       *DynamicGraph
+type CHPreprocGraphExplorer struct {
+	graph       *CHPreprocGraph
 	accessor    TopologyAccessor
 	sh_accessor DynamicTopologyAccessor
 }
 
-func (self *DynamicGraphExplorer) _GetAdjacentEdges(node int32, direction Direction, typ Adjacency) IIterator[EdgeRef] {
-	self.accessor.SetBaseNode(node, direction)
-	self.sh_accessor.SetBaseNode(node, direction)
-	return &DynamicEdgeRefIterator{
-		accessor:    &self.accessor,
-		sh_accessor: &self.sh_accessor,
-		typ:         0,
-	}
-}
-func (self *DynamicGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
+func (self *CHPreprocGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
 	self.accessor.SetBaseNode(node, direction)
 	self.sh_accessor.SetBaseNode(node, direction)
 	for self.accessor.Next() {
@@ -145,13 +115,13 @@ func (self *DynamicGraphExplorer) ForAdjacentEdges(node int32, direction Directi
 		})
 	}
 }
-func (self *DynamicGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
+func (self *CHPreprocGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
 	return self.graph.GetWeight(edge.EdgeID, edge.IsCHShortcut())
 }
-func (self *DynamicGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
+func (self *CHPreprocGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
 	return 0
 }
-func (self *DynamicGraphExplorer) GetOtherNode(edge_id, node int32, is_shortcut bool) int32 {
+func (self *CHPreprocGraphExplorer) GetOtherNode(edge_id, node int32, is_shortcut bool) int32 {
 	if is_shortcut {
 		e := self.graph.GetShortcut(edge_id)
 		if node == e.NodeA {
@@ -172,40 +142,48 @@ func (self *DynamicGraphExplorer) GetOtherNode(edge_id, node int32, is_shortcut 
 		return -1
 	}
 }
-
-type DynamicEdgeRefIterator struct {
-	accessor    *TopologyAccessor
-	sh_accessor *DynamicTopologyAccessor
-	typ         byte
-}
-
-func (self *DynamicEdgeRefIterator) Next() (EdgeRef, bool) {
-	if self.typ == 0 {
-		ok := self.accessor.Next()
-		if ok {
-			edge_id := self.accessor.GetEdgeID()
-			other_id := self.accessor.GetOtherID()
-			return EdgeRef{
-				EdgeID:  edge_id,
-				OtherID: other_id,
-				_Type:   0,
-			}, true
-		} else {
-			self.typ = 1
+func (self *CHPreprocGraphExplorer) GetWeightBetween(from, to int32) int32 {
+	self.accessor.SetBaseNode(from, FORWARD)
+	for self.accessor.Next() {
+		edge_id := self.accessor.GetEdgeID()
+		other_id := self.accessor.GetOtherID()
+		if other_id == to {
+			return self.graph.GetWeight(edge_id, false)
 		}
 	}
-	if self.typ == 1 {
-		ok := self.sh_accessor.Next()
-		if ok {
-			edge_id := self.sh_accessor.GetEdgeID()
-			other_id := self.sh_accessor.GetOtherID()
+	self.sh_accessor.SetBaseNode(from, FORWARD)
+	for self.sh_accessor.Next() {
+		edge_id := self.sh_accessor.GetEdgeID()
+		other_id := self.sh_accessor.GetOtherID()
+		if other_id == to {
+			return self.graph.GetWeight(edge_id, true)
+		}
+	}
+	return -1
+}
+func (self *CHPreprocGraphExplorer) GetEdgeBetween(from, to int32) (EdgeRef, bool) {
+	self.accessor.SetBaseNode(from, FORWARD)
+	for self.accessor.Next() {
+		edge_id := self.accessor.GetEdgeID()
+		other_id := self.accessor.GetOtherID()
+		if other_id == to {
 			return EdgeRef{
 				EdgeID:  edge_id,
-				OtherID: other_id,
-				_Type:   100,
+				_Type:   0,
+				OtherID: to,
 			}, true
-		} else {
-			return EdgeRef{}, false
+		}
+	}
+	self.sh_accessor.SetBaseNode(from, FORWARD)
+	for self.sh_accessor.Next() {
+		edge_id := self.sh_accessor.GetEdgeID()
+		other_id := self.sh_accessor.GetOtherID()
+		if other_id == to {
+			return EdgeRef{
+				EdgeID:  edge_id,
+				_Type:   100,
+				OtherID: to,
+			}, true
 		}
 	}
 	return EdgeRef{}, false
@@ -215,7 +193,7 @@ func (self *DynamicEdgeRefIterator) Next() (EdgeRef, bool) {
 // transform to/from dynamic graph
 //*******************************************
 
-func TransformToDynamicGraph(g *Graph) *DynamicGraph {
+func TransformToCHPreprocGraph(g *Graph) *CHPreprocGraph {
 	ch_topology := NewDynamicTopology(g.NodeCount())
 	node_levels := NewArray[int16](g.NodeCount())
 
@@ -223,7 +201,7 @@ func TransformToDynamicGraph(g *Graph) *DynamicGraph {
 		node_levels[i] = 0
 	}
 
-	dg := DynamicGraph{
+	dg := CHPreprocGraph{
 		ch_topology: ch_topology,
 		node_levels: node_levels,
 		shortcuts:   NewList[CHShortcut](100),
@@ -237,7 +215,7 @@ func TransformToDynamicGraph(g *Graph) *DynamicGraph {
 	return &dg
 }
 
-func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
+func TransformFromCHPreprocGraph(dg *CHPreprocGraph) *CHGraph {
 	g := CHGraph{
 		store:       dg.store,
 		topology:    dg.topology,
@@ -263,7 +241,7 @@ func TransformFromDynamicGraph(dg *DynamicGraph) *CHGraph {
 // * is-contracted is used to limit search to nodes that have not been contracted yet (bool array containing every node in graph)
 //
 // * returns in-neighbours and out-neughbours
-func FindNeighbours(explorer *DynamicGraphExplorer, id int32, is_contracted Array[bool]) ([]int32, []int32) {
+func FindNeighbours(explorer *CHPreprocGraphExplorer, id int32, is_contracted Array[bool]) ([]int32, []int32) {
 	// compute out-going neighbours
 	out_neigbours := NewList[int32](4)
 	explorer.ForAdjacentEdges(id, FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
@@ -293,104 +271,92 @@ func FindNeighbours(explorer *DynamicGraphExplorer, id int32, is_contracted Arra
 	return in_neigbours, out_neigbours
 }
 
-// computes if a shortcut has to be added for the node contract between start and end
-// is_contracted contains true for every node that is already contracted (will not be used while finding shortest path)
-// returns true if a shortcut is needed and the two coresponding edges
-func CalcShortcut(start, end, contract int32, graph *DynamicGraph, explorer *DynamicGraphExplorer, heap PriorityQueue[int32, int32], flags Dict[int32, FlagSH], is_contracted Array[bool]) (bool, [2]Tuple[int32, byte]) {
-	w1 := graph.GetWeightBetween(start, contract)
-	if w1 == -1 {
-		return false, [2]Tuple[int32, byte]{}
+// Performs a local dijkstra search from start until all targets are found or hop_limit reached.
+// Flags will be set in flags-array.
+// is_contracted contains true for every node that is already contracted (will not be used while finding shortest path).
+func _RunLocalSearch(start int32, targets List[int32], explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Array[_FlagSH], flag_count int32, is_contracted Array[bool], hop_limit int32) {
+	flags[start] = _FlagSH{
+		_counter:    flag_count,
+		curr_length: 0,
 	}
-	w2 := graph.GetWeightBetween(contract, end)
-	if w2 == -1 {
-		return false, [2]Tuple[int32, byte]{}
+	target_count := targets.Length()
+	for _, target := range targets {
+		flags[target] = _FlagSH{
+			_counter:    flag_count,
+			curr_length: 1000000000,
+			_is_target:  true,
+		}
 	}
-	max_weight := w1 + w2
-
-	flags[start] = FlagSH{pathlength: 0, visited: false, prevEdge: -1, isShortcut: false}
+	start_flag := flags[start]
+	start_flag.curr_length = 0
+	flags[start] = start_flag
 	heap.Enqueue(start, 0)
 
-	var curr_id int32
+	found_count := 0
 	for {
-		curr_id, _ := heap.Dequeue()
-		curr_flag := flags[curr_id]
-		if curr_id == end {
+		curr_id, ok := heap.Dequeue()
+		if !ok {
 			break
 		}
+		curr_flag := flags[curr_id]
 		if curr_flag.visited {
 			continue
 		}
 		curr_flag.visited = true
 		flags[curr_id] = curr_flag
-		// curr_node := graph.GetNode(curr_id)
+		if curr_flag._is_target {
+			found_count += 1
+		}
+		if found_count >= target_count {
+			break
+		}
+		if curr_flag.curr_hops >= hop_limit {
+			continue
+		}
 		explorer.ForAdjacentEdges(curr_id, FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			edge_id := ref.EdgeID
 			other_id := ref.OtherID
 			if is_contracted[other_id] {
 				return
 			}
-			var other_flag FlagSH
-			if flags.ContainsKey(other_id) {
-				other_flag = flags[other_id]
-			} else {
-				other_flag = FlagSH{pathlength: 10000000, visited: false, prevEdge: -1, isShortcut: false}
+			other_flag := flags[other_id]
+			if other_flag._counter != flag_count {
+				other_flag = _FlagSH{
+					_counter:    flag_count,
+					curr_length: 1000000000,
+				}
 			}
 			weight := explorer.GetEdgeWeight(ref)
-			newlength := curr_flag.pathlength + weight
-			if newlength > max_weight {
-				return
-			}
-			if newlength < other_flag.pathlength {
-				other_flag.pathlength = newlength
-				other_flag.prevEdge = edge_id
-				other_flag.isShortcut = ref.IsShortcut()
+			newlength := curr_flag.curr_length + weight
+			if newlength < other_flag.curr_length {
+				other_flag.curr_length = newlength
+				other_flag.curr_hops = curr_flag.curr_hops + 1
+				other_flag.prev_edge = edge_id
+				other_flag.prev_node = curr_id
+				other_flag.is_shortcut = ref.IsShortcut()
 				heap.Enqueue(other_id, newlength)
 			}
 			flags[other_id] = other_flag
 		})
 	}
-
-	curr_id = end
-	curr_flag := flags[curr_id]
-	prev_id := explorer.GetOtherNode(curr_flag.prevEdge, curr_id, curr_flag.isShortcut)
-	if prev_id != contract {
-		return false, [2]Tuple[int32, byte]{}
-	}
-	prev_flag := flags[prev_id]
-	prev_prev_id := explorer.GetOtherNode(prev_flag.prevEdge, prev_id, prev_flag.isShortcut)
-	if prev_prev_id != start {
-		return false, [2]Tuple[int32, byte]{}
-	}
-	var pt byte
-	if prev_flag.isShortcut {
-		pt = 2
-	} else {
-		pt = 0
-	}
-	var ct byte
-	if curr_flag.isShortcut {
-		ct = 2
-	} else {
-		ct = 0
-	}
-	return true, [2]Tuple[int32, byte]{
-		{prev_flag.prevEdge, pt},
-		{curr_flag.prevEdge, ct},
-	}
 }
 
-type FlagSH struct {
-	pathlength int32
-	prevEdge   int32
-	isShortcut bool
-	visited    bool
+type _FlagSH struct {
+	_counter    int32
+	curr_length int32
+	curr_hops   int32
+	prev_edge   int32
+	prev_node   int32
+	is_shortcut bool
+	visited     bool
+	_is_target  bool
 }
 
 //*******************************************
 // preprocess ch
 //*******************************************
 
-func CalcContraction(graph *DynamicGraph) {
+func CalcContraction(graph *CHPreprocGraph) {
 	fmt.Println("started contracting graph")
 	// initialize graph
 	//graph.resetContraction();
@@ -400,7 +366,8 @@ func CalcContraction(graph *DynamicGraph) {
 
 	is_contracted := NewArray[bool](graph.NodeCount())
 	heap := NewPriorityQueue[int32, int32](10)
-	flags := NewDict[int32, FlagSH](10)
+	flags := NewArray[_FlagSH](graph.NodeCount())
+	flag_count := int32(1)
 	level := int16(0)
 	nodes := NewList[int32](graph.NodeCount())
 	explorer := graph.GetExplorer()
@@ -453,19 +420,60 @@ func CalcContraction(graph *DynamicGraph) {
 			}
 			in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
 			for i := 0; i < len(in_neigbours); i++ {
+				from := in_neigbours[i]
+				heap.Clear()
+				_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
 				for j := 0; j < len(out_neigbours); j++ {
-					from := in_neigbours[i]
 					to := out_neigbours[j]
 					if from == to {
 						continue
 					}
-					heap.Clear()
-					flags.Clear()
-					add_shortcut, edges := CalcShortcut(from, to, node_id, graph, explorer, heap, flags, is_contracted)
-					if !add_shortcut {
-						continue
+					edges := [2]Tuple[int32, byte]{}
+
+					to_flag := flags[to]
+					// is target hasnt been found by search always add shortcut
+					if !to_flag.visited || to_flag._counter != flag_count {
+						t_edge, _ := explorer.GetEdgeBetween(node_id, to)
+						if t_edge.IsCHShortcut() {
+							edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
+						} else {
+							edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
+						}
+						f_edge, _ := explorer.GetEdgeBetween(from, node_id)
+						if f_edge.IsCHShortcut() {
+							edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
+						} else {
+							edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
+						}
+					} else {
+						// check if shortest path goes through node
+						if to_flag.prev_node != node_id {
+							continue
+						}
+						node_flag := flags[node_id]
+						if node_flag.prev_node != from {
+							continue
+						}
+
+						// capture edges that form shortcut
+						if to_flag.is_shortcut {
+							edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
+						} else {
+							edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
+						}
+						if node_flag.is_shortcut {
+							edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
+						} else {
+							edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
+						}
 					}
+
+					// add shortcut to graph
 					graph.AddShortcut(from, to, edges)
+				}
+				flag_count += 1
+				if flag_count > 1000 {
+					flag_count = 3
 				}
 			}
 			is_contracted[node_id] = true
@@ -496,7 +504,7 @@ func CalcContraction(graph *DynamicGraph) {
 // preprocess ch 2
 //*******************************************
 
-func CalcContraction2(graph *DynamicGraph, contraction_order Array[int32]) {
+func CalcContraction2(graph *CHPreprocGraph, contraction_order Array[int32]) {
 	fmt.Println("started contracting graph")
 	// initialize graph
 	for i := 0; i < graph.NodeCount(); i++ {
@@ -504,7 +512,8 @@ func CalcContraction2(graph *DynamicGraph, contraction_order Array[int32]) {
 	}
 	is_contracted := NewArray[bool](graph.NodeCount())
 	heap := NewPriorityQueue[int32, int32](10)
-	flags := NewDict[int32, FlagSH](10)
+	flags := NewArray[_FlagSH](graph.NodeCount())
+	flag_count := int32(1)
 	explorer := graph.GetExplorer()
 
 	count := 0
@@ -525,19 +534,60 @@ func CalcContraction2(graph *DynamicGraph, contraction_order Array[int32]) {
 		in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
 		t2 := time.Now()
 		for i := 0; i < len(in_neigbours); i++ {
+			from := in_neigbours[i]
+			heap.Clear()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
 			for j := 0; j < len(out_neigbours); j++ {
-				from := in_neigbours[i]
 				to := out_neigbours[j]
 				if from == to {
 					continue
 				}
-				heap.Clear()
-				flags.Clear()
-				add_shortcut, edges := CalcShortcut(from, to, node_id, graph, explorer, heap, flags, is_contracted)
-				if !add_shortcut {
-					continue
+				edges := [2]Tuple[int32, byte]{}
+
+				to_flag := flags[to]
+				// is target hasnt been found by search always add shortcut
+				if !to_flag.visited || to_flag._counter != flag_count {
+					t_edge, _ := explorer.GetEdgeBetween(node_id, to)
+					if t_edge.IsCHShortcut() {
+						edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
+					} else {
+						edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
+					}
+					f_edge, _ := explorer.GetEdgeBetween(from, node_id)
+					if f_edge.IsCHShortcut() {
+						edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
+					} else {
+						edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
+					}
+				} else {
+					// check if shortest path goes through node
+					if to_flag.prev_node != node_id {
+						continue
+					}
+					node_flag := flags[node_id]
+					if node_flag.prev_node != from {
+						continue
+					}
+
+					// capture edges that form shortcut
+					if to_flag.is_shortcut {
+						edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
+					} else {
+						edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
+					}
+					if node_flag.is_shortcut {
+						edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
+					} else {
+						edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
+					}
 				}
+
+				// add shortcut to graph
 				graph.AddShortcut(from, to, edges)
+			}
+			flag_count += 1
+			if flag_count > 1000 {
+				flag_count = 3
 			}
 		}
 		dt_2 += time.Since(t2).Nanoseconds()
@@ -556,7 +606,7 @@ func CalcContraction2(graph *DynamicGraph, contraction_order Array[int32]) {
 	fmt.Println("finished contracting graph")
 }
 
-func SimpleNodeOrdering(graph *DynamicGraph) Array[int32] {
+func SimpleNodeOrdering(graph *CHPreprocGraph) Array[int32] {
 	nodes := NewArray[int32](graph.NodeCount())
 	for i := 0; i < graph.NodeCount(); i++ {
 		nodes[i] = int32(i)
@@ -679,4 +729,424 @@ func MarkNodesOnPath(start, end int32, sp_counts Array[int32], graph IGraph, hea
 		edge = flags[curr_id].prev_edge
 		curr_id = explorer.GetOtherNode(CreateEdgeRef(edge), curr_id)
 	}
+}
+
+//*******************************************
+// preprocess ch 3
+//*******************************************
+
+func CalcContraction3(graph *CHPreprocGraph) {
+	fmt.Println("started contracting graph...")
+
+	// initialize
+	is_contracted := NewArray[bool](graph.NodeCount())
+	node_levels := NewArray[int16](graph.NodeCount())
+	contracted_neighbours := NewArray[int](graph.NodeCount())
+	shortcut_edgecount := NewList[int8](10)
+
+	// initialize routing components
+	heap := NewPriorityQueue[int32, int32](10)
+	flags := NewArray[_FlagSH](graph.NodeCount())
+	explorer := graph.GetExplorer()
+
+	// compute node priorities
+	fmt.Println("computing priorities...")
+	node_priorities := NewArray[int](graph.NodeCount())
+	for i := 0; i < graph.NodeCount(); i++ {
+		node_priorities[i] = _ComputeNodePriority(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+	}
+
+	// put nodes into priority queue
+	contraction_order := NewPriorityQueue[Tuple[int32, int], int](graph.NodeCount())
+	for i := 0; i < graph.NodeCount(); i++ {
+		prio := node_priorities[i]
+		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
+	}
+
+	fmt.Println("start contracting nodes...")
+	flag_count := int32(3)
+	count := 0
+	for {
+		temp, ok := contraction_order.Dequeue()
+		if !ok {
+			break
+		}
+		node_id := temp.A
+		node_prio := temp.B
+		if is_contracted[node_id] || node_prio != node_priorities[node_id] {
+			continue
+		}
+
+		count += 1
+		if count%1000 == 0 {
+			fmt.Println("	node :", count, "/", graph.NodeCount())
+		}
+
+		// contract node
+		level := node_levels[node_id]
+		in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
+		for i := 0; i < len(in_neigbours); i++ {
+			from := in_neigbours[i]
+			heap.Clear()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+			for j := 0; j < len(out_neigbours); j++ {
+				to := out_neigbours[j]
+				if from == to {
+					continue
+				}
+				edges := [2]Tuple[int32, byte]{}
+
+				to_flag := flags[to]
+				// is target hasnt been found by search always add shortcut
+				if !to_flag.visited || to_flag._counter != flag_count {
+					t_edge, _ := explorer.GetEdgeBetween(node_id, to)
+					if t_edge.IsCHShortcut() {
+						edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
+					} else {
+						edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
+					}
+					f_edge, _ := explorer.GetEdgeBetween(from, node_id)
+					if f_edge.IsCHShortcut() {
+						edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
+					} else {
+						edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
+					}
+				} else {
+					// check if shortest path goes through node
+					if to_flag.prev_node != node_id {
+						continue
+					}
+					node_flag := flags[node_id]
+					if node_flag.prev_node != from {
+						continue
+					}
+
+					// capture edges that form shortcut
+					if to_flag.is_shortcut {
+						edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
+					} else {
+						edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
+					}
+					if node_flag.is_shortcut {
+						edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
+					} else {
+						edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
+					}
+				}
+
+				// add shortcut to graph
+				graph.AddShortcut(from, to, edges)
+
+				// compute number of edges representing the shortcut (limited to 3)
+				ec := int8(0)
+				if edges[0].B == 0 {
+					ec += 1
+				} else {
+					ec += shortcut_edgecount[edges[0].A]
+				}
+				if edges[1].B == 0 {
+					ec += 1
+				} else {
+					ec += shortcut_edgecount[edges[1].A]
+				}
+				if ec > 3 {
+					ec = 3
+				}
+				shortcut_edgecount.Add(ec)
+			}
+			flag_count += 1
+			if flag_count > 1000 {
+				flag_count = 3
+			}
+		}
+		// set node to contracted
+		is_contracted[node_id] = true
+
+		// update neighbours
+		for i := 0; i < len(in_neigbours); i++ {
+			nb := in_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+		for i := 0; i < len(out_neigbours); i++ {
+			nb := out_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+	}
+	for i := 0; i < graph.NodeCount(); i++ {
+		graph.SetNodeLevel(int32(i), node_levels[i])
+	}
+	fmt.Println("finished contracting graph")
+}
+
+func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Array[_FlagSH], flag_counts [2]int32, is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int], shortcut_edgecount List[int8]) int {
+	in_neigbours, out_neigbours := FindNeighbours(explorer, node, is_contracted)
+	edge_diff := -(len(in_neigbours) + len(out_neigbours))
+	edge_count := int8(0)
+	for i := 0; i < len(in_neigbours); i++ {
+		from := in_neigbours[i]
+		flag_count := flag_counts[i%2]
+		heap.Clear()
+		_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+		for j := 0; j < len(out_neigbours); j++ {
+			to := out_neigbours[j]
+			if from == to {
+				continue
+			}
+			edges := [2]Tuple[int32, byte]{}
+			to_flag := flags[to]
+			if to_flag._counter != flag_count {
+				t_edge, _ := explorer.GetEdgeBetween(node, to)
+				if t_edge.IsCHShortcut() {
+					edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
+				} else {
+					edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
+				}
+				f_edge, _ := explorer.GetEdgeBetween(from, node)
+				if f_edge.IsCHShortcut() {
+					edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
+				} else {
+					edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
+				}
+			} else {
+				// check if shortest path goes through node
+				if to_flag.prev_node != node {
+					continue
+				}
+				node_flag := flags[node]
+				if node_flag.prev_node != from {
+					continue
+				}
+
+				// capture edges that form shortcut
+				if to_flag.is_shortcut {
+					edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
+				} else {
+					edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
+				}
+				if node_flag.is_shortcut {
+					edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
+				} else {
+					edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
+				}
+			}
+			edge_diff += 1
+			// compute number of edges representing the shortcut (limited to 3)
+			ec := int8(0)
+			if edges[0].B == 0 {
+				ec += 1
+			} else {
+				ec += shortcut_edgecount[edges[0].A]
+			}
+			if edges[1].B == 0 {
+				ec += 1
+			} else {
+				ec += shortcut_edgecount[edges[1].A]
+			}
+			if ec > 3 {
+				ec = 3
+			}
+			edge_count += ec
+		}
+	}
+
+	return 2*edge_diff + contracted_neighbours[node] + int(edge_count) + 5*int(node_levels[node])
+}
+
+func CalcContraction4(graph *CHPreprocGraph) {
+	fmt.Println("started contracting graph...")
+
+	// initialize
+	is_contracted := NewArray[bool](graph.NodeCount())
+	node_levels := NewArray[int16](graph.NodeCount())
+	contracted_neighbours := NewArray[int](graph.NodeCount())
+
+	// initialize routing components
+	heap := NewPriorityQueue[int32, int32](10)
+	flags := NewArray[_FlagSH](graph.NodeCount())
+	explorer := graph.GetExplorer()
+
+	// compute node priorities
+	fmt.Println("computing priorities...")
+	node_priorities := NewArray[int](graph.NodeCount())
+	for i := 0; i < graph.NodeCount(); i++ {
+		node_priorities[i] = _ComputeNodePriority2(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours)
+	}
+
+	// put nodes into priority queue
+	contraction_order := NewPriorityQueue[Tuple[int32, int], int](graph.NodeCount())
+	for i := 0; i < graph.NodeCount(); i++ {
+		prio := node_priorities[i]
+		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
+	}
+
+	fmt.Println("start contracting nodes...")
+	flag_count := int32(3)
+	count := 0
+	for {
+		temp, ok := contraction_order.Dequeue()
+		if !ok {
+			break
+		}
+		node_id := temp.A
+		node_prio := temp.B
+		if is_contracted[node_id] || node_prio != node_priorities[node_id] {
+			continue
+		}
+
+		count += 1
+		if count%1000 == 0 {
+			fmt.Println("	node :", count, "/", graph.NodeCount())
+		}
+
+		// contract node
+		level := node_levels[node_id]
+		in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
+		for i := 0; i < len(in_neigbours); i++ {
+			from := in_neigbours[i]
+			heap.Clear()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+			for j := 0; j < len(out_neigbours); j++ {
+				to := out_neigbours[j]
+				if from == to {
+					continue
+				}
+				edges := [2]Tuple[int32, byte]{}
+
+				to_flag := flags[to]
+				// is target hasnt been found by search always add shortcut
+				if !to_flag.visited || to_flag._counter != flag_count {
+					t_edge, _ := explorer.GetEdgeBetween(node_id, to)
+					if t_edge.IsCHShortcut() {
+						edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
+					} else {
+						edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
+					}
+					f_edge, _ := explorer.GetEdgeBetween(from, node_id)
+					if f_edge.IsCHShortcut() {
+						edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
+					} else {
+						edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
+					}
+				} else {
+					// check if shortest path goes through node
+					if to_flag.prev_node != node_id {
+						continue
+					}
+					node_flag := flags[node_id]
+					if node_flag.prev_node != from {
+						continue
+					}
+
+					// capture edges that form shortcut
+					if to_flag.is_shortcut {
+						edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
+					} else {
+						edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
+					}
+					if node_flag.is_shortcut {
+						edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
+					} else {
+						edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
+					}
+				}
+
+				// add shortcut to graph
+				graph.AddShortcut(from, to, edges)
+			}
+			flag_count += 1
+			if flag_count > 1000 {
+				flag_count = 3
+			}
+		}
+		// set node to contracted
+		is_contracted[node_id] = true
+
+		// update neighbours
+		for i := 0; i < len(in_neigbours); i++ {
+			nb := in_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			prio := _ComputeNodePriority2(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+		for i := 0; i < len(out_neigbours); i++ {
+			nb := out_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			prio := _ComputeNodePriority2(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+	}
+	for i := 0; i < graph.NodeCount(); i++ {
+		graph.SetNodeLevel(int32(i), node_levels[i])
+	}
+	fmt.Println("finished contracting graph")
+}
+
+func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Array[_FlagSH], flag_counts [2]int32, is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int]) int {
+	in_neigbours, out_neigbours := FindNeighbours(explorer, node, is_contracted)
+	edge_diff := -(len(in_neigbours) + len(out_neigbours))
+	for i := 0; i < len(in_neigbours); i++ {
+		from := in_neigbours[i]
+		flag_count := flag_counts[i%2]
+		heap.Clear()
+		_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+		for j := 0; j < len(out_neigbours); j++ {
+			to := out_neigbours[j]
+			if from == to {
+				continue
+			}
+			edges := [2]Tuple[int32, byte]{}
+			to_flag := flags[to]
+			if to_flag._counter != flag_count {
+				t_edge, _ := explorer.GetEdgeBetween(node, to)
+				if t_edge.IsCHShortcut() {
+					edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
+				} else {
+					edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
+				}
+				f_edge, _ := explorer.GetEdgeBetween(from, node)
+				if f_edge.IsCHShortcut() {
+					edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
+				} else {
+					edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
+				}
+			} else {
+				// check if shortest path goes through node
+				if to_flag.prev_node != node {
+					continue
+				}
+				node_flag := flags[node]
+				if node_flag.prev_node != from {
+					continue
+				}
+
+				// capture edges that form shortcut
+				if to_flag.is_shortcut {
+					edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
+				} else {
+					edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
+				}
+				if node_flag.is_shortcut {
+					edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
+				} else {
+					edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
+				}
+			}
+			edge_diff += 1
+		}
+	}
+
+	// return 2*edge_diff + contracted_neighbours[node] + 5*int(node_levels[node])
+	return 2*edge_diff + contracted_neighbours[node]
 }
