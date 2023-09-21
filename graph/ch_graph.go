@@ -36,13 +36,13 @@ type ICHGraph interface {
 type CHGraph struct {
 	// Base Graph
 	store    GraphStore
-	topology TopologyStore
+	topology AdjacencyArray
 	weight   DefaultWeighting
 	index    KDTree[int32]
 
 	// Additional Storage
 	ch_store    CHStore
-	ch_topology TopologyStore
+	ch_topology AdjacencyArray
 }
 
 func (self *CHGraph) GetDefaultExplorer() IGraphExplorer {
@@ -119,8 +119,8 @@ func (self *CHGraph) GetIndex() IGraphIndex {
 
 type CHGraphExplorer struct {
 	graph       *CHGraph
-	accessor    TopologyAccessor
-	sh_accessor TopologyAccessor
+	accessor    AdjArrayAccessor
+	sh_accessor AdjArrayAccessor
 	weight      IWeighting
 	sh_weight   IWeighting
 }

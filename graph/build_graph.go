@@ -8,17 +8,17 @@ import (
 // utility methods
 //*******************************************
 
-func _BuildTopology(store GraphStore) TopologyStore {
+func _BuildTopology(store GraphStore) AdjacencyArray {
 	nodes := store.nodes
 	edges := store.edges
 
-	dyn := NewDynamicTopology(nodes.Length())
+	dyn := NewAdjacencyList(nodes.Length())
 	for id, edge := range edges {
 		dyn.AddFWDEntry(edge.NodeA, edge.NodeB, int32(id), 0)
 		dyn.AddBWDEntry(edge.NodeA, edge.NodeB, int32(id), 0)
 	}
 
-	return *DynamicToTopology(&dyn)
+	return *AdjacencyListToArray(&dyn)
 }
 
 func _BuildWeighting(store GraphStore) DefaultWeighting {

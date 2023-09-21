@@ -13,7 +13,7 @@ import (
 //*******************************************
 
 func StoreGraph(graph *Graph, filename string) {
-	graph.topology._Store(filename + "-graph")
+	_StoreUntypedAdjacency(&graph.topology, filename+"-graph")
 	_StoreGraphStorage(graph.store, filename)
 	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
 
@@ -22,9 +22,9 @@ func StoreGraph(graph *Graph, filename string) {
 }
 
 func StoreTiledGraph(graph *TiledGraph, filename string) {
-	graph.topology._Store(filename + "-graph")
+	_StoreUntypedAdjacency(&graph.topology, filename+"-graph")
 	_StoreGraphStorage(graph.store, filename)
-	_StoreTypedTopology(&graph.skip_topology, filename+"-skip_topology")
+	_StoreTypedAdjacency(&graph.skip_topology, filename+"-skip_topology")
 	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
 	_StoreTiledStorage(graph.skip_store, filename)
 }
@@ -40,9 +40,9 @@ func StoreTiledGraph3(graph *TiledGraph3, filename string) {
 }
 
 func StoreCHGraph(graph *CHGraph, filename string) {
-	graph.topology._Store(filename + "-graph")
+	_StoreUntypedAdjacency(&graph.topology, filename+"-graph")
 	_StoreGraphStorage(graph.store, filename)
-	graph.ch_topology._Store(filename + "-ch_graph")
+	_StoreUntypedAdjacency(&graph.ch_topology, filename+"-ch_graph")
 	_StoreDefaultWeighting(&graph.weight, filename+"-fastest_weighting")
 	_StoreCHStorage(graph.ch_store, filename)
 }

@@ -150,7 +150,7 @@ func CreateGraph(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) *Graph {
 			node_geoms: node_geoms,
 			edge_geoms: edge_geoms,
 		},
-		topology: TopologyStore{node_entries: Array[_NodeEntry](node_refs), fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs), bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs)},
+		topology: AdjacencyArray{node_entries: Array[_NodeEntry](node_refs), fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs), bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs)},
 		weight:   DefaultWeighting{edge_weights},
 	}
 }

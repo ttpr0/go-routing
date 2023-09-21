@@ -8,7 +8,7 @@ type TiledGraph4 struct {
 	TiledGraph3
 
 	// Backward-Up Topology
-	up_topology TypedTopologyStore
+	up_topology AdjacencyArray
 }
 
 func (self *TiledGraph4) GetDefaultExplorer() IGraphExplorer {
@@ -24,9 +24,9 @@ func (self *TiledGraph4) GetDefaultExplorer() IGraphExplorer {
 
 type TiledGraph4Explorer struct {
 	graph         *TiledGraph
-	accessor      TopologyAccessor
-	skip_accessor TypedTopologyAccessor
-	up_accessor   TypedTopologyAccessor
+	accessor      AdjArrayAccessor
+	skip_accessor AdjArrayAccessor
+	up_accessor   AdjArrayAccessor
 	weight        IWeighting
 	skip_weight   IWeighting
 }
@@ -105,7 +105,7 @@ func (self *TiledGraph4Explorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 }
 
 func TransformToTiled5(graph *TiledGraph3) *TiledGraph4 {
-	dyn := NewDynamicTopology(graph.NodeCount())
+	dyn := NewAdjacencyList(graph.NodeCount())
 
 	for _, edge := range graph.index_edges {
 		dyn.AddBWDEntry(edge.From, edge.To, 0, 0)
@@ -114,6 +114,6 @@ func TransformToTiled5(graph *TiledGraph3) *TiledGraph4 {
 	return &TiledGraph4{
 		TiledGraph3: *graph,
 
-		up_topology: *DynamicToTypedTopology(&dyn),
+		up_topology: *AdjacencyListToArray(&dyn),
 	}
 }

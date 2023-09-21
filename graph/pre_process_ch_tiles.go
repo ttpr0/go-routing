@@ -191,8 +191,8 @@ func TiledNodeOrdering(graph *TiledGraph) (Array[int32], Array[bool]) {
 //*******************************************
 
 // creates topology with cross-border edges (type 10), skip-edges (type 20) and shortcuts (type 100)
-func CreateCHSkipTopology(graph *TiledGraph, ch_shortcuts List[CHShortcut], ch_weights List[int32], border_nodes Array[bool]) (*TypedTopologyStore, List[Shortcut], List[int32]) {
-	dyn_top := NewDynamicTopology(graph.NodeCount())
+func CreateCHSkipTopology(graph *TiledGraph, ch_shortcuts List[CHShortcut], ch_weights List[int32], border_nodes Array[bool]) (*AdjacencyArray, List[Shortcut], List[int32]) {
+	dyn_top := NewAdjacencyList(graph.NodeCount())
 
 	edge_types := graph.skip_store.edge_types
 	for i := 0; i < graph.EdgeCount(); i++ {
@@ -220,12 +220,12 @@ func CreateCHSkipTopology(graph *TiledGraph, ch_shortcuts List[CHShortcut], ch_w
 		}
 	}
 
-	return DynamicToTypedTopology(&dyn_top), shortcuts, shortcut_weights
+	return AdjacencyListToArray(&dyn_top), shortcuts, shortcut_weights
 }
 
 // creates topology with cross-border edges (type 10), skip-edges (type 20) and shortcuts (type 100)
-func CreateCHSkipTopology2(dg *CHPreprocGraph, border_nodes Array[bool], node_tiles Array[int16]) (*TypedTopologyStore, List[Shortcut], List[int32]) {
-	dyn_top := NewDynamicTopology(dg.NodeCount())
+func CreateCHSkipTopology2(dg *CHPreprocGraph, border_nodes Array[bool], node_tiles Array[int16]) (*AdjacencyArray, List[Shortcut], List[int32]) {
+	dyn_top := NewAdjacencyList(dg.NodeCount())
 	shortcuts := NewList[Shortcut](100)
 	shortcut_weights := NewList[int32](100)
 
@@ -259,7 +259,7 @@ func CreateCHSkipTopology2(dg *CHPreprocGraph, border_nodes Array[bool], node_ti
 		})
 	}
 
-	return DynamicToTypedTopology(&dyn_top), shortcuts, shortcut_weights
+	return AdjacencyListToArray(&dyn_top), shortcuts, shortcut_weights
 }
 
 // computes border and interior nodes of graph tile

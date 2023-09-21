@@ -18,7 +18,7 @@ func LoadGraph(file string) IGraph {
 	store := _LoadGraphStorage(file)
 	nodecount := store.NodeCount()
 	edgecount := store.EdgeCount()
-	topology := _LoadTopologyStore(file+"-graph", nodecount)
+	topology := _LoadUntypedAdjacency(file+"-graph", nodecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
 	index := _BuildKDTreeIndex(store)
 
@@ -34,9 +34,9 @@ func LoadCHGraph(file string) ICHGraph {
 	store := _LoadGraphStorage(file)
 	nodecount := store.NodeCount()
 	edgecount := store.EdgeCount()
-	topology := _LoadTopologyStore(file+"-graph", nodecount)
+	topology := _LoadUntypedAdjacency(file+"-graph", nodecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
-	ch_topology := _LoadTopologyStore(file+"-ch_graph", nodecount)
+	ch_topology := _LoadUntypedAdjacency(file+"-ch_graph", nodecount)
 	ch_store := _LoadCHStorage(file, nodecount)
 	chg := &CHGraph{
 		store:       store,
@@ -54,8 +54,8 @@ func LoadTiledGraph(file string) ITiledGraph {
 	store := _LoadGraphStorage(file)
 	nodecount := store.NodeCount()
 	edgecount := store.EdgeCount()
-	topology := _LoadTopologyStore(file+"-graph", nodecount)
-	skip_topology := _LoadTypedTopology(file+"-skip_topology", nodecount)
+	topology := _LoadUntypedAdjacency(file+"-graph", nodecount)
+	skip_topology := _LoadTypedAdjacency(file+"-skip_topology", nodecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
 	skip_store := _LoadTiledStorage(file, nodecount, edgecount)
 	fmt.Println("start buidling index")

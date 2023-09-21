@@ -15,14 +15,14 @@ import (
 
 type CHPreprocGraph struct {
 	// added attributes to build ch
-	ch_topology DynamicTopologyStore
+	ch_topology AdjacencyList
 	node_levels Array[int16]
 	shortcuts   List[CHShortcut]
 	sh_weight   List[int32]
 
 	// underlying base graph
 	store    GraphStore
-	topology TopologyStore
+	topology AdjacencyArray
 	weight   DefaultWeighting
 	index    KDTree[int32]
 }
@@ -89,8 +89,8 @@ func (self *CHPreprocGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int
 
 type CHPreprocGraphExplorer struct {
 	graph       *CHPreprocGraph
-	accessor    TopologyAccessor
-	sh_accessor DynamicTopologyAccessor
+	accessor    AdjArrayAccessor
+	sh_accessor AdjListAccessor
 }
 
 func (self *CHPreprocGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
@@ -194,7 +194,7 @@ func (self *CHPreprocGraphExplorer) GetEdgeBetween(from, to int32) (EdgeRef, boo
 //*******************************************
 
 func TransformToCHPreprocGraph(g *Graph) *CHPreprocGraph {
-	ch_topology := NewDynamicTopology(g.NodeCount())
+	ch_topology := NewAdjacencyList(g.NodeCount())
 	node_levels := NewArray[int16](g.NodeCount())
 
 	for i := 0; i < g.NodeCount(); i++ {
@@ -219,7 +219,7 @@ func TransformFromCHPreprocGraph(dg *CHPreprocGraph) *CHGraph {
 	g := CHGraph{
 		store:       dg.store,
 		topology:    dg.topology,
-		ch_topology: *DynamicToTopology(&dg.ch_topology),
+		ch_topology: *AdjacencyListToArray(&dg.ch_topology),
 		ch_store: CHStore{
 			shortcuts:   Array[CHShortcut](dg.shortcuts),
 			node_levels: dg.node_levels,

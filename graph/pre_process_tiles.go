@@ -319,8 +319,8 @@ func CalcShortcutEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_st
 //*******************************************
 
 // creates topology with cross-border edges (type 10), skip edges (type 20) and shortcuts (type 100)
-func CreateSkipTopology(graph *Graph, skip_store *TiledStore) *TypedTopologyStore {
-	dyn_top := NewDynamicTopology(graph.NodeCount())
+func CreateSkipTopology(graph *Graph, skip_store *TiledStore) *AdjacencyArray {
+	dyn_top := NewAdjacencyList(graph.NodeCount())
 
 	for i := 0; i < graph.EdgeCount(); i++ {
 		edge_id := int32(i)
@@ -338,7 +338,7 @@ func CreateSkipTopology(graph *Graph, skip_store *TiledStore) *TypedTopologyStor
 		dyn_top.AddEdgeEntries(shc.NodeA, shc.NodeB, shc_id, 100)
 	}
 
-	return DynamicToTypedTopology(&dyn_top)
+	return AdjacencyListToArray(&dyn_top)
 }
 
 //*******************************************

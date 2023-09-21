@@ -1,8 +1,8 @@
 package graph
 
 func CreateCHGraph2(g *CHGraph) *CHGraph2 {
-	up_top := NewDynamicTopology(g.NodeCount())
-	down_top := NewDynamicTopology(g.NodeCount())
+	up_top := NewAdjacencyList(g.NodeCount())
+	down_top := NewAdjacencyList(g.NodeCount())
 
 	accessor := g.topology.GetAccessor()
 	ch_accessor := g.ch_topology.GetAccessor()
@@ -44,8 +44,8 @@ func CreateCHGraph2(g *CHGraph) *CHGraph2 {
 	return &CHGraph2{
 		CHGraph: *g,
 
-		up_topology:   *DynamicToTypedTopology(&up_top),
-		down_topology: *DynamicToTypedTopology(&down_top),
+		up_topology:   *AdjacencyListToArray(&up_top),
+		down_topology: *AdjacencyListToArray(&down_top),
 	}
 }
 
@@ -53,8 +53,8 @@ type CHGraph2 struct {
 	CHGraph
 
 	// additional topologies
-	up_topology   TypedTopologyStore
-	down_topology TypedTopologyStore
+	up_topology   AdjacencyArray
+	down_topology AdjacencyArray
 }
 
 func (self *CHGraph2) GetDefaultExplorer() IGraphExplorer {
@@ -71,10 +71,10 @@ func (self *CHGraph2) GetDefaultExplorer() IGraphExplorer {
 
 type CHGraph2Explorer struct {
 	graph         *CHGraph2
-	accessor      TopologyAccessor
-	sh_accessor   TopologyAccessor
-	up_accessor   TypedTopologyAccessor
-	down_accessor TypedTopologyAccessor
+	accessor      AdjArrayAccessor
+	sh_accessor   AdjArrayAccessor
+	up_accessor   AdjArrayAccessor
+	down_accessor AdjArrayAccessor
 	weight        IWeighting
 	sh_weight     IWeighting
 }

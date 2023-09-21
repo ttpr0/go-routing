@@ -36,13 +36,13 @@ type ITiledGraph interface {
 type TiledGraph struct {
 	// Base Graph
 	store    GraphStore
-	topology TopologyStore
+	topology AdjacencyArray
 	weight   DefaultWeighting
 	index    KDTree[int32]
 
 	// Tiles Storage
 	skip_store    TiledStore
-	skip_topology TypedTopologyStore
+	skip_topology AdjacencyArray
 }
 
 func (self *TiledGraph) GetDefaultExplorer() IGraphExplorer {
@@ -110,8 +110,8 @@ func (self *TiledGraph) GetIndex() IGraphIndex {
 
 type TiledGraphExplorer struct {
 	graph         *TiledGraph
-	accessor      TopologyAccessor
-	skip_accessor TypedTopologyAccessor
+	accessor      AdjArrayAccessor
+	skip_accessor AdjArrayAccessor
 	weight        IWeighting
 	skip_weight   IWeighting
 }

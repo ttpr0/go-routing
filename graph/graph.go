@@ -45,7 +45,7 @@ type IGraphIndex interface {
 
 type Graph struct {
 	store    GraphStore
-	topology TopologyStore
+	topology AdjacencyArray
 	weight   DefaultWeighting
 	index    KDTree[int32]
 }
@@ -97,7 +97,7 @@ func (self *Graph) GetIndex() IGraphIndex {
 
 type BaseGraphExplorer struct {
 	graph    *Graph
-	accessor TopologyAccessor
+	accessor AdjArrayAccessor
 	weight   IWeighting
 }
 
