@@ -203,7 +203,7 @@ func (self *CHGraphExplorer) ForAdjacentEdges(node int32, direction Direction, t
 		this_level := self.graph.GetNodeLevel(node)
 		for self.accessor.Next() {
 			other_id := self.accessor.GetOtherID()
-			if this_level >= self.graph.GetNodeLevel(other_id) {
+			if this_level <= self.graph.GetNodeLevel(other_id) {
 				continue
 			}
 			edge_id := self.accessor.GetEdgeID()
@@ -215,7 +215,7 @@ func (self *CHGraphExplorer) ForAdjacentEdges(node int32, direction Direction, t
 		}
 		for self.sh_accessor.Next() {
 			other_id := self.sh_accessor.GetOtherID()
-			if this_level >= self.graph.GetNodeLevel(other_id) {
+			if this_level <= self.graph.GetNodeLevel(other_id) {
 				continue
 			}
 			edge_id := self.sh_accessor.GetEdgeID()
