@@ -30,6 +30,20 @@ func LoadGraph(file string) IGraph {
 	}
 }
 
+func LoadGraph2(file string) IGraph {
+	store := _LoadGraphStorage(file)
+	topology := _BuildTopology(store)
+	weighting := _BuildWeighting(store)
+	index := _BuildKDTreeIndex(store)
+
+	return &Graph{
+		store:    store,
+		topology: topology,
+		weight:   weighting,
+		index:    index,
+	}
+}
+
 func LoadCHGraph(file string) ICHGraph {
 	store := _LoadGraphStorage(file)
 	nodecount := store.NodeCount()
@@ -46,6 +60,25 @@ func LoadCHGraph(file string) ICHGraph {
 		weight:      *weights,
 	}
 	SortNodesByLevel(chg)
+	chg.index = _BuildKDTreeIndex(chg.store)
+	return chg
+}
+
+func LoadCHGraph2(file string) ICHGraph {
+	store := _LoadGraphStorage(file)
+	nodecount := store.NodeCount()
+	edgecount := store.EdgeCount()
+	topology := _LoadUntypedAdjacency(file+"-graph", nodecount)
+	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
+	ch_topology := _LoadUntypedAdjacency(file+"-ch_graph", nodecount)
+	ch_store := _LoadCHStorage(file, nodecount)
+	chg := &CHGraph{
+		store:       store,
+		topology:    *topology,
+		ch_topology: *ch_topology,
+		ch_store:    ch_store,
+		weight:      *weights,
+	}
 	chg.index = _BuildKDTreeIndex(chg.store)
 	return chg
 }

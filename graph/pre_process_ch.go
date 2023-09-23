@@ -1150,3 +1150,201 @@ func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap Pr
 	// return 2*edge_diff + contracted_neighbours[node] + 5*int(node_levels[node])
 	return 2*edge_diff + contracted_neighbours[node]
 }
+
+//*******************************************
+// preprocess ch using partitions
+//*******************************************
+
+// Computes contraction using 2*ED + CN + EC + 5*L.
+// Ignores border nodes until all interior nodes are contracted.
+func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
+	fmt.Println("started contracting graph...")
+
+	// initialize
+	is_contracted := NewArray[bool](graph.NodeCount())
+	node_levels := NewArray[int16](graph.NodeCount())
+	contracted_neighbours := NewArray[int](graph.NodeCount())
+	shortcut_edgecount := NewList[int8](10)
+
+	// initialize routing components
+	heap := NewPriorityQueue[int32, int32](10)
+	flags := NewArray[_FlagSH](graph.NodeCount())
+	explorer := graph.GetExplorer()
+
+	// compute node priorities
+	fmt.Println("computing priorities...")
+	is_border := _IsBorderNode(graph, node_tiles)
+	border_count := 0
+	node_priorities := NewArray[int](graph.NodeCount())
+	contraction_order := NewPriorityQueue[Tuple[int32, int], int](graph.NodeCount())
+	for i := 0; i < graph.NodeCount(); i++ {
+		if is_border[i] {
+			node_priorities[i] = 10000000000
+			border_count += 1
+		}
+		prio := _ComputeNodePriority(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+		node_priorities[i] = prio
+		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
+	}
+
+	fmt.Println("start contracting nodes...")
+	flag_count := int32(3)
+	contract_count := 0
+	is_border_contraction := false
+	for {
+		temp, ok := contraction_order.Dequeue()
+		if !ok {
+			break
+		}
+		node_id := temp.A
+		node_prio := temp.B
+		if is_contracted[node_id] || node_prio != node_priorities[node_id] {
+			continue
+		}
+
+		contract_count += 1
+		if contract_count%1000 == 0 {
+			fmt.Println("	node :", contract_count, "/", graph.NodeCount())
+		}
+
+		if contract_count == graph.NodeCount()-border_count {
+			is_border_contraction = true
+			for i := 0; i < graph.NodeCount(); i++ {
+				if !is_border[i] {
+					continue
+				}
+				prio := _ComputeNodePriority(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+				node_priorities[i] = prio
+				contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
+			}
+		}
+
+		// contract node
+		level := node_levels[node_id]
+		in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
+		for i := 0; i < len(in_neigbours); i++ {
+			from := in_neigbours[i]
+			heap.Clear()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+			for j := 0; j < len(out_neigbours); j++ {
+				to := out_neigbours[j]
+				if from == to {
+					continue
+				}
+				edges := [2]Tuple[int32, byte]{}
+
+				to_flag := flags[to]
+				// is target hasnt been found by search always add shortcut
+				if !to_flag.visited || to_flag._counter != flag_count {
+					t_edge, _ := explorer.GetEdgeBetween(node_id, to)
+					if t_edge.IsCHShortcut() {
+						edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
+					} else {
+						edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
+					}
+					f_edge, _ := explorer.GetEdgeBetween(from, node_id)
+					if f_edge.IsCHShortcut() {
+						edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
+					} else {
+						edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
+					}
+				} else {
+					// check if shortest path goes through node
+					if to_flag.prev_node != node_id {
+						continue
+					}
+					node_flag := flags[node_id]
+					if node_flag.prev_node != from {
+						continue
+					}
+
+					// capture edges that form shortcut
+					if to_flag.is_shortcut {
+						edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
+					} else {
+						edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
+					}
+					if node_flag.is_shortcut {
+						edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
+					} else {
+						edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
+					}
+				}
+
+				// add shortcut to graph
+				graph.AddShortcut(from, to, edges)
+
+				// compute number of edges representing the shortcut (limited to 3)
+				ec := int8(0)
+				if edges[0].B == 0 {
+					ec += 1
+				} else {
+					ec += shortcut_edgecount[edges[0].A]
+				}
+				if edges[1].B == 0 {
+					ec += 1
+				} else {
+					ec += shortcut_edgecount[edges[1].A]
+				}
+				if ec > 3 {
+					ec = 3
+				}
+				shortcut_edgecount.Add(ec)
+			}
+			flag_count += 1
+			if flag_count > 1000 {
+				flag_count = 3
+			}
+		}
+		// set node to contracted
+		is_contracted[node_id] = true
+
+		// update neighbours
+		for i := 0; i < len(in_neigbours); i++ {
+			nb := in_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			if is_border[nb] && !is_border_contraction {
+				continue
+			}
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+		for i := 0; i < len(out_neigbours); i++ {
+			nb := out_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			if is_border[nb] && !is_border_contraction {
+				continue
+			}
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+	}
+	for i := 0; i < graph.NodeCount(); i++ {
+		graph.SetNodeLevel(int32(i), node_levels[i])
+	}
+	fmt.Println("finished contracting graph")
+}
+
+func _IsBorderNode(graph *CHPreprocGraph, node_tiles Array[int16]) Array[bool] {
+	is_border := NewArray[bool](graph.NodeCount())
+
+	explorer := graph.GetExplorer()
+	for i := 0; i < graph.NodeCount(); i++ {
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
+			if node_tiles[i] != node_tiles[ref.OtherID] {
+				is_border[i] = true
+			}
+		})
+		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
+			if node_tiles[i] != node_tiles[ref.OtherID] {
+				is_border[i] = true
+			}
+		})
+	}
+
+	return is_border
+}

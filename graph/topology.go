@@ -352,7 +352,6 @@ func (self *AdjacencyArray) _ReorderNodes(mapping Array[int32]) {
 	for i, id := range mapping {
 		node_refs[id] = self.node_entries[i]
 	}
-	self.node_entries = Array[_NodeEntry](node_refs)
 
 	fwd_edge_refs := NewList[_EdgeEntry](self.fwd_edge_entries.Length())
 	bwd_edge_refs := NewList[_EdgeEntry](self.bwd_edge_entries.Length())
@@ -387,6 +386,7 @@ func (self *AdjacencyArray) _ReorderNodes(mapping Array[int32]) {
 		fwd_start += fwd_count
 		bwd_start += bwd_count
 	}
+	self.node_entries = Array[_NodeEntry](node_refs)
 	self.fwd_edge_entries = Array[_EdgeEntry](fwd_edge_refs)
 	self.bwd_edge_entries = Array[_EdgeEntry](bwd_edge_refs)
 }
