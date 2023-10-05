@@ -10,54 +10,75 @@ import (
 func CalcBidirectBFS(g graph.IGraph, start int32) Array[bool] {
 	explorer := g.GetDefaultExplorer()
 
-	// fwd search
+	// bidirectional search
 	visited_fwd := NewArray[bool](g.NodeCount())
-	queue := NewQueue[int32]()
-	queue.Push(start)
-	for {
-		curr_id, ok := queue.Pop()
-		if !ok {
-			break
-		}
-		if visited_fwd[curr_id] {
-			continue
-		}
-		visited_fwd[curr_id] = true
-		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
-			if ref.IsShortcut() {
-				return
-			}
-			other_id := ref.OtherID
-			if visited_fwd[other_id] {
-				return
-			}
-			queue.Push(other_id)
-		})
-	}
-
-	// bwd search
 	visited_bwd := NewArray[bool](g.NodeCount())
-	queue = NewQueue[int32]()
-	queue.Push(start)
+	queue_fwd := NewQueue[int32]()
+	queue_fwd.Push(start)
+	queue_bwd := NewQueue[int32]()
+	queue_bwd.Push(start)
+	fwd_finished := false
+	bwd_finished := false
 	for {
-		curr_id, ok := queue.Pop()
-		if !ok {
+		if fwd_finished && bwd_finished {
 			break
 		}
-		if visited_bwd[curr_id] {
-			continue
+
+		if !fwd_finished {
+			s := true
+			curr_id, ok := queue_fwd.Pop()
+			if !ok {
+				fwd_finished = true
+				s = false
+			}
+			if visited_fwd[curr_id] {
+				s = false
+			}
+			if s {
+				visited_fwd[curr_id] = true
+				explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
+					if ref.IsShortcut() {
+						return
+					}
+					other_id := ref.OtherID
+					if visited_fwd[other_id] {
+						return
+					}
+					if !visited_bwd[other_id] && bwd_finished {
+						return
+					}
+					queue_fwd.Push(other_id)
+				})
+			}
 		}
-		visited_bwd[curr_id] = true
-		explorer.ForAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
-			if ref.IsShortcut() {
-				return
+
+		if !bwd_finished {
+			s := true
+			curr_id, ok := queue_bwd.Pop()
+			if !ok {
+				bwd_finished = true
+				s = false
 			}
-			other_id := ref.OtherID
-			if visited_bwd[other_id] {
-				return
+			if visited_bwd[curr_id] {
+				s = false
 			}
-			queue.Push(other_id)
-		})
+			if s {
+				visited_bwd[curr_id] = true
+				explorer.ForAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_EDGES, func(ref graph.EdgeRef) {
+					if ref.IsShortcut() {
+						return
+					}
+					other_id := ref.OtherID
+					if visited_bwd[other_id] {
+						return
+					}
+					if !visited_fwd[other_id] && fwd_finished {
+						return
+					}
+					queue_bwd.Push(other_id)
+				})
+			}
+		}
 	}
 
 	// combine results

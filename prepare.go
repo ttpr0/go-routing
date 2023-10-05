@@ -12,37 +12,10 @@ func prepare() {
 	g := graph.LoadGraph("./graphs/niedersachsen")
 
 	// compute closely connected components
-	groups := NewArray[int](g.NodeCount())
-	group := 1
-	for i := 0; i < g.NodeCount(); i++ {
-		if groups[i] != 0 {
-			continue
-		}
-		fmt.Println("iteration:", group)
-		start := int32(i)
-		visited := algorithm.CalcBidirectBFS(g, start)
-		for i := 0; i < g.NodeCount(); i++ {
-			if visited[i] {
-				if groups[i] != 0 {
-					fmt.Println("failure 1")
-				}
-				groups[i] = group
-			}
-		}
-		group += 1
-	}
+	groups := algorithm.ConnectedComponents(g)
 
 	// get largest group
-	counts := NewArray[int](group + 1)
-	for i := 0; i < g.NodeCount(); i++ {
-		counts[groups[i]] += 1
-	}
-	max_group := 0
-	for i := 0; i < counts.Length(); i++ {
-		if counts[i] > counts[max_group] {
-			max_group = i
-		}
-	}
+	max_group := GetMostCommon(groups)
 
 	// get nodes to be removed
 	remove := NewList[int32](100)
@@ -54,7 +27,24 @@ func prepare() {
 	fmt.Println("remove", remove.Length(), "nodes")
 
 	// remove nodes from graph
-	new_g := graph.RemoveNodes(g.(*graph.Graph), remove)
+	new_g := graph.RemoveNodes(g, remove)
 
 	graph.StoreGraph(new_g, "./graphs/niedersachsen_sub")
+}
+
+func GetMostCommon[T comparable](arr Array[T]) T {
+	var max_val T
+	max_count := 0
+	counts := NewDict[T, int](10)
+	for i := 0; i < arr.Length(); i++ {
+		val := arr[i]
+		count := counts[val]
+		count += 1
+		if count > max_count {
+			max_count = count
+			max_val = val
+		}
+		counts[val] = count
+	}
+	return max_val
 }
