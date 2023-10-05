@@ -241,7 +241,7 @@ func TransformFromCHPreprocGraph(dg *CHPreprocGraph) *CHGraph {
 // * is-contracted is used to limit search to nodes that have not been contracted yet (bool array containing every node in graph)
 //
 // * returns in-neighbours and out-neughbours
-func FindNeighbours(explorer *CHPreprocGraphExplorer, id int32, is_contracted Array[bool]) ([]int32, []int32) {
+func _FindNeighbours(explorer *CHPreprocGraphExplorer, id int32, is_contracted Array[bool]) ([]int32, []int32) {
 	// compute out-going neighbours
 	out_neigbours := NewList[int32](4)
 	explorer.ForAdjacentEdges(id, FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
@@ -352,6 +352,50 @@ type _FlagSH struct {
 	_is_target  bool
 }
 
+func _GetShortcut(from, to, via int32, explorer *CHPreprocGraphExplorer, flags Array[_FlagSH], flag_count int32) ([2]Tuple[int32, byte], bool) {
+	edges := [2]Tuple[int32, byte]{}
+
+	to_flag := flags[to]
+	// is target hasnt been found by search always add shortcut
+	if !to_flag.visited || to_flag._counter != flag_count {
+		t_edge, _ := explorer.GetEdgeBetween(via, to)
+		if t_edge.IsCHShortcut() {
+			edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
+		} else {
+			edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
+		}
+		f_edge, _ := explorer.GetEdgeBetween(from, via)
+		if f_edge.IsCHShortcut() {
+			edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
+		} else {
+			edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
+		}
+		return edges, true
+	} else {
+		// check if shortest path goes through node
+		if to_flag.prev_node != via {
+			return edges, false
+		}
+		node_flag := flags[via]
+		if node_flag.prev_node != from {
+			return edges, false
+		}
+
+		// capture edges that form shortcut
+		if to_flag.is_shortcut {
+			edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
+		} else {
+			edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
+		}
+		if node_flag.is_shortcut {
+			edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
+		} else {
+			edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
+		}
+		return edges, true
+	}
+}
+
 //*******************************************
 // preprocess ch
 //*******************************************
@@ -418,7 +462,7 @@ func CalcContraction(graph *CHPreprocGraph) {
 			if count == 35393 {
 				fmt.Println("test")
 			}
-			in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
+			in_neigbours, out_neigbours := _FindNeighbours(explorer, node_id, is_contracted)
 			for i := 0; i < len(in_neigbours); i++ {
 				from := in_neigbours[i]
 				heap.Clear()
@@ -428,51 +472,20 @@ func CalcContraction(graph *CHPreprocGraph) {
 					if from == to {
 						continue
 					}
-					edges := [2]Tuple[int32, byte]{}
-
-					to_flag := flags[to]
-					// is target hasnt been found by search always add shortcut
-					if !to_flag.visited || to_flag._counter != flag_count {
-						t_edge, _ := explorer.GetEdgeBetween(node_id, to)
-						if t_edge.IsCHShortcut() {
-							edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
-						} else {
-							edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
-						}
-						f_edge, _ := explorer.GetEdgeBetween(from, node_id)
-						if f_edge.IsCHShortcut() {
-							edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
-						} else {
-							edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
-						}
-					} else {
-						// check if shortest path goes through node
-						if to_flag.prev_node != node_id {
-							continue
-						}
-						node_flag := flags[node_id]
-						if node_flag.prev_node != from {
-							continue
-						}
-
-						// capture edges that form shortcut
-						if to_flag.is_shortcut {
-							edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
-						} else {
-							edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
-						}
-						if node_flag.is_shortcut {
-							edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
-						} else {
-							edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
-						}
+					edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+					if !shortcut_needed {
+						continue
 					}
-
 					// add shortcut to graph
 					graph.AddShortcut(from, to, edges)
 				}
 				flag_count += 1
-				if flag_count > 1000 {
+				if flag_count > 4000000 {
+					for j := 0; j < graph.NodeCount(); j++ {
+						flag := flags[j]
+						flag._counter = 0
+						flags[j] = flag
+					}
 					flag_count = 3
 				}
 			}
@@ -531,7 +544,7 @@ func CalcContraction2(graph *CHPreprocGraph, contraction_order Array[int32]) {
 
 		// contract nodes
 		level := graph.GetNodeLevel(node_id)
-		in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
+		in_neigbours, out_neigbours := _FindNeighbours(explorer, node_id, is_contracted)
 		t2 := time.Now()
 		for i := 0; i < len(in_neigbours); i++ {
 			from := in_neigbours[i]
@@ -542,51 +555,20 @@ func CalcContraction2(graph *CHPreprocGraph, contraction_order Array[int32]) {
 				if from == to {
 					continue
 				}
-				edges := [2]Tuple[int32, byte]{}
-
-				to_flag := flags[to]
-				// is target hasnt been found by search always add shortcut
-				if !to_flag.visited || to_flag._counter != flag_count {
-					t_edge, _ := explorer.GetEdgeBetween(node_id, to)
-					if t_edge.IsCHShortcut() {
-						edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
-					} else {
-						edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
-					}
-					f_edge, _ := explorer.GetEdgeBetween(from, node_id)
-					if f_edge.IsCHShortcut() {
-						edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
-					} else {
-						edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
-					}
-				} else {
-					// check if shortest path goes through node
-					if to_flag.prev_node != node_id {
-						continue
-					}
-					node_flag := flags[node_id]
-					if node_flag.prev_node != from {
-						continue
-					}
-
-					// capture edges that form shortcut
-					if to_flag.is_shortcut {
-						edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
-					} else {
-						edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
-					}
-					if node_flag.is_shortcut {
-						edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
-					} else {
-						edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
-					}
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				if !shortcut_needed {
+					continue
 				}
-
 				// add shortcut to graph
 				graph.AddShortcut(from, to, edges)
 			}
 			flag_count += 1
-			if flag_count > 1000 {
+			if flag_count > 4000000 {
+				for j := 0; j < graph.NodeCount(); j++ {
+					flag := flags[j]
+					flag._counter = 0
+					flags[j] = flag
+				}
 				flag_count = 3
 			}
 		}
@@ -784,7 +766,7 @@ func CalcContraction3(graph *CHPreprocGraph) {
 
 		// contract node
 		level := node_levels[node_id]
-		in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
+		in_neigbours, out_neigbours := _FindNeighbours(explorer, node_id, is_contracted)
 		for i := 0; i < len(in_neigbours); i++ {
 			from := in_neigbours[i]
 			heap.Clear()
@@ -794,46 +776,10 @@ func CalcContraction3(graph *CHPreprocGraph) {
 				if from == to {
 					continue
 				}
-				edges := [2]Tuple[int32, byte]{}
-
-				to_flag := flags[to]
-				// is target hasnt been found by search always add shortcut
-				if !to_flag.visited || to_flag._counter != flag_count {
-					t_edge, _ := explorer.GetEdgeBetween(node_id, to)
-					if t_edge.IsCHShortcut() {
-						edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
-					} else {
-						edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
-					}
-					f_edge, _ := explorer.GetEdgeBetween(from, node_id)
-					if f_edge.IsCHShortcut() {
-						edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
-					} else {
-						edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
-					}
-				} else {
-					// check if shortest path goes through node
-					if to_flag.prev_node != node_id {
-						continue
-					}
-					node_flag := flags[node_id]
-					if node_flag.prev_node != from {
-						continue
-					}
-
-					// capture edges that form shortcut
-					if to_flag.is_shortcut {
-						edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
-					} else {
-						edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
-					}
-					if node_flag.is_shortcut {
-						edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
-					} else {
-						edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
-					}
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				if !shortcut_needed {
+					continue
 				}
-
 				// add shortcut to graph
 				graph.AddShortcut(from, to, edges)
 
@@ -855,7 +801,12 @@ func CalcContraction3(graph *CHPreprocGraph) {
 				shortcut_edgecount.Add(ec)
 			}
 			flag_count += 1
-			if flag_count > 1000 {
+			if flag_count > 4000000 {
+				for j := 0; j < graph.NodeCount(); j++ {
+					flag := flags[j]
+					flag._counter = 0
+					flags[j] = flag
+				}
 				flag_count = 3
 			}
 		}
@@ -887,7 +838,7 @@ func CalcContraction3(graph *CHPreprocGraph) {
 }
 
 func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Array[_FlagSH], flag_counts [2]int32, is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int], shortcut_edgecount List[int8]) int {
-	in_neigbours, out_neigbours := FindNeighbours(explorer, node, is_contracted)
+	in_neigbours, out_neigbours := _FindNeighbours(explorer, node, is_contracted)
 	edge_diff := -(len(in_neigbours) + len(out_neigbours))
 	edge_count := int8(0)
 	for i := 0; i < len(in_neigbours); i++ {
@@ -900,42 +851,9 @@ func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap Pri
 			if from == to {
 				continue
 			}
-			edges := [2]Tuple[int32, byte]{}
-			to_flag := flags[to]
-			if to_flag._counter != flag_count {
-				t_edge, _ := explorer.GetEdgeBetween(node, to)
-				if t_edge.IsCHShortcut() {
-					edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
-				} else {
-					edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
-				}
-				f_edge, _ := explorer.GetEdgeBetween(from, node)
-				if f_edge.IsCHShortcut() {
-					edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
-				} else {
-					edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
-				}
-			} else {
-				// check if shortest path goes through node
-				if to_flag.prev_node != node {
-					continue
-				}
-				node_flag := flags[node]
-				if node_flag.prev_node != from {
-					continue
-				}
-
-				// capture edges that form shortcut
-				if to_flag.is_shortcut {
-					edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
-				} else {
-					edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
-				}
-				if node_flag.is_shortcut {
-					edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
-				} else {
-					edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
-				}
+			edges, shortcut_needed := _GetShortcut(from, to, node, explorer, flags, flag_count)
+			if !shortcut_needed {
+				continue
 			}
 			edge_diff += 1
 			// compute number of edges representing the shortcut (limited to 3)
@@ -1008,7 +926,7 @@ func CalcContraction4(graph *CHPreprocGraph) {
 
 		// contract node
 		level := node_levels[node_id]
-		in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
+		in_neigbours, out_neigbours := _FindNeighbours(explorer, node_id, is_contracted)
 		for i := 0; i < len(in_neigbours); i++ {
 			from := in_neigbours[i]
 			heap.Clear()
@@ -1018,51 +936,20 @@ func CalcContraction4(graph *CHPreprocGraph) {
 				if from == to {
 					continue
 				}
-				edges := [2]Tuple[int32, byte]{}
-
-				to_flag := flags[to]
-				// is target hasnt been found by search always add shortcut
-				if !to_flag.visited || to_flag._counter != flag_count {
-					t_edge, _ := explorer.GetEdgeBetween(node_id, to)
-					if t_edge.IsCHShortcut() {
-						edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
-					} else {
-						edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
-					}
-					f_edge, _ := explorer.GetEdgeBetween(from, node_id)
-					if f_edge.IsCHShortcut() {
-						edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
-					} else {
-						edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
-					}
-				} else {
-					// check if shortest path goes through node
-					if to_flag.prev_node != node_id {
-						continue
-					}
-					node_flag := flags[node_id]
-					if node_flag.prev_node != from {
-						continue
-					}
-
-					// capture edges that form shortcut
-					if to_flag.is_shortcut {
-						edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
-					} else {
-						edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
-					}
-					if node_flag.is_shortcut {
-						edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
-					} else {
-						edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
-					}
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				if !shortcut_needed {
+					continue
 				}
-
 				// add shortcut to graph
 				graph.AddShortcut(from, to, edges)
 			}
 			flag_count += 1
-			if flag_count > 1000 {
+			if flag_count > 4000000 {
+				for j := 0; j < graph.NodeCount(); j++ {
+					flag := flags[j]
+					flag._counter = 0
+					flags[j] = flag
+				}
 				flag_count = 3
 			}
 		}
@@ -1094,7 +981,7 @@ func CalcContraction4(graph *CHPreprocGraph) {
 }
 
 func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Array[_FlagSH], flag_counts [2]int32, is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int]) int {
-	in_neigbours, out_neigbours := FindNeighbours(explorer, node, is_contracted)
+	in_neigbours, out_neigbours := _FindNeighbours(explorer, node, is_contracted)
 	edge_diff := -(len(in_neigbours) + len(out_neigbours))
 	for i := 0; i < len(in_neigbours); i++ {
 		from := in_neigbours[i]
@@ -1106,42 +993,9 @@ func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap Pr
 			if from == to {
 				continue
 			}
-			edges := [2]Tuple[int32, byte]{}
-			to_flag := flags[to]
-			if to_flag._counter != flag_count {
-				t_edge, _ := explorer.GetEdgeBetween(node, to)
-				if t_edge.IsCHShortcut() {
-					edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
-				} else {
-					edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
-				}
-				f_edge, _ := explorer.GetEdgeBetween(from, node)
-				if f_edge.IsCHShortcut() {
-					edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
-				} else {
-					edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
-				}
-			} else {
-				// check if shortest path goes through node
-				if to_flag.prev_node != node {
-					continue
-				}
-				node_flag := flags[node]
-				if node_flag.prev_node != from {
-					continue
-				}
-
-				// capture edges that form shortcut
-				if to_flag.is_shortcut {
-					edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
-				} else {
-					edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
-				}
-				if node_flag.is_shortcut {
-					edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
-				} else {
-					edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
-				}
+			_, shortcut_needed := _GetShortcut(from, to, node, explorer, flags, flag_count)
+			if !shortcut_needed {
+				continue
 			}
 			edge_diff += 1
 		}
@@ -1221,7 +1075,7 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 
 		// contract node
 		level := node_levels[node_id]
-		in_neigbours, out_neigbours := FindNeighbours(explorer, node_id, is_contracted)
+		in_neigbours, out_neigbours := _FindNeighbours(explorer, node_id, is_contracted)
 		for i := 0; i < len(in_neigbours); i++ {
 			from := in_neigbours[i]
 			heap.Clear()
@@ -1231,46 +1085,10 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 				if from == to {
 					continue
 				}
-				edges := [2]Tuple[int32, byte]{}
-
-				to_flag := flags[to]
-				// is target hasnt been found by search always add shortcut
-				if !to_flag.visited || to_flag._counter != flag_count {
-					t_edge, _ := explorer.GetEdgeBetween(node_id, to)
-					if t_edge.IsCHShortcut() {
-						edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
-					} else {
-						edges[0] = MakeTuple(t_edge.EdgeID, byte(0))
-					}
-					f_edge, _ := explorer.GetEdgeBetween(from, node_id)
-					if f_edge.IsCHShortcut() {
-						edges[1] = MakeTuple(f_edge.EdgeID, byte(2))
-					} else {
-						edges[1] = MakeTuple(f_edge.EdgeID, byte(0))
-					}
-				} else {
-					// check if shortest path goes through node
-					if to_flag.prev_node != node_id {
-						continue
-					}
-					node_flag := flags[node_id]
-					if node_flag.prev_node != from {
-						continue
-					}
-
-					// capture edges that form shortcut
-					if to_flag.is_shortcut {
-						edges[0] = MakeTuple(to_flag.prev_edge, byte(2))
-					} else {
-						edges[0] = MakeTuple(to_flag.prev_edge, byte(0))
-					}
-					if node_flag.is_shortcut {
-						edges[1] = MakeTuple(node_flag.prev_edge, byte(2))
-					} else {
-						edges[1] = MakeTuple(node_flag.prev_edge, byte(0))
-					}
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				if !shortcut_needed {
+					continue
 				}
-
 				// add shortcut to graph
 				graph.AddShortcut(from, to, edges)
 
@@ -1292,7 +1110,12 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 				shortcut_edgecount.Add(ec)
 			}
 			flag_count += 1
-			if flag_count > 1000 {
+			if flag_count > 4000000 {
+				for j := 0; j < graph.NodeCount(); j++ {
+					flag := flags[j]
+					flag._counter = 0
+					flags[j] = flag
+				}
 				flag_count = 3
 			}
 		}
@@ -1347,4 +1170,135 @@ func _IsBorderNode(graph *CHPreprocGraph, node_tiles Array[int16]) Array[bool] {
 	}
 
 	return is_border
+}
+
+// Computes contraction using 2*ED + CN + EC + 5*L.
+// Ignores border nodes until all interior nodes are contracted.
+func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
+	fmt.Println("started contracting graph...")
+
+	// initialize
+	is_contracted := NewArray[bool](graph.NodeCount())
+	node_levels := NewArray[int16](graph.NodeCount())
+	contracted_neighbours := NewArray[int](graph.NodeCount())
+	shortcut_edgecount := NewList[int8](10)
+
+	// initialize routing components
+	heap := NewPriorityQueue[int32, int32](10)
+	flags := NewArray[_FlagSH](graph.NodeCount())
+	explorer := graph.GetExplorer()
+
+	// compute node priorities
+	fmt.Println("computing priorities...")
+	is_border := _IsBorderNode(graph, node_tiles)
+	node_priorities := NewArray[int](graph.NodeCount())
+	contraction_order := NewPriorityQueue[Tuple[int32, int], int](graph.NodeCount())
+	for i := 0; i < graph.NodeCount(); i++ {
+		if is_border[i] {
+			node_priorities[i] = 10000000000
+		}
+		prio := _ComputeNodePriority(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+		node_priorities[i] = prio
+		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
+	}
+
+	fmt.Println("start contracting nodes...")
+	flag_count := int32(3)
+	contract_count := 0
+	for {
+		temp, ok := contraction_order.Dequeue()
+		if !ok {
+			break
+		}
+		node_id := temp.A
+		node_prio := temp.B
+		if node_prio == 10000000000 {
+			break
+		}
+		if is_contracted[node_id] || node_prio != node_priorities[node_id] {
+			continue
+		}
+
+		contract_count += 1
+		if contract_count%1000 == 0 {
+			fmt.Println("	node :", contract_count, "/", graph.NodeCount())
+		}
+
+		// contract node
+		level := node_levels[node_id]
+		in_neigbours, out_neigbours := _FindNeighbours(explorer, node_id, is_contracted)
+		for i := 0; i < len(in_neigbours); i++ {
+			from := in_neigbours[i]
+			heap.Clear()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+			for j := 0; j < len(out_neigbours); j++ {
+				to := out_neigbours[j]
+				if from == to {
+					continue
+				}
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				if !shortcut_needed {
+					continue
+				}
+				// add shortcut to graph
+				graph.AddShortcut(from, to, edges)
+
+				// compute number of edges representing the shortcut (limited to 3)
+				ec := int8(0)
+				if edges[0].B == 0 {
+					ec += 1
+				} else {
+					ec += shortcut_edgecount[edges[0].A]
+				}
+				if edges[1].B == 0 {
+					ec += 1
+				} else {
+					ec += shortcut_edgecount[edges[1].A]
+				}
+				if ec > 3 {
+					ec = 3
+				}
+				shortcut_edgecount.Add(ec)
+			}
+			flag_count += 1
+			if flag_count > 4000000 {
+				for j := 0; j < graph.NodeCount(); j++ {
+					flag := flags[j]
+					flag._counter = 0
+					flags[j] = flag
+				}
+				flag_count = 3
+			}
+		}
+		// set node to contracted
+		is_contracted[node_id] = true
+
+		// update neighbours
+		for i := 0; i < len(in_neigbours); i++ {
+			nb := in_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			if is_border[nb] {
+				continue
+			}
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+		for i := 0; i < len(out_neigbours); i++ {
+			nb := out_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			if is_border[nb] {
+				continue
+			}
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+	}
+	for i := 0; i < graph.NodeCount(); i++ {
+		graph.SetNodeLevel(int32(i), node_levels[i])
+	}
+	fmt.Println("finished contracting graph")
 }
