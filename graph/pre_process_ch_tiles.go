@@ -13,7 +13,7 @@ import (
 
 func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 	fmt.Println("Compute node ordering:")
-	contraction_order, border_nodes := TiledNodeOrdering(graph)
+	// contraction_order, border_nodes := TiledNodeOrdering(graph)
 
 	fmt.Println("Compute subset contraction:")
 	g := &Graph{
@@ -23,9 +23,11 @@ func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 		index:    graph.index,
 	}
 	dg := TransformToCHPreprocGraph(g)
-	CalcContraction2(dg, contraction_order)
+	CalcPartialContraction5(dg, graph.skip_store.node_tiles)
+	// CalcContraction2(dg, contraction_order)
 
 	fmt.Println("Set border nodes to maxlevel:")
+	border_nodes := _IsBorderNode3(graph)
 	max_level := int16(0)
 	node_levels := dg.node_levels
 	for i := 0; i < node_levels.Length(); i++ {
@@ -41,7 +43,7 @@ func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 
 	fmt.Println("Create topology from shortcuts:")
 	node_tiles := graph.skip_store.node_tiles
-	skip_topology, shortcuts, skip_weights := CreateCHSkipTopology2(dg, border_nodes, node_tiles)
+	skip_topology, shortcuts, skip_weights := CreateCHSkipTopology(dg, border_nodes, node_tiles)
 	new_graph := &TiledGraph{
 		store:    graph.store,
 		topology: graph.topology,
@@ -58,12 +60,25 @@ func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 		skip_topology: *skip_topology,
 	}
 
+	// reorder graph
+	order := ComputeTileLevelOrdering2(new_graph, node_levels)
+	mapping := NewArray[int32](g.NodeCount())
+	reordered_node_levels := NewArray[int16](g.NodeCount())
+	for i := 0; i < g.NodeCount(); i++ {
+		id := order[i]
+		new_id := int32(i)
+		mapping[id] = new_id
+		reordered_node_levels[new_id] = node_levels[id]
+	}
+	ReorderTiledGraph(new_graph, mapping)
+	node_levels = reordered_node_levels
+
 	fmt.Println("Create downwards edge lists:")
 	edges := graph.store.edges
 	edge_weigths := graph.weight.edge_weights
 	ch_shortcuts := dg.shortcuts
 	ch_weights := dg.sh_weight
-	tiles := GetTiles(graph)
+	tiles := _GetTiles(graph)
 	index_edges := NewList[TiledSHEdge](100)
 	tile_ranges := NewDict[int16, Tuple[int32, int32]](tiles.Length())
 	for index, tile := range tiles {
@@ -128,7 +143,7 @@ func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 //*******************************************
 
 func TiledNodeOrdering(graph *TiledGraph) (Array[int32], Array[bool]) {
-	tiles := GetTiles(graph)
+	tiles := _GetTiles(graph)
 	border_nodes := NewArray[bool](graph.NodeCount())
 	sp_counts := NewArray[int](graph.NodeCount())
 	explorer := graph.GetDefaultExplorer()
@@ -142,7 +157,7 @@ func TiledNodeOrdering(graph *TiledGraph) (Array[int32], Array[bool]) {
 		for _, b_node := range b_nodes {
 			border_nodes[b_node] = true
 			flags.Clear()
-			CalcFullSPT(graph, b_node, flags)
+			_CalcFullSPT(graph, b_node, flags)
 			for _, i_node := range i_nodes {
 				if !flags.ContainsKey(i_node) {
 					continue
@@ -191,40 +206,7 @@ func TiledNodeOrdering(graph *TiledGraph) (Array[int32], Array[bool]) {
 //*******************************************
 
 // creates topology with cross-border edges (type 10), skip-edges (type 20) and shortcuts (type 100)
-func CreateCHSkipTopology(graph *TiledGraph, ch_shortcuts List[CHShortcut], ch_weights List[int32], border_nodes Array[bool]) (*AdjacencyArray, List[Shortcut], List[int32]) {
-	dyn_top := NewAdjacencyList(graph.NodeCount())
-
-	edge_types := graph.skip_store.edge_types
-	for i := 0; i < graph.EdgeCount(); i++ {
-		edge_id := int32(i)
-		edge := graph.GetEdge(edge_id)
-		if edge_types[edge_id] == 10 {
-			dyn_top.AddEdgeEntries(edge.NodeA, edge.NodeB, edge_id, 10)
-		} else if border_nodes[edge.NodeA] && border_nodes[edge.NodeB] {
-			dyn_top.AddEdgeEntries(edge.NodeA, edge.NodeB, edge_id, 20)
-		}
-	}
-
-	shortcuts := NewList[Shortcut](100)
-	shortcut_weights := NewList[int32](100)
-	for i := 0; i < ch_shortcuts.Length(); i++ {
-		shc := ch_shortcuts[i]
-		if border_nodes[shc.NodeA] && border_nodes[shc.NodeB] {
-			shc_id := int32(shortcuts.Length())
-			shortcuts.Add(Shortcut{
-				NodeA: shc.NodeA,
-				NodeB: shc.NodeB,
-			})
-			shortcut_weights.Add(ch_weights[i])
-			dyn_top.AddEdgeEntries(shc.NodeA, shc.NodeB, shc_id, 100)
-		}
-	}
-
-	return AdjacencyListToArray(&dyn_top), shortcuts, shortcut_weights
-}
-
-// creates topology with cross-border edges (type 10), skip-edges (type 20) and shortcuts (type 100)
-func CreateCHSkipTopology2(dg *CHPreprocGraph, border_nodes Array[bool], node_tiles Array[int16]) (*AdjacencyArray, List[Shortcut], List[int32]) {
+func CreateCHSkipTopology(dg *CHPreprocGraph, border_nodes Array[bool], node_tiles Array[int16]) (*AdjacencyArray, List[Shortcut], List[int32]) {
 	dyn_top := NewAdjacencyList(dg.NodeCount())
 	shortcuts := NewList[Shortcut](100)
 	shortcut_weights := NewList[int32](100)
