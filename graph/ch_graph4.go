@@ -1,50 +1,25 @@
 package graph
 
 import (
-	"sort"
-
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 // Reorders nodes of graph g inplace.
 // Contraction Hierarchy has to be built with tiles.
 func CreateCHGraph4(g *CHGraph, node_tiles Array[int16]) *CHGraph4 {
-	// sort by level
-	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
-	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), g.GetNodeLevel(int32(i))))
-	}
-	sort.SliceStable(indices, func(i, j int) bool {
-		return indices[i].B > indices[j].B
-	})
-	// sort by tile
-	is_border := _IsBorderNode2(g, node_tiles)
-	for i := 0; i < int(g.NodeCount()); i++ {
-		index := indices[i]
-		tile := node_tiles[index.A]
-		if is_border[index.A] {
-			tile = -10000
-		}
-		index.B = tile
-		indices[i] = index
-	}
-	sort.SliceStable(indices, func(i, j int) bool {
-		return indices[i].B < indices[j].B
-	})
-
 	// Reorder nodes
+	order := ComputeTileLevelOrdering(g, node_tiles)
 	mapping := NewArray[int32](g.NodeCount())
 	reordered_node_tiles := NewArray[int16](g.NodeCount())
 	for i := 0; i < g.NodeCount(); i++ {
-		index := indices[i]
-		id := index.A
+		id := order[i]
 		new_id := int32(i)
 		mapping[id] = new_id
 		reordered_node_tiles[new_id] = node_tiles[id]
 	}
 	ReorderCHGraph(g, mapping)
 	node_tiles = reordered_node_tiles
-	is_border = _IsBorderNode2(g, node_tiles)
+	is_border := _IsBorderNode2(g, node_tiles)
 
 	// initialize down edges lists
 	fwd_down_edges := NewList[CHEdge4](g.NodeCount())
@@ -54,10 +29,12 @@ func CreateCHGraph4(g *CHGraph, node_tiles Array[int16]) *CHGraph4 {
 	border_count := 0
 
 	// add overlay down-edges
-	fwd_down_edges.Add(CHEdge4{})
-	fwd_count := 0
-	bwd_down_edges.Add(CHEdge4{})
-	bwd_count := 0
+	fwd_down_edges.Add(CHEdge4{
+		IsDummy: true,
+	})
+	bwd_down_edges.Add(CHEdge4{
+		IsDummy: true,
+	})
 	fwd_other_edges := NewDict[int16, List[CHEdge4]](100)
 	bwd_other_edges := NewDict[int16, List[CHEdge4]](100)
 	for i := 0; i < g.NodeCount(); i++ {
@@ -87,7 +64,6 @@ func CreateCHGraph4(g *CHGraph, node_tiles Array[int16]) *CHGraph4 {
 				fwd_other_edges[this_tile] = edges
 			} else {
 				fwd_down_edges.Add(edge)
-				fwd_count += 1
 			}
 		})
 		explorer.ForAdjacentEdges(this_id, BACKWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
@@ -110,59 +86,34 @@ func CreateCHGraph4(g *CHGraph, node_tiles Array[int16]) *CHGraph4 {
 				bwd_other_edges[this_tile] = edges
 			} else {
 				bwd_down_edges.Add(edge)
-				bwd_count += 1
 			}
 		})
 	}
-	// set count in dummy edge
-	fwd_dummy := fwd_down_edges[0]
-	fwd_dummy.To = int32(fwd_count)
-	fwd_dummy.IsDummy = true
-	fwd_down_edges[0] = fwd_dummy
-	bwd_dummy := bwd_down_edges[0]
-	bwd_dummy.To = int32(bwd_count)
-	bwd_dummy.IsDummy = true
-	bwd_down_edges[0] = bwd_dummy
-
-	// populate down edges
+	// add other down edges
 	curr_tile := int16(-1)
-	fwd_id := 0
-	bwd_id := 0
 	for i := border_count; i < g.NodeCount(); i++ {
 		this_id := int32(i)
 		this_tile := node_tiles[this_id]
 		if this_tile != curr_tile {
-			if curr_tile != -1 {
-				fwd_dummy := fwd_down_edges[fwd_id]
-				fwd_dummy.To = int32(fwd_count)
-				fwd_dummy.IsDummy = true
-				fwd_dummy.ToTile = curr_tile
-				fwd_down_edges[fwd_id] = fwd_dummy
-				bwd_dummy := bwd_down_edges[bwd_id]
-				bwd_dummy.To = int32(bwd_count)
-				bwd_dummy.IsDummy = true
-				bwd_dummy.ToTile = curr_tile
-				bwd_down_edges[bwd_id] = bwd_dummy
-			}
-			fwd_count = 0
-			fwd_id = fwd_down_edges.Length()
-			fwd_down_edges.Add(CHEdge4{})
-			bwd_count = 0
-			bwd_id = bwd_down_edges.Length()
-			bwd_down_edges.Add(CHEdge4{})
+			fwd_down_edges.Add(CHEdge4{
+				ToTile:  this_tile,
+				IsDummy: true,
+			})
+			bwd_down_edges.Add(CHEdge4{
+				ToTile:  this_tile,
+				IsDummy: true,
+			})
 			curr_tile = this_tile
 			if fwd_other_edges.ContainsKey(this_tile) {
 				edges := fwd_other_edges[this_tile]
 				for _, edge := range edges {
 					fwd_down_edges.Add(edge)
-					fwd_count += 1
 				}
 			}
 			if bwd_other_edges.ContainsKey(this_tile) {
 				edges := bwd_other_edges[this_tile]
 				for _, edge := range edges {
 					bwd_down_edges.Add(edge)
-					bwd_count += 1
 				}
 			}
 		}
@@ -173,7 +124,6 @@ func CreateCHGraph4(g *CHGraph, node_tiles Array[int16]) *CHGraph4 {
 				To:     other_id,
 				Weight: explorer.GetEdgeWeight(ref),
 			})
-			fwd_count += 1
 		})
 		explorer.ForAdjacentEdges(this_id, BACKWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
 			other_id := ref.OtherID
@@ -182,9 +132,40 @@ func CreateCHGraph4(g *CHGraph, node_tiles Array[int16]) *CHGraph4 {
 				To:     other_id,
 				Weight: explorer.GetEdgeWeight(ref),
 			})
-			bwd_count += 1
 		})
 	}
+
+	// set count in dummy edges
+	fwd_id := 0
+	fwd_count := 0
+	for i := 0; i < fwd_down_edges.Length(); i++ {
+		edge := fwd_down_edges[i]
+		if edge.IsDummy {
+			// set count in previous dummy
+			fwd_down_edges[fwd_id].To = int32(fwd_count)
+			// reset count
+			fwd_id = i
+			fwd_count = 0
+			continue
+		}
+		fwd_count += 1
+	}
+	fwd_down_edges[fwd_id].To = int32(fwd_count)
+	bwd_id := 0
+	bwd_count := 0
+	for i := 0; i < bwd_down_edges.Length(); i++ {
+		edge := bwd_down_edges[i]
+		if edge.IsDummy {
+			// set count in previous dummy
+			bwd_down_edges[bwd_id].To = int32(bwd_count)
+			// reset count
+			bwd_id = i
+			bwd_count = 0
+			continue
+		}
+		bwd_count += 1
+	}
+	bwd_down_edges[bwd_id].To = int32(bwd_count)
 
 	return &CHGraph4{
 		CHGraph: *g,
@@ -235,7 +216,7 @@ type CHEdge4 struct {
 	IsDummy bool
 }
 
-func _IsBorderNode2(graph *CHGraph, node_tiles Array[int16]) Array[bool] {
+func _IsBorderNode2(graph ICHGraph, node_tiles Array[int16]) Array[bool] {
 	is_border := NewArray[bool](graph.NodeCount())
 
 	explorer := graph.GetDefaultExplorer()

@@ -101,18 +101,18 @@ func _LoadTileRanges2(file string) (Dict[int16, Tuple[int32, int32]], Array[Tile
 }
 
 func TransformToTiled3(graph *TiledGraph) *TiledGraph3 {
-	tiles := GetTiles(graph)
+	tiles := _GetTiles(graph)
 	index_edges := NewList[TiledSHEdge](100)
 	tile_ranges := NewDict[int16, Tuple[int32, int32]](tiles.Length())
 	for index, tile := range tiles {
 		fmt.Println("Process Tile:", index, "/", len(tiles))
 		start := index_edges.Length()
 		count := 0
-		b_nodes, i_nodes := GetBorderNodes(graph, tile)
+		b_nodes, i_nodes := _GetBorderNodes(graph, tile)
 		flags := NewDict[int32, _Flag](100)
 		for _, b_node := range b_nodes {
 			flags.Clear()
-			CalcFullSPT(graph, b_node, flags)
+			_CalcFullSPT(graph, b_node, flags)
 			for _, i_node := range i_nodes {
 				if flags.ContainsKey(i_node) {
 					flag := flags[i_node]

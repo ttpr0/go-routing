@@ -3,7 +3,6 @@ package graph
 import (
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -83,171 +82,6 @@ func GraphToGeoJSON2(graph *Graph, node_tiles Array[int16]) (geo.FeatureCollecti
 	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)
 }
 
-// checks graph topology
-func CheckGraph(g IGraph) {
-	explorer := g.GetDefaultExplorer()
-	for i := 0; i < int(g.NodeCount()); i++ {
-		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if ref.IsShortcut() {
-				return
-			}
-			edge := g.GetEdge(ref.EdgeID)
-			if edge.NodeA != int32(i) {
-				fmt.Println("error 81")
-			}
-			if edge.NodeB != ref.OtherID {
-				fmt.Println("error 84")
-			}
-		})
-		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if ref.IsShortcut() {
-				return
-			}
-			edge := g.GetEdge(ref.EdgeID)
-			if edge.NodeB != int32(i) {
-				fmt.Println("error 95")
-			}
-			if edge.NodeA != ref.OtherID {
-				fmt.Println("error 98")
-			}
-		})
-	}
-}
-
-// checks topology of ch graph
-func CheckCHGraph(g ICHGraph) {
-	explorer := g.GetDefaultExplorer()
-	for i := 0; i < int(g.NodeCount()); i++ {
-		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if ref.IsShortcut() {
-				edge := g.GetShortcut(ref.EdgeID)
-				if edge.NodeA != int32(i) {
-					fmt.Println("error 1")
-				}
-				if edge.NodeB != ref.OtherID {
-					fmt.Println("error 2")
-				}
-			} else {
-				edge := g.GetEdge(ref.EdgeID)
-				if edge.NodeA != int32(i) {
-					fmt.Println("error 3")
-				}
-				if edge.NodeB != ref.OtherID {
-					fmt.Println("error 4")
-				}
-			}
-		})
-		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if ref.IsShortcut() {
-				edge := g.GetShortcut(ref.EdgeID)
-				if edge.NodeB != int32(i) {
-					fmt.Println("error 5")
-				}
-				if edge.NodeA != ref.OtherID {
-					fmt.Println("error 6")
-				}
-			} else {
-				edge := g.GetEdge(ref.EdgeID)
-				if edge.NodeB != int32(i) {
-					fmt.Println("error 7")
-				}
-				if edge.NodeA != ref.OtherID {
-					fmt.Println("error 8")
-				}
-			}
-		})
-	}
-}
-
-// checks graph topology
-func CheckTiledGraph(g ITiledGraph) {
-	explorer := g.GetDefaultExplorer()
-
-	// check edges
-	for i := 0; i < int(g.NodeCount()); i++ {
-		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if ref.IsShortcut() {
-				fmt.Println("error 23")
-			} else {
-				edge := g.GetEdge(ref.EdgeID)
-				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) && !ref.IsCrossBorder() {
-					fmt.Println("error 24")
-				}
-			}
-		})
-		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if ref.IsShortcut() {
-				fmt.Println("error 25")
-			} else {
-				edge := g.GetEdge(ref.EdgeID)
-				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) && !ref.IsCrossBorder() {
-					fmt.Println("error 26")
-				}
-			}
-		})
-	}
-
-	// check skip
-	for i := 0; i < int(g.NodeCount()); i++ {
-		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_SKIP, func(ref EdgeRef) {
-			if ref.IsShortcut() {
-				edge := g.GetShortcut(ref.EdgeID)
-				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) {
-					fmt.Println("error 33")
-				}
-			} else {
-				edge := g.GetEdge(ref.EdgeID)
-				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) && !ref.IsCrossBorder() {
-					fmt.Println("error 34")
-				}
-			}
-		})
-		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_SKIP, func(ref EdgeRef) {
-			if ref.IsShortcut() {
-				edge := g.GetShortcut(ref.EdgeID)
-				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) {
-					fmt.Println("error 35")
-				}
-			} else {
-				edge := g.GetEdge(ref.EdgeID)
-				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) && !ref.IsCrossBorder() {
-					fmt.Println("error 36")
-				}
-			}
-		})
-	}
-}
-
-func SortNodesByLevel(g *CHGraph) {
-	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
-	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), g.GetNodeLevel(int32(i))))
-	}
-	sort.SliceStable(indices, func(i, j int) bool {
-		return indices[i].B > indices[j].B
-	})
-	order := NewArray[int32](len(indices))
-	for i, index := range indices {
-		order[i] = index.A
-	}
-
-	mapping := NewArray[int32](len(order))
-	for new_id, id := range order {
-		mapping[int(id)] = int32(new_id)
-	}
-
-	ReorderCHGraph(g, mapping)
-}
-
-func ReorderCHGraph(g *CHGraph, node_mapping Array[int32]) {
-	g.store._ReorderNodes(node_mapping)
-	g.topology._ReorderNodes(node_mapping)
-	g.weight._ReorderNodes(node_mapping)
-
-	g.ch_store._ReorderNodes(node_mapping)
-	g.ch_topology._ReorderNodes(node_mapping)
-}
-
 func GraphToMETIS(g IGraph) string {
 	n := g.NodeCount()
 	m := 0
@@ -309,7 +143,7 @@ func ReadNodeTiles(filename string) Array[int16] {
 	data := make([]byte, stat.Size())
 	file.Read(data)
 	s := string(data)
-	tokens := strings.Split(s, "\r\n")
+	tokens := strings.Split(s, "\n")
 
 	tiles := NewArray[int16](len(tokens))
 	for i := 0; i < tiles.Length(); i++ {
@@ -346,7 +180,7 @@ func ReadNodeOrdering(filename string) Array[int32] {
 	data := make([]byte, stat.Size())
 	file.Read(data)
 	s := string(data)
-	tokens := strings.Split(s, "\r\n")
+	tokens := strings.Split(s, "\n")
 
 	num_nodes, _ := strconv.Atoi(tokens[0])
 	ordering := NewArray[int32](num_nodes)
@@ -358,4 +192,24 @@ func ReadNodeOrdering(filename string) Array[int32] {
 		ordering[val2-1] = int32(val1 - 1)
 	}
 	return ordering
+}
+
+func _IsBorderNode3(graph ITiledGraph) Array[bool] {
+	is_border := NewArray[bool](graph.NodeCount())
+
+	explorer := graph.GetDefaultExplorer()
+	for i := 0; i < graph.NodeCount(); i++ {
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
+			if graph.GetNodeTile(int32(i)) != graph.GetNodeTile(ref.OtherID) {
+				is_border[i] = true
+			}
+		})
+		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
+			if graph.GetNodeTile(int32(i)) != graph.GetNodeTile(ref.OtherID) {
+				is_border[i] = true
+			}
+		})
+	}
+
+	return is_border
 }

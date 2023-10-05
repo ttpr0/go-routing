@@ -253,98 +253,6 @@ func (self *AdjListAccessor) Type() byte {
 // utility methods on topology stores
 //*******************************************
 
-func _StoreUntypedAdjacency(store *AdjacencyArray, filename string) {
-	topologybuffer := bytes.Buffer{}
-
-	fwd_edgerefcount := store.fwd_edge_entries.Length()
-	bwd_edgerefcount := store.bwd_edge_entries.Length()
-	binary.Write(&topologybuffer, binary.LittleEndian, int32(fwd_edgerefcount))
-	binary.Write(&topologybuffer, binary.LittleEndian, int32(bwd_edgerefcount))
-
-	for i := 0; i < store.node_entries.Length(); i++ {
-		node_ref := store.node_entries.Get(i)
-		binary.Write(&topologybuffer, binary.LittleEndian, node_ref.FWDEdgeStart)
-		binary.Write(&topologybuffer, binary.LittleEndian, node_ref.FWDEdgeCount)
-		binary.Write(&topologybuffer, binary.LittleEndian, node_ref.BWDEdgeStart)
-		binary.Write(&topologybuffer, binary.LittleEndian, node_ref.BWDEdgeCount)
-	}
-	for i := 0; i < fwd_edgerefcount; i++ {
-		edgeref := store.fwd_edge_entries.Get(i)
-		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.EdgeID)
-		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.OtherID)
-	}
-	for i := 0; i < bwd_edgerefcount; i++ {
-		edgeref := store.bwd_edge_entries.Get(i)
-		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.EdgeID)
-		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.OtherID)
-	}
-
-	topologyfile, _ := os.Create(filename)
-	defer topologyfile.Close()
-	topologyfile.Write(topologybuffer.Bytes())
-}
-
-func _LoadUntypedAdjacency(file string, nodecount int) *AdjacencyArray {
-	_, err := os.Stat(file)
-	if errors.Is(err, os.ErrNotExist) {
-		panic("file not found: " + file)
-	}
-
-	topologydata, _ := os.ReadFile(file)
-	topologyreader := bytes.NewReader(topologydata)
-	var fwd_edgerefcount int32
-	binary.Read(topologyreader, binary.LittleEndian, &fwd_edgerefcount)
-	var bwd_edgerefcount int32
-	binary.Read(topologyreader, binary.LittleEndian, &bwd_edgerefcount)
-	node_refs := NewList[_NodeEntry](int(nodecount))
-	fwd_edge_refs := NewList[_EdgeEntry](int(fwd_edgerefcount))
-	bwd_edge_refs := NewList[_EdgeEntry](int(bwd_edgerefcount))
-	for i := 0; i < int(nodecount); i++ {
-		var s1 int32
-		binary.Read(topologyreader, binary.LittleEndian, &s1)
-		var c1 int16
-		binary.Read(topologyreader, binary.LittleEndian, &c1)
-		var s2 int32
-		binary.Read(topologyreader, binary.LittleEndian, &s2)
-		var c2 int16
-		binary.Read(topologyreader, binary.LittleEndian, &c2)
-		node_refs.Add(_NodeEntry{
-			FWDEdgeStart: s1,
-			FWDEdgeCount: c1,
-			BWDEdgeStart: s2,
-			BWDEdgeCount: c2,
-		})
-	}
-	for i := 0; i < int(fwd_edgerefcount); i++ {
-		var id int32
-		binary.Read(topologyreader, binary.LittleEndian, &id)
-		var nid int32
-		binary.Read(topologyreader, binary.LittleEndian, &nid)
-		fwd_edge_refs.Add(_EdgeEntry{
-			EdgeID:  id,
-			OtherID: nid,
-			Type:    0,
-		})
-	}
-	for i := 0; i < int(bwd_edgerefcount); i++ {
-		var id int32
-		binary.Read(topologyreader, binary.LittleEndian, &id)
-		var nid int32
-		binary.Read(topologyreader, binary.LittleEndian, &nid)
-		bwd_edge_refs.Add(_EdgeEntry{
-			EdgeID:  id,
-			OtherID: nid,
-			Type:    0,
-		})
-	}
-
-	return &AdjacencyArray{
-		node_entries:     Array[_NodeEntry](node_refs),
-		fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs),
-		bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs),
-	}
-}
-
 // reorders nodes in topologystore,
 // mapping: old id -> new id
 func (self *AdjacencyArray) _ReorderNodes(mapping Array[int32]) {
@@ -391,7 +299,7 @@ func (self *AdjacencyArray) _ReorderNodes(mapping Array[int32]) {
 	self.bwd_edge_entries = Array[_EdgeEntry](bwd_edge_refs)
 }
 
-func _StoreTypedAdjacency(store *AdjacencyArray, filename string) {
+func _StoreAdjacency(store *AdjacencyArray, typed bool, filename string) {
 	topologybuffer := bytes.Buffer{}
 
 	fwd_edgerefcount := store.fwd_edge_entries.Length()
@@ -409,13 +317,17 @@ func _StoreTypedAdjacency(store *AdjacencyArray, filename string) {
 	for i := 0; i < fwd_edgerefcount; i++ {
 		edgeref := store.fwd_edge_entries.Get(i)
 		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.EdgeID)
-		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.Type)
+		if typed {
+			binary.Write(&topologybuffer, binary.LittleEndian, edgeref.Type)
+		}
 		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.OtherID)
 	}
 	for i := 0; i < bwd_edgerefcount; i++ {
 		edgeref := store.bwd_edge_entries.Get(i)
 		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.EdgeID)
-		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.Type)
+		if typed {
+			binary.Write(&topologybuffer, binary.LittleEndian, edgeref.Type)
+		}
 		binary.Write(&topologybuffer, binary.LittleEndian, edgeref.OtherID)
 	}
 
@@ -424,7 +336,7 @@ func _StoreTypedAdjacency(store *AdjacencyArray, filename string) {
 	topologyfile.Write(topologybuffer.Bytes())
 }
 
-func _LoadTypedAdjacency(file string, nodecount int) *AdjacencyArray {
+func _LoadAdjacency(file string, typed bool, nodecount int) *AdjacencyArray {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -459,7 +371,11 @@ func _LoadTypedAdjacency(file string, nodecount int) *AdjacencyArray {
 		var id int32
 		binary.Read(topologyreader, binary.LittleEndian, &id)
 		var t byte
-		binary.Read(topologyreader, binary.LittleEndian, &t)
+		if typed {
+			binary.Read(topologyreader, binary.LittleEndian, &t)
+		} else {
+			t = 0
+		}
 		var nid int32
 		binary.Read(topologyreader, binary.LittleEndian, &nid)
 		fwd_edge_refs.Add(_EdgeEntry{
@@ -472,7 +388,11 @@ func _LoadTypedAdjacency(file string, nodecount int) *AdjacencyArray {
 		var id int32
 		binary.Read(topologyreader, binary.LittleEndian, &id)
 		var t byte
-		binary.Read(topologyreader, binary.LittleEndian, &t)
+		if typed {
+			binary.Read(topologyreader, binary.LittleEndian, &t)
+		} else {
+			t = 0
+		}
 		var nid int32
 		binary.Read(topologyreader, binary.LittleEndian, &nid)
 		bwd_edge_refs.Add(_EdgeEntry{

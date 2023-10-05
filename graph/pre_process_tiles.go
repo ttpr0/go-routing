@@ -10,6 +10,7 @@ import (
 // preprocess tiled-graph
 //*******************************************
 
+// Creates tiled-graph with skeleton cliques.
 func PreprocessTiledGraph(graph *Graph, node_tiles Array[int16]) *TiledGraph {
 	skip_store := TiledStore{
 		node_tiles:   node_tiles,
@@ -19,7 +20,7 @@ func PreprocessTiledGraph(graph *Graph, node_tiles Array[int16]) *TiledGraph {
 		edge_types:   NewArray[byte](graph.EdgeCount()),
 	}
 
-	UpdateCrossBorder(&skip_store, graph)
+	_UpdateCrossBorder(&skip_store, graph)
 
 	tiles := NewDict[int16, bool](100)
 	for _, tile_id := range node_tiles {
@@ -34,14 +35,14 @@ func PreprocessTiledGraph(graph *Graph, node_tiles Array[int16]) *TiledGraph {
 	for tile_id, _ := range tiles {
 		fmt.Printf("tile %v: %v / %v \n", tile_id, c, tile_count)
 		fmt.Printf("tile %v: getting start nodes \n", tile_id)
-		start_nodes, end_nodes := GetInOutNodes(graph, &skip_store, tile_id)
+		start_nodes, end_nodes := _GetInOutNodes(graph, &skip_store, tile_id)
 		fmt.Printf("tile %v: calculating skip edges \n", tile_id)
-		CalcSkipEdges(graph, start_nodes, end_nodes, &skip_store)
+		_CalcSkipEdges(graph, start_nodes, end_nodes, &skip_store)
 		fmt.Printf("tile %v: finished \n", tile_id)
 		c += 1
 	}
 
-	skip_topology := CreateSkipTopology(graph, &skip_store)
+	skip_topology := _CreateSkipTopology(graph, &skip_store)
 
 	tiled_graph := &TiledGraph{
 		store:         graph.store,
@@ -55,6 +56,7 @@ func PreprocessTiledGraph(graph *Graph, node_tiles Array[int16]) *TiledGraph {
 	return tiled_graph
 }
 
+// Creates tiled-graph with full-shortcut cliques.
 func PreprocessTiledGraph3(graph *Graph, node_tiles Array[int16]) *TiledGraph {
 	skip_store := TiledStore{
 		node_tiles:   node_tiles,
@@ -64,7 +66,7 @@ func PreprocessTiledGraph3(graph *Graph, node_tiles Array[int16]) *TiledGraph {
 		edge_types:   NewArray[byte](graph.EdgeCount()),
 	}
 
-	UpdateCrossBorder(&skip_store, graph)
+	_UpdateCrossBorder(&skip_store, graph)
 
 	tiles := NewDict[int16, bool](100)
 	for _, tile_id := range node_tiles {
@@ -79,14 +81,14 @@ func PreprocessTiledGraph3(graph *Graph, node_tiles Array[int16]) *TiledGraph {
 	for tile_id, _ := range tiles {
 		fmt.Printf("tile %v: %v / %v \n", tile_id, c, tile_count)
 		fmt.Printf("tile %v: getting start nodes \n", tile_id)
-		start_nodes, end_nodes := GetInOutNodes(graph, &skip_store, tile_id)
+		start_nodes, end_nodes := _GetInOutNodes(graph, &skip_store, tile_id)
 		fmt.Printf("tile %v: calculating skip edges \n", tile_id)
-		CalcShortcutEdges(graph, start_nodes, end_nodes, &skip_store)
+		_CalcShortcutEdges(graph, start_nodes, end_nodes, &skip_store)
 		fmt.Printf("tile %v: finished \n", tile_id)
 		c += 1
 	}
 
-	skip_topology := CreateSkipTopology(graph, &skip_store)
+	skip_topology := _CreateSkipTopology(graph, &skip_store)
 
 	tiled_graph := &TiledGraph{
 		store:         graph.store,
@@ -100,19 +102,6 @@ func PreprocessTiledGraph3(graph *Graph, node_tiles Array[int16]) *TiledGraph {
 	return tiled_graph
 }
 
-func PreprocessTiledGraph4(graph *TiledGraph) *TiledGraph {
-	g := &Graph{
-		store:    graph.store,
-		topology: graph.topology,
-		weight:   graph.weight,
-		index:    graph.index,
-	}
-
-	tiles := graph.skip_store.node_tiles
-
-	return PreprocessTiledGraph3(g, tiles)
-}
-
 //*******************************************
 // preprocessing utility methods
 //*******************************************
@@ -120,7 +109,7 @@ func PreprocessTiledGraph4(graph *TiledGraph) *TiledGraph {
 // return list of nodes that have at least one cross-border edge
 //
 // returns in_nodes, out_nodes
-func GetInOutNodes(graph *Graph, skip_store *TiledStore, tile_id int16) (List[int32], List[int32]) {
+func _GetInOutNodes(graph *Graph, skip_store *TiledStore, tile_id int16) (List[int32], List[int32]) {
 	in_list := NewList[int32](100)
 	out_list := NewList[int32](100)
 
@@ -157,7 +146,7 @@ func GetInOutNodes(graph *Graph, skip_store *TiledStore, tile_id int16) (List[in
 }
 
 // sets edge type of cross border edges to 10
-func UpdateCrossBorder(skip_store *TiledStore, graph *Graph) {
+func _UpdateCrossBorder(skip_store *TiledStore, graph *Graph) {
 	for i := 0; i < graph.EdgeCount(); i++ {
 		edge := graph.GetEdge(int32(i))
 		if skip_store.GetNodeTile(edge.NodeA) != skip_store.GetNodeTile(edge.NodeB) {
@@ -177,7 +166,7 @@ type _Flag struct {
 }
 
 // marks every edge as that lies on a shortest path between border nodes with edge_type 20
-func CalcSkipEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_store *TiledStore) {
+func _CalcSkipEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_store *TiledStore) {
 	explorer := graph.GetDefaultExplorer()
 	for _, start := range start_nodes {
 		heap := NewPriorityQueue[int32, int32](10)
@@ -243,8 +232,8 @@ func CalcSkipEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_store 
 	}
 }
 
-// computes shortest paths from everyv start to end node and adds shortcuts
-func CalcShortcutEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_store *TiledStore) {
+// computes shortest paths from every start to end node and adds shortcuts
+func _CalcShortcutEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_store *TiledStore) {
 	explorer := graph.GetDefaultExplorer()
 	for _, start := range start_nodes {
 		heap := NewPriorityQueue[int32, int32](10)
@@ -319,7 +308,7 @@ func CalcShortcutEdges(graph *Graph, start_nodes, end_nodes List[int32], skip_st
 //*******************************************
 
 // creates topology with cross-border edges (type 10), skip edges (type 20) and shortcuts (type 100)
-func CreateSkipTopology(graph *Graph, skip_store *TiledStore) *AdjacencyArray {
+func _CreateSkipTopology(graph *Graph, skip_store *TiledStore) *AdjacencyArray {
 	dyn_top := NewAdjacencyList(graph.NodeCount())
 
 	for i := 0; i < graph.EdgeCount(); i++ {
@@ -345,46 +334,10 @@ func CreateSkipTopology(graph *Graph, skip_store *TiledStore) *AdjacencyArray {
 // preprocess tiled-graph index
 //*******************************************
 
-func TransformToTiled2(graph *TiledGraph) *TiledGraph2 {
-	tiles := GetTiles(graph)
-	border_nodes := NewDict[int16, Array[int32]](len(tiles))
-	interior_nodes := NewDict[int16, Array[int32]](len(tiles))
-	border_range_map := NewDict[int16, Dict[int32, Array[float32]]](len(tiles))
-	for index, tile := range tiles {
-		fmt.Println("Process Tile:", index, "/", len(tiles))
-		b_nodes, i_nodes := GetBorderNodes(graph, tile)
-		border_nodes[tile] = b_nodes
-		interior_nodes[tile] = i_nodes
-		range_map := NewDict[int32, Array[float32]](len(b_nodes))
-		flags := NewDict[int32, _Flag](100)
-		for _, b_node := range b_nodes {
-			flags.Clear()
-			CalcFullSPT(graph, b_node, flags)
-			ranges := NewArray[float32](len(i_nodes))
-			for i, i_node := range i_nodes {
-				if flags.ContainsKey(i_node) {
-					flag := flags[i_node]
-					ranges[i] = float32(flag.pathlength)
-				} else {
-					ranges[i] = 1000000
-				}
-			}
-			range_map[b_node] = ranges
-		}
-		border_range_map[tile] = range_map
-	}
-
-	return &TiledGraph2{
-		TiledGraph:       *graph,
-		border_nodes:     border_nodes,
-		interior_nodes:   interior_nodes,
-		border_range_map: border_range_map,
-	}
-}
-
-func GetTiles(graph *TiledGraph) List[int16] {
+func _GetTiles(graph ITiledGraph) List[int16] {
 	tile_dict := NewDict[int16, bool](100)
-	for _, tile_id := range graph.skip_store.node_tiles {
+	for i := 0; i < graph.NodeCount(); i++ {
+		tile_id := graph.GetNodeTile(int32(i))
 		if tile_dict.ContainsKey(tile_id) {
 			continue
 		}
@@ -397,13 +350,16 @@ func GetTiles(graph *TiledGraph) List[int16] {
 	return tiles
 }
 
-// computes border and interior nodes of graph tile
-func GetBorderNodes(graph *TiledGraph, tile_id int16) (Array[int32], Array[int32]) {
+// Computes border and interior nodes of graph tile.
+// If tile doesn't exist arrays will be empty.
+func _GetBorderNodes(graph ITiledGraph, tile_id int16) (Array[int32], Array[int32]) {
 	border := NewList[int32](100)
 	interior := NewList[int32](100)
 
 	explorer := graph.GetDefaultExplorer()
-	for id, tile := range graph.skip_store.node_tiles {
+	for i := 0; i < graph.NodeCount(); i++ {
+		id := int32(i)
+		tile := graph.GetNodeTile(id)
 		if tile != tile_id {
 			continue
 		}
@@ -424,7 +380,7 @@ func GetBorderNodes(graph *TiledGraph, tile_id int16) (Array[int32], Array[int32
 	return Array[int32](border), Array[int32](interior)
 }
 
-func CalcFullSPT(graph *TiledGraph, start int32, flags Dict[int32, _Flag]) {
+func _CalcFullSPT(graph ITiledGraph, start int32, flags Dict[int32, _Flag]) {
 	heap := NewPriorityQueue[int32, int32](10)
 
 	flags[start] = _Flag{pathlength: 0, visited: false, prevEdge: -1}

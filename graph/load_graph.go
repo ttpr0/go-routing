@@ -1,24 +1,18 @@
 package graph
 
 import (
-	"bytes"
-	"encoding/binary"
-	"errors"
 	"fmt"
-	"os"
-
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 //*******************************************
 // graph io
 //*******************************************
 
-func LoadGraph(file string) IGraph {
+func LoadGraph(file string) *Graph {
 	store := _LoadGraphStorage(file)
 	nodecount := store.NodeCount()
 	edgecount := store.EdgeCount()
-	topology := _LoadUntypedAdjacency(file+"-graph", nodecount)
+	topology := _LoadAdjacency(file+"-graph", false, nodecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
 	index := _BuildKDTreeIndex(store)
 
@@ -30,27 +24,27 @@ func LoadGraph(file string) IGraph {
 	}
 }
 
-func LoadGraph2(file string) IGraph {
-	store := _LoadGraphStorage(file)
-	topology := _BuildTopology(store)
-	weighting := _BuildWeighting(store)
-	index := _BuildKDTreeIndex(store)
+// func LoadGraph2(file string) *Graph {
+// 	store := _LoadGraphStorage(file)
+// 	topology := _BuildTopology(store)
+// 	weighting := _BuildWeighting(store)
+// 	index := _BuildKDTreeIndex(store)
 
-	return &Graph{
-		store:    store,
-		topology: topology,
-		weight:   weighting,
-		index:    index,
-	}
-}
+// 	return &Graph{
+// 		store:    store,
+// 		topology: topology,
+// 		weight:   weighting,
+// 		index:    index,
+// 	}
+// }
 
-func LoadCHGraph(file string) ICHGraph {
+func LoadCHGraph(file string) *CHGraph {
 	store := _LoadGraphStorage(file)
 	nodecount := store.NodeCount()
 	edgecount := store.EdgeCount()
-	topology := _LoadUntypedAdjacency(file+"-graph", nodecount)
+	topology := _LoadAdjacency(file+"-graph", false, nodecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
-	ch_topology := _LoadUntypedAdjacency(file+"-ch_graph", nodecount)
+	ch_topology := _LoadAdjacency(file+"-ch_graph", false, nodecount)
 	ch_store := _LoadCHStorage(file, nodecount)
 	chg := &CHGraph{
 		store:       store,
@@ -64,13 +58,13 @@ func LoadCHGraph(file string) ICHGraph {
 	return chg
 }
 
-func LoadCHGraph2(file string) ICHGraph {
+func LoadCHGraph2(file string) *CHGraph {
 	store := _LoadGraphStorage(file)
 	nodecount := store.NodeCount()
 	edgecount := store.EdgeCount()
-	topology := _LoadUntypedAdjacency(file+"-graph", nodecount)
+	topology := _LoadAdjacency(file+"-graph", false, nodecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
-	ch_topology := _LoadUntypedAdjacency(file+"-ch_graph", nodecount)
+	ch_topology := _LoadAdjacency(file+"-ch_graph", false, nodecount)
 	ch_store := _LoadCHStorage(file, nodecount)
 	chg := &CHGraph{
 		store:       store,
@@ -83,12 +77,12 @@ func LoadCHGraph2(file string) ICHGraph {
 	return chg
 }
 
-func LoadTiledGraph(file string) ITiledGraph {
+func LoadTiledGraph(file string) *TiledGraph {
 	store := _LoadGraphStorage(file)
 	nodecount := store.NodeCount()
 	edgecount := store.EdgeCount()
-	topology := _LoadUntypedAdjacency(file+"-graph", nodecount)
-	skip_topology := _LoadTypedAdjacency(file+"-skip_topology", nodecount)
+	topology := _LoadAdjacency(file+"-graph", false, nodecount)
+	skip_topology := _LoadAdjacency(file+"-skip_topology", true, nodecount)
 	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
 	skip_store := _LoadTiledStorage(file, nodecount, edgecount)
 	fmt.Println("start buidling index")
@@ -105,20 +99,8 @@ func LoadTiledGraph(file string) ITiledGraph {
 	}
 }
 
-func LoadTiledGraph2(file string) ITiledGraph2 {
-	tg := LoadTiledGraph(file).(*TiledGraph)
-	border_nodes, interior_nodes, border_range_map := _LoadTileRanges(file + "-tileranges")
-
-	return &TiledGraph2{
-		TiledGraph:       *tg,
-		border_nodes:     border_nodes,
-		interior_nodes:   interior_nodes,
-		border_range_map: border_range_map,
-	}
-}
-
 func LoadTiledGraph3(file string) *TiledGraph3 {
-	tg := LoadTiledGraph(file).(*TiledGraph)
+	tg := LoadTiledGraph(file)
 	tile_ranges, index_edges := _LoadTileRanges2(file + "-tileranges")
 
 	return &TiledGraph3{
@@ -131,55 +113,3 @@ func LoadTiledGraph3(file string) *TiledGraph3 {
 //*******************************************
 // load graph information
 //*******************************************
-
-func _LoadTileRanges(file string) (Dict[int16, Array[int32]], Dict[int16, Array[int32]], Dict[int16, Dict[int32, Array[float32]]]) {
-	_, err := os.Stat(file)
-	if errors.Is(err, os.ErrNotExist) {
-		panic("file not found: " + file)
-	}
-
-	tiledata, _ := os.ReadFile(file)
-	tilereader := bytes.NewReader(tiledata)
-	var tilecount int32
-	binary.Read(tilereader, binary.LittleEndian, &tilecount)
-
-	border_nodes := NewDict[int16, Array[int32]](100)
-	interior_nodes := NewDict[int16, Array[int32]](100)
-	border_range_map := NewDict[int16, Dict[int32, Array[float32]]](100)
-
-	for i := 0; i < int(tilecount); i++ {
-		var tile int16
-		binary.Read(tilereader, binary.LittleEndian, &tile)
-		var b_node_count int32
-		binary.Read(tilereader, binary.LittleEndian, &b_node_count)
-		b_nodes := NewArray[int32](int(b_node_count))
-		for j := 0; j < int(b_node_count); j++ {
-			var node int32
-			binary.Read(tilereader, binary.LittleEndian, &node)
-			b_nodes[j] = node
-		}
-		border_nodes[tile] = b_nodes
-		var i_node_count int32
-		binary.Read(tilereader, binary.LittleEndian, &i_node_count)
-		i_nodes := NewArray[int32](int(i_node_count))
-		for j := 0; j < int(i_node_count); j++ {
-			var node int32
-			binary.Read(tilereader, binary.LittleEndian, &node)
-			i_nodes[j] = node
-		}
-		interior_nodes[tile] = i_nodes
-		range_map := NewDict[int32, Array[float32]](int(b_node_count))
-		for _, b_node := range b_nodes {
-			ranges := NewArray[float32](int(i_node_count))
-			for j, _ := range i_nodes {
-				var dist float32
-				binary.Read(tilereader, binary.LittleEndian, &dist)
-				ranges[j] = dist
-			}
-			range_map[b_node] = ranges
-		}
-		border_range_map[tile] = range_map
-	}
-
-	return border_nodes, interior_nodes, border_range_map
-}
