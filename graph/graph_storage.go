@@ -204,13 +204,21 @@ func _StoreGraphGeom(nodes []geo.Coord, edges []geo.CoordArray, filename string)
 	c := 0
 	for i := 0; i < edgecount; i++ {
 		nc := len(edges[i])
+		if nc > 255 {
+			nc = 255
+		}
 		binary.Write(&geombuffer, binary.LittleEndian, int32(c))
 		binary.Write(&geombuffer, binary.LittleEndian, uint8(nc))
 		c += nc * 8
 	}
 	for i := 0; i < edgecount; i++ {
 		coords := edges[i]
-		for _, coord := range coords {
+		nc := len(coords)
+		if nc > 255 {
+			nc = 255
+		}
+		for j := 0; j < nc; j++ {
+			coord := coords[j]
 			binary.Write(&geombuffer, binary.LittleEndian, coord[0])
 			binary.Write(&geombuffer, binary.LittleEndian, coord[1])
 		}
