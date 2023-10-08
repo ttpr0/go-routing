@@ -274,22 +274,19 @@ func _FindNeighbours(explorer *CHPreprocGraphExplorer, id int32, is_contracted A
 // Performs a local dijkstra search from start until all targets are found or hop_limit reached.
 // Flags will be set in flags-array.
 // is_contracted contains true for every node that is already contracted (will not be used while finding shortest path).
-func _RunLocalSearch(start int32, targets List[int32], explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Array[_FlagSH], flag_count int32, is_contracted Array[bool], hop_limit int32) {
-	flags[start] = _FlagSH{
-		_counter:    flag_count,
+func _RunLocalSearch(start int32, targets List[int32], explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Flags[_FlagSH], is_contracted Array[bool], hop_limit int32) {
+	*flags.Get(start) = _FlagSH{
 		curr_length: 0,
 	}
 	target_count := targets.Length()
 	for _, target := range targets {
-		flags[target] = _FlagSH{
-			_counter:    flag_count,
+		*flags.Get(target) = _FlagSH{
 			curr_length: 1000000000,
 			_is_target:  true,
 		}
 	}
-	start_flag := flags[start]
+	start_flag := flags.Get(start)
 	start_flag.curr_length = 0
-	flags[start] = start_flag
 	heap.Enqueue(start, 0)
 
 	found_count := 0
@@ -298,12 +295,11 @@ func _RunLocalSearch(start int32, targets List[int32], explorer *CHPreprocGraphE
 		if !ok {
 			break
 		}
-		curr_flag := flags[curr_id]
+		curr_flag := flags.Get(curr_id)
 		if curr_flag.visited {
 			continue
 		}
 		curr_flag.visited = true
-		flags[curr_id] = curr_flag
 		if curr_flag._is_target {
 			found_count += 1
 		}
@@ -319,13 +315,7 @@ func _RunLocalSearch(start int32, targets List[int32], explorer *CHPreprocGraphE
 			if is_contracted[other_id] {
 				return
 			}
-			other_flag := flags[other_id]
-			if other_flag._counter != flag_count {
-				other_flag = _FlagSH{
-					_counter:    flag_count,
-					curr_length: 1000000000,
-				}
-			}
+			other_flag := flags.Get(other_id)
 			weight := explorer.GetEdgeWeight(ref)
 			newlength := curr_flag.curr_length + weight
 			if newlength < other_flag.curr_length {
@@ -336,13 +326,11 @@ func _RunLocalSearch(start int32, targets List[int32], explorer *CHPreprocGraphE
 				other_flag.is_shortcut = ref.IsShortcut()
 				heap.Enqueue(other_id, newlength)
 			}
-			flags[other_id] = other_flag
 		})
 	}
 }
 
 type _FlagSH struct {
-	_counter    int32
 	curr_length int32
 	curr_hops   int32
 	prev_edge   int32
@@ -352,12 +340,14 @@ type _FlagSH struct {
 	_is_target  bool
 }
 
-func _GetShortcut(from, to, via int32, explorer *CHPreprocGraphExplorer, flags Array[_FlagSH], flag_count int32) ([2]Tuple[int32, byte], bool) {
+// Returns the neccessary shortcut between from and to.
+// If no shortcut is needed false will be returned.
+func _GetShortcut(from, to, via int32, explorer *CHPreprocGraphExplorer, flags Flags[_FlagSH]) ([2]Tuple[int32, byte], bool) {
 	edges := [2]Tuple[int32, byte]{}
 
-	to_flag := flags[to]
+	to_flag := flags.Get(to)
 	// is target hasnt been found by search always add shortcut
-	if !to_flag.visited || to_flag._counter != flag_count {
+	if !to_flag.visited {
 		t_edge, _ := explorer.GetEdgeBetween(via, to)
 		if t_edge.IsCHShortcut() {
 			edges[0] = MakeTuple(t_edge.EdgeID, byte(2))
@@ -376,7 +366,7 @@ func _GetShortcut(from, to, via int32, explorer *CHPreprocGraphExplorer, flags A
 		if to_flag.prev_node != via {
 			return edges, false
 		}
-		node_flag := flags[via]
+		node_flag := flags.Get(via)
 		if node_flag.prev_node != from {
 			return edges, false
 		}
@@ -410,8 +400,7 @@ func CalcContraction(graph *CHPreprocGraph) {
 
 	is_contracted := NewArray[bool](graph.NodeCount())
 	heap := NewPriorityQueue[int32, int32](10)
-	flags := NewArray[_FlagSH](graph.NodeCount())
-	flag_count := int32(1)
+	flags := NewFlags[_FlagSH](int32(graph.NodeCount()), _FlagSH{curr_length: 100000000})
 	level := int16(0)
 	nodes := NewList[int32](graph.NodeCount())
 	explorer := graph.GetExplorer()
@@ -466,27 +455,19 @@ func CalcContraction(graph *CHPreprocGraph) {
 			for i := 0; i < len(in_neigbours); i++ {
 				from := in_neigbours[i]
 				heap.Clear()
-				_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+				flags.Reset()
+				_RunLocalSearch(from, out_neigbours, explorer, heap, flags, is_contracted, 1000000)
 				for j := 0; j < len(out_neigbours); j++ {
 					to := out_neigbours[j]
 					if from == to {
 						continue
 					}
-					edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+					edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags)
 					if !shortcut_needed {
 						continue
 					}
 					// add shortcut to graph
 					graph.AddShortcut(from, to, edges)
-				}
-				flag_count += 1
-				if flag_count > 4000000 {
-					for j := 0; j < graph.NodeCount(); j++ {
-						flag := flags[j]
-						flag._counter = 0
-						flags[j] = flag
-					}
-					flag_count = 3
 				}
 			}
 			is_contracted[node_id] = true
@@ -525,8 +506,7 @@ func CalcContraction2(graph *CHPreprocGraph, contraction_order Array[int32]) {
 	}
 	is_contracted := NewArray[bool](graph.NodeCount())
 	heap := NewPriorityQueue[int32, int32](10)
-	flags := NewArray[_FlagSH](graph.NodeCount())
-	flag_count := int32(1)
+	flags := NewFlags[_FlagSH](int32(graph.NodeCount()), _FlagSH{curr_length: 100000000})
 	explorer := graph.GetExplorer()
 
 	count := 0
@@ -549,27 +529,19 @@ func CalcContraction2(graph *CHPreprocGraph, contraction_order Array[int32]) {
 		for i := 0; i < len(in_neigbours); i++ {
 			from := in_neigbours[i]
 			heap.Clear()
-			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+			flags.Reset()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, is_contracted, 1000000)
 			for j := 0; j < len(out_neigbours); j++ {
 				to := out_neigbours[j]
 				if from == to {
 					continue
 				}
-				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags)
 				if !shortcut_needed {
 					continue
 				}
 				// add shortcut to graph
 				graph.AddShortcut(from, to, edges)
-			}
-			flag_count += 1
-			if flag_count > 4000000 {
-				for j := 0; j < graph.NodeCount(); j++ {
-					flag := flags[j]
-					flag._counter = 0
-					flags[j] = flag
-				}
-				flag_count = 3
 			}
 		}
 		dt_2 += time.Since(t2).Nanoseconds()
@@ -717,6 +689,7 @@ func MarkNodesOnPath(start, end int32, sp_counts Array[int32], graph IGraph, hea
 // preprocess ch 3
 //*******************************************
 
+// Computes contraction using 2*ED + CN + EC + 5*L with hop-limits.
 func CalcContraction3(graph *CHPreprocGraph) {
 	fmt.Println("started contracting graph...")
 
@@ -727,15 +700,18 @@ func CalcContraction3(graph *CHPreprocGraph) {
 	shortcut_edgecount := NewList[int8](10)
 
 	// initialize routing components
+	node_count := graph.NodeCount()
+	edge_count := graph.EdgeCount()
 	heap := NewPriorityQueue[int32, int32](10)
-	flags := NewArray[_FlagSH](graph.NodeCount())
+	flags := NewFlags[_FlagSH](int32(graph.NodeCount()), _FlagSH{curr_length: 100000000})
 	explorer := graph.GetExplorer()
+	hop_limit := int32(5)
 
 	// compute node priorities
 	fmt.Println("computing priorities...")
 	node_priorities := NewArray[int](graph.NodeCount())
 	for i := 0; i < graph.NodeCount(); i++ {
-		node_priorities[i] = _ComputeNodePriority(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+		node_priorities[i] = _ComputeNodePriority(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, hop_limit)
 	}
 
 	// put nodes into priority queue
@@ -746,7 +722,6 @@ func CalcContraction3(graph *CHPreprocGraph) {
 	}
 
 	fmt.Println("start contracting nodes...")
-	flag_count := int32(3)
 	count := 0
 	for {
 		temp, ok := contraction_order.Dequeue()
@@ -758,7 +733,7 @@ func CalcContraction3(graph *CHPreprocGraph) {
 		if is_contracted[node_id] || node_prio != node_priorities[node_id] {
 			continue
 		}
-
+		node_count -= 1
 		count += 1
 		if count%1000 == 0 {
 			fmt.Println("	node :", count, "/", graph.NodeCount())
@@ -767,21 +742,24 @@ func CalcContraction3(graph *CHPreprocGraph) {
 		// contract node
 		level := node_levels[node_id]
 		in_neigbours, out_neigbours := _FindNeighbours(explorer, node_id, is_contracted)
+		ed := len(in_neigbours) + len(out_neigbours)
 		for i := 0; i < len(in_neigbours); i++ {
 			from := in_neigbours[i]
 			heap.Clear()
-			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+			flags.Reset()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, is_contracted, hop_limit)
 			for j := 0; j < len(out_neigbours); j++ {
 				to := out_neigbours[j]
 				if from == to {
 					continue
 				}
-				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags)
 				if !shortcut_needed {
 					continue
 				}
 				// add shortcut to graph
 				graph.AddShortcut(from, to, edges)
+				ed -= 1
 
 				// compute number of edges representing the shortcut (limited to 3)
 				ec := int8(0)
@@ -800,15 +778,13 @@ func CalcContraction3(graph *CHPreprocGraph) {
 				}
 				shortcut_edgecount.Add(ec)
 			}
-			flag_count += 1
-			if flag_count > 4000000 {
-				for j := 0; j < graph.NodeCount(); j++ {
-					flag := flags[j]
-					flag._counter = 0
-					flags[j] = flag
-				}
-				flag_count = 3
-			}
+		}
+		edge_count -= ed
+		if edge_count*2/node_count > 5 {
+			hop_limit = 10
+		}
+		if edge_count*2/node_count > 10 {
+			hop_limit = 10000000
 		}
 		// set node to contracted
 		is_contracted[node_id] = true
@@ -818,7 +794,7 @@ func CalcContraction3(graph *CHPreprocGraph) {
 			nb := in_neigbours[i]
 			node_levels[nb] = Max(level+1, node_levels[nb])
 			contracted_neighbours[nb] += 1
-			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, hop_limit)
 			node_priorities[nb] = prio
 			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
 		}
@@ -826,7 +802,7 @@ func CalcContraction3(graph *CHPreprocGraph) {
 			nb := out_neigbours[i]
 			node_levels[nb] = Max(level+1, node_levels[nb])
 			contracted_neighbours[nb] += 1
-			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, hop_limit)
 			node_priorities[nb] = prio
 			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
 		}
@@ -837,21 +813,21 @@ func CalcContraction3(graph *CHPreprocGraph) {
 	fmt.Println("finished contracting graph")
 }
 
-func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Array[_FlagSH], flag_counts [2]int32, is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int], shortcut_edgecount List[int8]) int {
+func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Flags[_FlagSH], is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int], shortcut_edgecount List[int8], hop_limit int32) int {
 	in_neigbours, out_neigbours := _FindNeighbours(explorer, node, is_contracted)
 	edge_diff := -(len(in_neigbours) + len(out_neigbours))
 	edge_count := int8(0)
 	for i := 0; i < len(in_neigbours); i++ {
 		from := in_neigbours[i]
-		flag_count := flag_counts[i%2]
+		flags.Reset()
 		heap.Clear()
-		_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+		_RunLocalSearch(from, out_neigbours, explorer, heap, flags, is_contracted, hop_limit)
 		for j := 0; j < len(out_neigbours); j++ {
 			to := out_neigbours[j]
 			if from == to {
 				continue
 			}
-			edges, shortcut_needed := _GetShortcut(from, to, node, explorer, flags, flag_count)
+			edges, shortcut_needed := _GetShortcut(from, to, node, explorer, flags)
 			if !shortcut_needed {
 				continue
 			}
@@ -878,6 +854,7 @@ func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap Pri
 	return 2*edge_diff + contracted_neighbours[node] + int(edge_count) + 5*int(node_levels[node])
 }
 
+// Computes contraction using 2*ED + CN.
 func CalcContraction4(graph *CHPreprocGraph) {
 	fmt.Println("started contracting graph...")
 
@@ -888,14 +865,14 @@ func CalcContraction4(graph *CHPreprocGraph) {
 
 	// initialize routing components
 	heap := NewPriorityQueue[int32, int32](10)
-	flags := NewArray[_FlagSH](graph.NodeCount())
+	flags := NewFlags[_FlagSH](int32(graph.NodeCount()), _FlagSH{curr_length: 100000000})
 	explorer := graph.GetExplorer()
 
 	// compute node priorities
 	fmt.Println("computing priorities...")
 	node_priorities := NewArray[int](graph.NodeCount())
 	for i := 0; i < graph.NodeCount(); i++ {
-		node_priorities[i] = _ComputeNodePriority2(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours)
+		node_priorities[i] = _ComputeNodePriority2(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours)
 	}
 
 	// put nodes into priority queue
@@ -906,7 +883,6 @@ func CalcContraction4(graph *CHPreprocGraph) {
 	}
 
 	fmt.Println("start contracting nodes...")
-	flag_count := int32(3)
 	count := 0
 	for {
 		temp, ok := contraction_order.Dequeue()
@@ -930,27 +906,19 @@ func CalcContraction4(graph *CHPreprocGraph) {
 		for i := 0; i < len(in_neigbours); i++ {
 			from := in_neigbours[i]
 			heap.Clear()
-			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+			flags.Reset()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, is_contracted, 1000000)
 			for j := 0; j < len(out_neigbours); j++ {
 				to := out_neigbours[j]
 				if from == to {
 					continue
 				}
-				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags)
 				if !shortcut_needed {
 					continue
 				}
 				// add shortcut to graph
 				graph.AddShortcut(from, to, edges)
-			}
-			flag_count += 1
-			if flag_count > 4000000 {
-				for j := 0; j < graph.NodeCount(); j++ {
-					flag := flags[j]
-					flag._counter = 0
-					flags[j] = flag
-				}
-				flag_count = 3
 			}
 		}
 		// set node to contracted
@@ -961,7 +929,7 @@ func CalcContraction4(graph *CHPreprocGraph) {
 			nb := in_neigbours[i]
 			node_levels[nb] = Max(level+1, node_levels[nb])
 			contracted_neighbours[nb] += 1
-			prio := _ComputeNodePriority2(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours)
+			prio := _ComputeNodePriority2(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours)
 			node_priorities[nb] = prio
 			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
 		}
@@ -969,7 +937,7 @@ func CalcContraction4(graph *CHPreprocGraph) {
 			nb := out_neigbours[i]
 			node_levels[nb] = Max(level+1, node_levels[nb])
 			contracted_neighbours[nb] += 1
-			prio := _ComputeNodePriority2(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours)
+			prio := _ComputeNodePriority2(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours)
 			node_priorities[nb] = prio
 			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
 		}
@@ -980,20 +948,20 @@ func CalcContraction4(graph *CHPreprocGraph) {
 	fmt.Println("finished contracting graph")
 }
 
-func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Array[_FlagSH], flag_counts [2]int32, is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int]) int {
+func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Flags[_FlagSH], is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int]) int {
 	in_neigbours, out_neigbours := _FindNeighbours(explorer, node, is_contracted)
 	edge_diff := -(len(in_neigbours) + len(out_neigbours))
 	for i := 0; i < len(in_neigbours); i++ {
 		from := in_neigbours[i]
-		flag_count := flag_counts[i%2]
+		flags.Reset()
 		heap.Clear()
-		_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+		_RunLocalSearch(from, out_neigbours, explorer, heap, flags, is_contracted, 1000000)
 		for j := 0; j < len(out_neigbours); j++ {
 			to := out_neigbours[j]
 			if from == to {
 				continue
 			}
-			_, shortcut_needed := _GetShortcut(from, to, node, explorer, flags, flag_count)
+			_, shortcut_needed := _GetShortcut(from, to, node, explorer, flags)
 			if !shortcut_needed {
 				continue
 			}
@@ -1022,7 +990,7 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 
 	// initialize routing components
 	heap := NewPriorityQueue[int32, int32](10)
-	flags := NewArray[_FlagSH](graph.NodeCount())
+	flags := NewFlags[_FlagSH](int32(graph.NodeCount()), _FlagSH{curr_length: 100000000})
 	explorer := graph.GetExplorer()
 
 	// compute node priorities
@@ -1036,13 +1004,12 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 			node_priorities[i] = 10000000000
 			border_count += 1
 		}
-		prio := _ComputeNodePriority(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+		prio := _ComputeNodePriority(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, 100000)
 		node_priorities[i] = prio
 		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
 	}
 
 	fmt.Println("start contracting nodes...")
-	flag_count := int32(3)
 	contract_count := 0
 	is_border_contraction := false
 	for {
@@ -1067,7 +1034,7 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 				if !is_border[i] {
 					continue
 				}
-				prio := _ComputeNodePriority(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+				prio := _ComputeNodePriority(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, 100000)
 				node_priorities[i] = prio
 				contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
 			}
@@ -1079,13 +1046,14 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 		for i := 0; i < len(in_neigbours); i++ {
 			from := in_neigbours[i]
 			heap.Clear()
-			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+			flags.Reset()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, is_contracted, 1000000)
 			for j := 0; j < len(out_neigbours); j++ {
 				to := out_neigbours[j]
 				if from == to {
 					continue
 				}
-				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags)
 				if !shortcut_needed {
 					continue
 				}
@@ -1109,15 +1077,6 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 				}
 				shortcut_edgecount.Add(ec)
 			}
-			flag_count += 1
-			if flag_count > 4000000 {
-				for j := 0; j < graph.NodeCount(); j++ {
-					flag := flags[j]
-					flag._counter = 0
-					flags[j] = flag
-				}
-				flag_count = 3
-			}
 		}
 		// set node to contracted
 		is_contracted[node_id] = true
@@ -1130,7 +1089,7 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 			if is_border[nb] && !is_border_contraction {
 				continue
 			}
-			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, 100000)
 			node_priorities[nb] = prio
 			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
 		}
@@ -1141,7 +1100,7 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 			if is_border[nb] && !is_border_contraction {
 				continue
 			}
-			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, 100000)
 			node_priorities[nb] = prio
 			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
 		}
@@ -1185,7 +1144,7 @@ func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 
 	// initialize routing components
 	heap := NewPriorityQueue[int32, int32](10)
-	flags := NewArray[_FlagSH](graph.NodeCount())
+	flags := NewFlags[_FlagSH](int32(graph.NodeCount()), _FlagSH{curr_length: 100000000})
 	explorer := graph.GetExplorer()
 
 	// compute node priorities
@@ -1197,13 +1156,12 @@ func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 		if is_border[i] {
 			node_priorities[i] = 10000000000
 		}
-		prio := _ComputeNodePriority(int32(i), explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+		prio := _ComputeNodePriority(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, 100000)
 		node_priorities[i] = prio
 		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
 	}
 
 	fmt.Println("start contracting nodes...")
-	flag_count := int32(3)
 	contract_count := 0
 	for {
 		temp, ok := contraction_order.Dequeue()
@@ -1230,13 +1188,14 @@ func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 		for i := 0; i < len(in_neigbours); i++ {
 			from := in_neigbours[i]
 			heap.Clear()
-			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, flag_count, is_contracted, 1000000)
+			flags.Reset()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, is_contracted, 1000000)
 			for j := 0; j < len(out_neigbours); j++ {
 				to := out_neigbours[j]
 				if from == to {
 					continue
 				}
-				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags, flag_count)
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags)
 				if !shortcut_needed {
 					continue
 				}
@@ -1260,15 +1219,6 @@ func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 				}
 				shortcut_edgecount.Add(ec)
 			}
-			flag_count += 1
-			if flag_count > 4000000 {
-				for j := 0; j < graph.NodeCount(); j++ {
-					flag := flags[j]
-					flag._counter = 0
-					flags[j] = flag
-				}
-				flag_count = 3
-			}
 		}
 		// set node to contracted
 		is_contracted[node_id] = true
@@ -1281,7 +1231,7 @@ func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 			if is_border[nb] {
 				continue
 			}
-			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, 100000)
 			node_priorities[nb] = prio
 			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
 		}
@@ -1292,7 +1242,121 @@ func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 			if is_border[nb] {
 				continue
 			}
-			prio := _ComputeNodePriority(nb, explorer, heap, flags, [2]int32{1, 2}, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount)
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, 100000)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+	}
+	for i := 0; i < graph.NodeCount(); i++ {
+		graph.SetNodeLevel(int32(i), node_levels[i])
+	}
+	fmt.Println("finished contracting graph")
+}
+
+// Computes contraction using 2*ED + CN + EC + 5*L without hop-limits.
+func CalcContraction6(graph *CHPreprocGraph) {
+	fmt.Println("started contracting graph...")
+
+	// initialize
+	is_contracted := NewArray[bool](graph.NodeCount())
+	node_levels := NewArray[int16](graph.NodeCount())
+	contracted_neighbours := NewArray[int](graph.NodeCount())
+	shortcut_edgecount := NewList[int8](10)
+
+	// initialize routing components
+	heap := NewPriorityQueue[int32, int32](10)
+	flags := NewFlags[_FlagSH](int32(graph.NodeCount()), _FlagSH{curr_length: 100000000})
+	explorer := graph.GetExplorer()
+	hop_limit := int32(10000000)
+
+	// compute node priorities
+	fmt.Println("computing priorities...")
+	node_priorities := NewArray[int](graph.NodeCount())
+	for i := 0; i < graph.NodeCount(); i++ {
+		node_priorities[i] = _ComputeNodePriority(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, hop_limit)
+	}
+
+	// put nodes into priority queue
+	contraction_order := NewPriorityQueue[Tuple[int32, int], int](graph.NodeCount())
+	for i := 0; i < graph.NodeCount(); i++ {
+		prio := node_priorities[i]
+		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
+	}
+
+	fmt.Println("start contracting nodes...")
+	count := 0
+	for {
+		temp, ok := contraction_order.Dequeue()
+		if !ok {
+			break
+		}
+		node_id := temp.A
+		node_prio := temp.B
+		if is_contracted[node_id] || node_prio != node_priorities[node_id] {
+			continue
+		}
+		count += 1
+		if count%1000 == 0 {
+			fmt.Println("	node :", count, "/", graph.NodeCount())
+		}
+
+		// contract node
+		level := node_levels[node_id]
+		in_neigbours, out_neigbours := _FindNeighbours(explorer, node_id, is_contracted)
+		ed := len(in_neigbours) + len(out_neigbours)
+		for i := 0; i < len(in_neigbours); i++ {
+			from := in_neigbours[i]
+			heap.Clear()
+			flags.Reset()
+			_RunLocalSearch(from, out_neigbours, explorer, heap, flags, is_contracted, hop_limit)
+			for j := 0; j < len(out_neigbours); j++ {
+				to := out_neigbours[j]
+				if from == to {
+					continue
+				}
+				edges, shortcut_needed := _GetShortcut(from, to, node_id, explorer, flags)
+				if !shortcut_needed {
+					continue
+				}
+				// add shortcut to graph
+				graph.AddShortcut(from, to, edges)
+				ed -= 1
+
+				// compute number of edges representing the shortcut (limited to 3)
+				ec := int8(0)
+				if edges[0].B == 0 {
+					ec += 1
+				} else {
+					ec += shortcut_edgecount[edges[0].A]
+				}
+				if edges[1].B == 0 {
+					ec += 1
+				} else {
+					ec += shortcut_edgecount[edges[1].A]
+				}
+				if ec > 3 {
+					ec = 3
+				}
+				shortcut_edgecount.Add(ec)
+			}
+		}
+		// set node to contracted
+		is_contracted[node_id] = true
+
+		// update neighbours
+		for i := 0; i < len(in_neigbours); i++ {
+			nb := in_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, hop_limit)
+			node_priorities[nb] = prio
+			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
+		}
+		for i := 0; i < len(out_neigbours); i++ {
+			nb := out_neigbours[i]
+			node_levels[nb] = Max(level+1, node_levels[nb])
+			contracted_neighbours[nb] += 1
+			prio := _ComputeNodePriority(nb, explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, hop_limit)
 			node_priorities[nb] = prio
 			contraction_order.Enqueue(MakeTuple(nb, prio), prio)
 		}
