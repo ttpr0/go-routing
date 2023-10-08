@@ -16,6 +16,7 @@ func prepare() {
 	const DATA_DIR = "./data"
 	const GRAPH_DIR = "./graphs"
 	const GRAPH_NAME = "niedersachsen"
+	const KAHIP_EXE = "D:/Dokumente/BA/KaHIP/kaffpa"
 	var PARTITIONS = []int{1000}
 	//*******************************************
 	// Parse graph
@@ -57,7 +58,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			cmd := exec.Command("./KaHIP/kaffpa", GRAPH_NAME+"_metis.txt", "--k="+size, "--preconfiguration=eco", "--output_filename=tmp_"+size+".txt")
+			cmd := exec.Command(KAHIP_EXE, GRAPH_NAME+"_metis.txt", "--k="+size, "--preconfiguration=eco", "--output_filename=tmp_"+size+".txt")
 			if err := cmd.Run(); err != nil {
 				log.Fatal(err)
 			}
@@ -124,7 +125,7 @@ func create_grasp_graph(in_name, out_name, tiles_name string) {
 	g := graph.LoadGraph2(in_name)
 	tiles := graph.ReadNodeTiles(tiles_name)
 
-	tg := graph.PreprocessTiledGraph(g, tiles)
+	tg := graph.PreprocessTiledGraph3(g, tiles)
 
 	order := graph.ComputeTileOrdering(tg)
 	mapping := graph.NodeOrderToNodeMapping(order)
@@ -138,7 +139,7 @@ func create_isophast_graph(in_name, out_name, tiles_name string) {
 	g := graph.LoadGraph2(in_name)
 	tiles := graph.ReadNodeTiles(tiles_name)
 
-	tg := graph.PreprocessTiledGraph(g, tiles)
+	tg := graph.PreprocessTiledGraph3(g, tiles)
 
 	tg3 := graph.TransformToTiled4(tg)
 
@@ -150,7 +151,7 @@ func create_ch_graph(in_name, out_name string) {
 
 	dg := graph.TransformToCHPreprocGraph(g)
 
-	graph.CalcContraction3(dg)
+	graph.CalcContraction6(dg)
 
 	cg := graph.TransformFromCHPreprocGraph(dg)
 

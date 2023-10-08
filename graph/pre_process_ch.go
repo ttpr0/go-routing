@@ -1155,6 +1155,7 @@ func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 	for i := 0; i < graph.NodeCount(); i++ {
 		if is_border[i] {
 			node_priorities[i] = 10000000000
+			continue
 		}
 		prio := _ComputeNodePriority(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, 100000)
 		node_priorities[i] = prio

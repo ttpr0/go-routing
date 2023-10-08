@@ -72,13 +72,22 @@ func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 	}
 	ReorderTiledGraph(new_graph, mapping)
 	node_levels = reordered_node_levels
+	node_tiles = new_graph.skip_store.node_tiles
 
-	fmt.Println("Create downwards edge lists:")
-	edges := graph.store.edges
-	edge_weigths := graph.weight.edge_weights
+	// remap shortcuts
 	ch_shortcuts := dg.shortcuts
 	ch_weights := dg.sh_weight
-	tiles := _GetTiles(graph)
+	for i := 0; i < ch_shortcuts.Length(); i++ {
+		shc := ch_shortcuts[i]
+		shc.NodeA = mapping[shc.NodeA]
+		shc.NodeB = mapping[shc.NodeB]
+		ch_shortcuts[i] = shc
+	}
+
+	fmt.Println("Create downwards edge lists:")
+	edges := new_graph.store.edges
+	edge_weigths := new_graph.weight.edge_weights
+	tiles := _GetTiles(new_graph)
 	index_edges := NewList[TiledSHEdge](100)
 	tile_ranges := NewDict[int16, Tuple[int32, int32]](tiles.Length())
 	for index, tile := range tiles {
