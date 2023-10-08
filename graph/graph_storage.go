@@ -40,7 +40,14 @@ func (self *GraphStore) GetNodeGeom(node int32) geo.Coord {
 	return self.node_geoms[node]
 }
 func (self *GraphStore) GetEdgeGeom(edge int32) geo.CoordArray {
-	return self.edge_geoms[edge]
+	geom := self.edge_geoms[edge]
+	if geom == nil {
+		e := self.GetEdge(edge)
+		geom = make([]geo.Coord, 2)
+		geom[0] = self.GetNodeGeom(e.NodeA)
+		geom[1] = self.GetNodeGeom(e.NodeB)
+	}
+	return geom
 }
 
 func _StoreGraphStorage(store GraphStore, file string) {
@@ -55,6 +62,21 @@ func _LoadGraphStorage(file string) GraphStore {
 	edges := _LoadGraphEdges(file + "-edges")
 	edgecount := len(edges)
 	node_geoms, edge_geoms := _LoadGraphGeom(file+"-geom", nodecount, edgecount)
+
+	return GraphStore{
+		nodes:      nodes,
+		edges:      edges,
+		node_geoms: node_geoms,
+		edge_geoms: edge_geoms,
+	}
+}
+
+func _LoadGraphStorageMin(file string) GraphStore {
+	nodes := _LoadGraphNodes(file + "-nodes")
+	nodecount := len(nodes)
+	edges := _LoadGraphEdges(file + "-edges")
+	edgecount := len(edges)
+	node_geoms, edge_geoms := _LoadGraphGeomMin(file+"-geom", nodecount, edgecount)
 
 	return GraphStore{
 		nodes:      nodes,
@@ -263,6 +285,42 @@ func _LoadGraphGeom(file string, nodecount, edgecount int) ([]geo.Coord, []geo.C
 			points[j][1] = lat
 		}
 		edge_geoms[i] = points
+	}
+
+	return node_geoms, edge_geoms
+}
+
+func _LoadGraphGeomMin(file string, nodecount, edgecount int) ([]geo.Coord, []geo.CoordArray) {
+	_, err := os.Stat(file)
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file)
+	}
+
+	geomdata, _ := os.ReadFile(file)
+	startindex := nodecount*8 + edgecount*5
+	geomreader := bytes.NewReader(geomdata)
+	linereader := bytes.NewReader(geomdata[startindex:])
+	node_geoms := make([]geo.Coord, nodecount)
+	for i := 0; i < int(nodecount); i++ {
+		var lon float32
+		binary.Read(geomreader, binary.LittleEndian, &lon)
+		var lat float32
+		binary.Read(geomreader, binary.LittleEndian, &lat)
+		node_geoms[i] = geo.Coord{lon, lat}
+	}
+	edge_geoms := make([]geo.CoordArray, edgecount)
+	for i := 0; i < int(edgecount); i++ {
+		var s int32
+		binary.Read(geomreader, binary.LittleEndian, &s)
+		var c byte
+		binary.Read(geomreader, binary.LittleEndian, &c)
+		for j := 0; j < int(c); j++ {
+			var lon float32
+			binary.Read(linereader, binary.LittleEndian, &lon)
+			var lat float32
+			binary.Read(linereader, binary.LittleEndian, &lat)
+		}
+		edge_geoms[i] = nil
 	}
 
 	return node_geoms, edge_geoms

@@ -24,19 +24,21 @@ func LoadGraph(file string) *Graph {
 	}
 }
 
-// func LoadGraph2(file string) *Graph {
-// 	store := _LoadGraphStorage(file)
-// 	topology := _BuildTopology(store)
-// 	weighting := _BuildWeighting(store)
-// 	index := _BuildKDTreeIndex(store)
+func LoadGraph2(file string) *Graph {
+	store := _LoadGraphStorageMin(file)
+	nodecount := store.NodeCount()
+	edgecount := store.EdgeCount()
+	topology := _LoadAdjacency(file+"-graph", false, nodecount)
+	weights := _LoadDefaultWeighting(file+"-fastest_weighting", edgecount)
+	index := _BuildKDTreeIndex(store)
 
-// 	return &Graph{
-// 		store:    store,
-// 		topology: topology,
-// 		weight:   weighting,
-// 		index:    index,
-// 	}
-// }
+	return &Graph{
+		store:    store,
+		topology: *topology,
+		weight:   *weights,
+		index:    index,
+	}
+}
 
 func LoadCHGraph(file string) *CHGraph {
 	store := _LoadGraphStorage(file)
