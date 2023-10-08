@@ -1,42 +1,51 @@
 package util
 
+type _Flag[T any] struct {
+	data     T
+	_counter int32
+}
+
 type Flags[T any] struct {
-	flags       Array[T]
-	flag_counts Array[int32]
-	_default    T
-	_counter    int32
+	flags    Array[_Flag[T]]
+	_default T
+	_counter *int32
 }
 
 func NewFlags[T any](count int32, default_data T) Flags[T] {
-	flags := NewArray[T](int(count))
-	flag_counts := NewArray[int32](int(count))
+	flags := NewArray[_Flag[T]](int(count))
 	for i := 0; i < flags.Length(); i++ {
-		flags[i] = default_data
-		flag_counts[i] = 0
+		flags[i] = _Flag[T]{
+			data:     default_data,
+			_counter: 0,
+		}
 	}
+	counter := int32(0)
 	return Flags[T]{
-		flags:       flags,
-		flag_counts: flag_counts,
-		_default:    default_data,
-		_counter:    0,
+		flags:    flags,
+		_default: default_data,
+		_counter: &counter,
 	}
 }
 
 func (self *Flags[T]) Get(id int32) *T {
 	flag := &(self.flags[id])
-	if self.flag_counts[id] != self._counter {
-		*flag = self._default
-		self.flag_counts[id] = self._counter
+	if flag._counter != *self._counter {
+		*flag = _Flag[T]{
+			data:     self._default,
+			_counter: *self._counter,
+		}
 	}
-	return flag
+	return &flag.data
 }
 func (self *Flags[T]) Reset() {
-	self._counter += 1
-	if self._counter > 4000000 {
+	*self._counter += 1
+	if *self._counter > 4000000 {
 		for i := 0; i < self.flags.Length(); i++ {
-			self.flags[i] = self._default
-			self.flag_counts[i] = 0
+			self.flags[i] = _Flag[T]{
+				data:     self._default,
+				_counter: 0,
+			}
 		}
-		self._counter = 0
+		*self._counter = 0
 	}
 }
