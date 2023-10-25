@@ -11,7 +11,7 @@ func (self *Optional[T]) HasValue() bool {
 }
 
 // Creates an optional with set value.
-func Ok[T any](value T) Optional[T] {
+func Some[T any](value T) Optional[T] {
 	return Optional[T]{
 		Value:      value,
 		_has_value: true,

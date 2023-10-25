@@ -3,10 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"math"
-	"net/http"
 	"os"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/decay"
@@ -79,25 +76,6 @@ func NewGeoJSONFeature() GeoJSONFeature {
 	line.Geom = make(map[string]any)
 	line.Props = make(map[string]any)
 	return line
-}
-
-func ReadRequestBody[T any](r *http.Request) T {
-	data, err := io.ReadAll(r.Body)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	var req T
-	err = json.Unmarshal(data, &req)
-	if err != nil {
-		fmt.Println(err.Error())
-	}
-	return req
-}
-
-func WriteResponse[T any](w http.ResponseWriter, resp T, status int) {
-	data, _ := json.Marshal(resp)
-	w.WriteHeader(status)
-	w.Write(data)
 }
 
 func GetDemandView(param DemandRequestParams) view.IPointView {
