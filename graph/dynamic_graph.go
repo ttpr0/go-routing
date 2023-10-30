@@ -263,13 +263,14 @@ func (self *DynGraph) ConvertToGraph() *Graph {
 		node_geoms: new_node_geoms,
 		edge_geoms: new_edge_geoms,
 	}
-	weight := _BuildWeighting(new_store)
+	base := GraphBase{
+		store:    new_store,
+		topology: _BuildTopology(new_store),
+		index:    _BuildKDTreeIndex(new_store),
+	}
+	weight := BuildDefaultWeighting(base)
 	return &Graph{
-		base: GraphBase{
-			store:    new_store,
-			topology: _BuildTopology(new_store),
-			index:    _BuildKDTreeIndex(new_store),
-		},
-		weight: &weight,
+		base:   base,
+		weight: weight,
 	}
 }

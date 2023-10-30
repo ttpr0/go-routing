@@ -5,7 +5,7 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func CalcPHAST4(g *graph.CHGraph, start int32, max_range int32) Array[int32] {
+func CalcPHAST4(g graph.ICHGraph, start int32, max_range int32) Array[int32] {
 	active_tiles := NewArray[bool](g.TileCount())
 	visited := NewArray[bool](g.NodeCount())
 	dist := NewArray[int32](g.NodeCount())
@@ -93,7 +93,7 @@ func CalcPHAST4(g *graph.CHGraph, start int32, max_range int32) Array[int32] {
 	return dist
 }
 
-func CalcPHAST5(g *graph.CHGraph, start int32, max_range int32) Array[int32] {
+func CalcPHAST5(g graph.ICHGraph, start int32, max_range int32) Array[int32] {
 	active_tiles := NewArray[bool](g.TileCount())
 	visited := NewArray[bool](g.NodeCount())
 	dist := NewArray[int32](g.NodeCount())

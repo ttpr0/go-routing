@@ -13,7 +13,7 @@ import (
 // simple 2sfca using rphast
 // *******************************************
 
-func CalcRPHAST2SFCA(g *graph.CHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcRPHAST2SFCA(g graph.ICHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// node queue for selecting graph subset
 	node_queue := NewQueue[int32]()
 
@@ -186,7 +186,7 @@ func CalcRPHAST2SFCA(g *graph.CHGraph, dem view.IPointView, sup view.IPointView,
 // phast with range restriction
 // *******************************************
 
-func CalcRPHAST2SFCA2(g *graph.CHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcRPHAST2SFCA2(g graph.ICHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// node queue for selecting graph subset
 	node_queue := NewQueue[int32]()
 
@@ -332,7 +332,7 @@ func CalcRPHAST2SFCA2(g *graph.CHGraph, dem view.IPointView, sup view.IPointView
 // rphast with range
 // *******************************************
 
-func CalcRPHAST2SFCA3(g *graph.CHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcRPHAST2SFCA3(g graph.ICHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// node queue for selecting graph subset
 	node_queue := NewQueue[int32]()
 
@@ -511,7 +511,7 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph, dem view.IPointView, sup view.IPointView
 // rphast with range selected edge subset
 // *******************************************
 
-func CalcRPHAST2SFCA4(g *graph.CHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcRPHAST2SFCA4(g graph.ICHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// node queue for selecting graph subset
 	node_queue := NewPriorityQueue[int32, int32](10000)
 

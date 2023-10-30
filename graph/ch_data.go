@@ -57,12 +57,12 @@ func (self *_CHData) _ReorderNodes(mapping Array[int32]) {
 
 type _CHDataHandler struct{}
 
-func (self _CHDataHandler) Load(dir string, name string, nodecount int) ISpeedUpData {
+func (self _CHDataHandler) Load(dir string, name string) ISpeedUpData {
+	meta := ReadJSONFromFile[_CHDataMeta](dir + name + "-meta")
 	id_mapping := _LoadIDMapping(dir + name + "-mapping")
-	ch_topology := _LoadAdjacency(dir+name+"-ch_graph", false, nodecount)
+	ch_topology := _LoadAdjacency(dir+name+"-ch_graph", false, int(meta.NodeCount))
 	ch_shortcuts := _LoadShortcuts(dir + name + "-shortcut")
 	node_levels := ReadArrayFromFile[int16](dir + name + "-level")
-	meta := ReadJSONFromFile[_CHDataMeta](dir + name + "-meta")
 
 	return &_CHData{
 		id_mapping: id_mapping,
@@ -90,6 +90,7 @@ func (self _CHDataHandler) Store(dir string, name string, data ISpeedUpData) {
 		BaseWeighting:   ch_data._base_weighting,
 		BuildWithTiles:  ch_data._build_with_tiles,
 		ContainsDummies: ch_data._contains_dummies,
+		NodeCount:       int32(ch_data.node_levels.Length()),
 	}
 	WriteJSONToFile(meta, dir+name+"-meta")
 }
@@ -101,18 +102,35 @@ func (self _CHDataHandler) Remove(dir string, name string) {
 	os.Remove(dir + name + "-ch_tiles")
 	os.Remove(dir + name + "-meta")
 }
-func (self _CHDataHandler) _ReorderNodes(dir string, name string, mapping Array[int32]) {
-	id_mapping := _LoadIDMapping(dir + name + "-mapping")
-	id_mapping.ReorderSources(mapping)
-	_StoreIDMapping(id_mapping, dir+name+"-mapping")
+func (self _CHDataHandler) _ReorderNodes(dir string, name string, mapping Array[int32], typ ReorderType) {
+	if typ == ONLY_SOURCE_NODES {
+		id_mapping := _LoadIDMapping(dir + name + "-mapping")
+		id_mapping.ReorderSources(mapping)
+		_StoreIDMapping(id_mapping, dir+name+"-mapping")
+	} else if typ == ONLY_TARGET_NODES {
+		panic("not implemented")
+	} else if typ == ALL_NODES {
+		panic("not implemented")
+	} else {
+		panic("not implemented")
+	}
 }
-func (self _CHDataHandler) _ReorderNodesInplace(data ISpeedUpData, mapping Array[int32]) {
+func (self _CHDataHandler) _ReorderNodesInplace(data ISpeedUpData, mapping Array[int32], typ ReorderType) {
 	ch_data := data.(*_CHData)
-	ch_data.id_mapping.ReorderSources(mapping)
+	if typ == ONLY_SOURCE_NODES {
+		ch_data.id_mapping.ReorderSources(mapping)
+	} else if typ == ONLY_TARGET_NODES {
+		ch_data._ReorderNodes(mapping)
+	} else if typ == ALL_NODES {
+		panic("not implemented")
+	} else {
+		panic("not implemented")
+	}
 }
 
 type _CHDataMeta struct {
 	BaseWeighting   string `json:base_weighting`
 	BuildWithTiles  bool   `json:built_with_tiles`
 	ContainsDummies bool   `json:contains_dummies`
+	NodeCount       int32  `json:node_count`
 }

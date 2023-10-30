@@ -3,138 +3,124 @@ package graph
 import (
 	"sort"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 //*******************************************
-// modifikation methods
+// modification methods
 //*******************************************
 
-func RemoveNodes(graph *Graph, nodes List[int32]) *Graph {
-	store := graph.base.store
-
-	remove := NewArray[bool](store.NodeCount())
-	for _, n := range nodes {
-		remove[n] = true
-	}
-
-	new_nodes := NewList[Node](100)
-	new_node_geoms := NewList[geo.Coord](100)
-	mapping := NewArray[int32](store.NodeCount())
-	id := int32(0)
-	for i := 0; i < store.NodeCount(); i++ {
-		if remove[i] {
-			mapping[i] = -1
-			continue
-		}
-		new_nodes.Add(store.GetNode(int32(i)))
-		new_node_geoms.Add(store.GetNodeGeom(int32(i)))
-		mapping[i] = id
-		id += 1
-	}
-	new_edges := NewList[Edge](100)
-	new_edge_geoms := NewList[geo.CoordArray](100)
-	for i := 0; i < store.EdgeCount(); i++ {
-		edge := store.GetEdge(int32(i))
-		if remove[edge.NodeA] || remove[edge.NodeB] {
-			continue
-		}
-		new_edges.Add(Edge{
-			NodeA:    mapping[edge.NodeA],
-			NodeB:    mapping[edge.NodeB],
-			Type:     edge.Type,
-			Length:   edge.Length,
-			Maxspeed: edge.Maxspeed,
-			Oneway:   edge.Oneway,
-		})
-		new_edge_geoms.Add(store.GetEdgeGeom(int32(i)))
-	}
-
-	new_store := GraphStore{
-		nodes:      Array[Node](new_nodes),
-		edges:      Array[Edge](new_edges),
-		node_geoms: new_node_geoms,
-		edge_geoms: new_edge_geoms,
-	}
-	weight := _BuildWeighting(new_store)
-	return &Graph{
-		base: GraphBase{
-			store:    new_store,
-			topology: _BuildTopology(new_store),
-			index:    _BuildKDTreeIndex(new_store),
-		},
-		weight: &weight,
-	}
+// Removes all weightings and speed-ups.
+func RemoveBaseNodes(base *GraphBase, nodes List[int32]) {
+	base._RemoveNodes(nodes)
 }
 
 //*******************************************
 // reordering methods
 //*******************************************
 
-func SortNodesByLevel(g *CHGraph) {
-	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
-	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), g.GetNodeLevel(int32(i))))
-	}
-	sort.SliceStable(indices, func(i, j int) bool {
-		return indices[i].B > indices[j].B
-	})
-	order := NewArray[int32](len(indices))
-	for i, index := range indices {
-		order[i] = index.A
-	}
-
-	mapping := NewArray[int32](len(order))
-	for new_id, id := range order {
-		mapping[int(id)] = int32(new_id)
-	}
-
-	ReorderCHGraph(g, mapping)
+// reorders node information of base-graph,
+// mapping: old id -> new id
+func ReorderGraphBaseNodes(base *GraphBase, mapping Array[int32]) {
+	base._ReorderNodes(mapping)
 }
 
-// Reorders nodes in graph inplace.
-// "node_mapping" maps old id -> new id.
-func ReorderGraph(g *Graph, node_mapping Array[int32]) {
-	g.base._ReorderNodes(node_mapping)
-	panic("dont use this")
-	// g.weight._ReorderNodes(node_mapping)
+// reorders node information of base-graph,
+// mapping: old id -> new id
+func ReorderWeightingNodes(weight IWeighting, mapping Array[int32]) {
+	w_h := WEIGHTING_HANDLERS[weight.Type()]
+	w_h._ReorderNodes(weight, mapping)
 }
 
-// Reorders nodes in graph inplace.
-// "node_mapping" maps old id -> new id.
-func ReorderCHGraph(g *CHGraph, node_mapping Array[int32]) {
-	g.base._ReorderNodes(node_mapping)
-	panic("dont use this")
-	// g.weight._ReorderNodes(node_mapping)
+type ReorderType byte
 
-	g.ch_shortcuts._ReorderNodes(node_mapping)
-	g.ch_topology._ReorderNodes(node_mapping)
-	Reorder[int16](g.node_levels, node_mapping)
+const (
+	ALL_NODES         ReorderType = 0
+	ONLY_SOURCE_NODES ReorderType = 2
+	ONLY_TARGET_NODES ReorderType = 4
+)
 
-	if g._build_with_tiles {
-		Reorder[int16](g.node_tiles.Value, node_mapping)
-	}
-
-	if g.HasDownEdges(FORWARD) || g.HasDownEdges(BACKWARD) {
-		panic("not implemented")
-	}
+// reorders node information of base-graph,
+// mapping: old id -> new id
+func ReorderSpeedUpNodes(speed ISpeedUpData, mapping Array[int32], typ ReorderType) {
+	s_h := SPEEDUP_HANDLERS[speed.Type()]
+	s_h._ReorderNodesInplace(speed, mapping, typ)
 }
 
-// Reorders nodes in graph inplace.
-// "node_mapping" maps old id -> new id.
-func ReorderTiledGraph(g *TiledGraph, node_mapping Array[int32]) {
-	g.base._ReorderNodes(node_mapping)
-	panic("dont use this")
-	// g.weight._ReorderNodes(node_mapping)
-
-	g.skip_shortcuts._ReorderNodes(node_mapping)
-	g.skip_topology._ReorderNodes(node_mapping)
-	Reorder[int16](g.node_tiles, node_mapping)
-	if g.HasCellIndex() {
-		g.cell_index.Value._ReorderNodes(node_mapping)
-	}
+// reorders node information of base-graph,
+// mapping: old id -> new id
+func ReorderStoredSpeedUpNodes(dir, name string, typ1 SpeedUpType, mapping Array[int32], typ2 ReorderType) {
+	s_h := SPEEDUP_HANDLERS[typ1]
+	s_h._ReorderNodes(dir, name, mapping, typ2)
 }
+
+// func SortNodesByLevel(g *CHGraph) {
+// 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
+// 	for i := 0; i < int(g.NodeCount()); i++ {
+// 		indices.Add(MakeTuple(int32(i), g.GetNodeLevel(int32(i))))
+// 	}
+// 	sort.SliceStable(indices, func(i, j int) bool {
+// 		return indices[i].B > indices[j].B
+// 	})
+// 	order := NewArray[int32](len(indices))
+// 	for i, index := range indices {
+// 		order[i] = index.A
+// 	}
+
+// 	mapping := NewArray[int32](len(order))
+// 	for new_id, id := range order {
+// 		mapping[int(id)] = int32(new_id)
+// 	}
+
+// 	ReorderCHGraph(g, mapping)
+// }
+
+// // Reorders nodes in graph inplace.
+// // "node_mapping" maps old id -> new id.
+// func ReorderGraph(g *Graph, node_mapping Array[int32]) {
+// 	g.base._ReorderNodes(node_mapping)
+// 	panic("dont use this")
+// 	// g.weight._ReorderNodes(node_mapping)
+// }
+
+// // Reorders nodes in graph inplace.
+// // "node_mapping" maps old id -> new id.
+// func ReorderCHGraph(g *CHGraph, node_mapping Array[int32]) {
+// 	g.base._ReorderNodes(node_mapping)
+// 	panic("dont use this")
+// 	// g.weight._ReorderNodes(node_mapping)
+
+// 	g.ch_shortcuts._ReorderNodes(node_mapping)
+// 	g.ch_topology._ReorderNodes(node_mapping)
+// 	Reorder[int16](g.node_levels, node_mapping)
+
+// 	if g._build_with_tiles {
+// 		Reorder[int16](g.node_tiles.Value, node_mapping)
+// 	}
+
+// 	if g.HasDownEdges(FORWARD) || g.HasDownEdges(BACKWARD) {
+// 		panic("not implemented")
+// 	}
+// }
+
+// // Reorders nodes in graph inplace.
+// // "node_mapping" maps old id -> new id.
+// func ReorderTiledGraph(g *TiledGraph, node_mapping Array[int32]) {
+// 	g.base._ReorderNodes(node_mapping)
+// 	panic("dont use this")
+// 	// g.weight._ReorderNodes(node_mapping)
+
+// 	g.skip_shortcuts._ReorderNodes(node_mapping)
+// 	g.skip_topology._ReorderNodes(node_mapping)
+// 	Reorder[int16](g.node_tiles, node_mapping)
+// 	if g.HasCellIndex() {
+// 		g.cell_index.Value._ReorderNodes(node_mapping)
+// 	}
+// }
+
+//*******************************************
+// compute orderings
+//*******************************************
 
 // Orders nodes by CH-level.
 func ComputeLevelOrdering(g IGraph, node_levels Array[int16]) Array[int32] {

@@ -321,35 +321,37 @@ func _CreateSkipTopology(graph *Graph, shortcuts *ShortcutStore, edge_types Arra
 // preprocess tiled-graph index
 //*******************************************
 
-func PrepareGRASPCellIndex(graph *TiledGraph) {
-	tiles := _GetTiles(graph.node_tiles)
-	cell_index := _NewCellIndex()
-	for index, tile := range tiles {
-		fmt.Println("Process Tile:", index, "/", len(tiles))
-		index_edges := NewList[Shortcut](4)
-		b_nodes, i_nodes := _GetBorderNodes(graph, tile)
-		flags := NewDict[int32, _Flag](100)
-		for _, b_node := range b_nodes {
-			flags.Clear()
-			_CalcFullSPT(graph, b_node, flags)
-			for _, i_node := range i_nodes {
-				if flags.ContainsKey(i_node) {
-					flag := flags[i_node]
-					index_edges.Add(Shortcut{
-						From:   b_node,
-						To:     i_node,
-						Weight: flag.pathlength,
-					})
-				}
-			}
-		}
-		cell_index.SetFWDIndexEdges(tile, Array[Shortcut](index_edges))
-	}
-	graph.cell_index = Some(cell_index)
-}
+// func PrepareGRASPCellIndex(graph *TiledGraph) {
+// 	tiles := _GetTiles(graph.node_tiles)
+// 	cell_index := _NewCellIndex()
+// 	for index, tile := range tiles {
+// 		fmt.Println("Process Tile:", index, "/", len(tiles))
+// 		index_edges := NewList[Shortcut](4)
+// 		b_nodes, i_nodes := _GetBorderNodes(graph, tile)
+// 		flags := NewDict[int32, _Flag](100)
+// 		for _, b_node := range b_nodes {
+// 			flags.Clear()
+// 			_CalcFullSPT(graph, b_node, flags)
+// 			for _, i_node := range i_nodes {
+// 				if flags.ContainsKey(i_node) {
+// 					flag := flags[i_node]
+// 					index_edges.Add(Shortcut{
+// 						From:   b_node,
+// 						To:     i_node,
+// 						Weight: flag.pathlength,
+// 					})
+// 				}
+// 			}
+// 		}
+// 		cell_index.SetFWDIndexEdges(tile, Array[Shortcut](index_edges))
+// 	}
+// 	graph.cell_index = Some(cell_index)
+// }
 
 // Modifies tiled-data inplace.
-func PrepareGRASPCellIndex2(graph *Graph, data *_TiledData) {
+func PrepareGRASPCellIndex2(graph *Graph, tiled_data ISpeedUpData) {
+	data := tiled_data.(*_TiledData)
+
 	temp_graph := &TiledGraph{
 		base:   graph.base,
 		weight: graph.weight,

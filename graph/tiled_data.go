@@ -46,11 +46,11 @@ func (self *_TiledData) _ReorderNodes(mapping Array[int32]) {
 
 type _TiledDataHandler struct{}
 
-func (self _TiledDataHandler) Load(dir string, name string, nodecount int) ISpeedUpData {
+func (self _TiledDataHandler) Load(dir string, name string) ISpeedUpData {
 	id_mapping := _LoadIDMapping(dir + name + "-mapping")
 	skip_shortcuts := _LoadShortcuts(dir + name + "skip_shortcuts")
-	skip_topology := _LoadAdjacency(dir+name+"-skip_topology", true, nodecount)
 	node_tiles := ReadArrayFromFile[int16](dir + name + "-tiles")
+	skip_topology := _LoadAdjacency(dir+name+"-skip_topology", true, node_tiles.Length())
 	edge_types := ReadArrayFromFile[byte](dir + name + "-tiles_types")
 
 	var cell_index Optional[_CellIndex]
@@ -100,14 +100,30 @@ func (self _TiledDataHandler) Remove(dir string, name string) {
 	os.Remove(dir + name + "-tileranges")
 	os.Remove(dir + name + "-meta")
 }
-func (self _TiledDataHandler) _ReorderNodes(dir string, name string, mapping Array[int32]) {
-	id_mapping := _LoadIDMapping(dir + name + "-mapping")
-	id_mapping.ReorderSources(mapping)
-	_StoreIDMapping(id_mapping, dir+name+"-mapping")
+func (self _TiledDataHandler) _ReorderNodes(dir string, name string, mapping Array[int32], typ ReorderType) {
+	if typ == ONLY_SOURCE_NODES {
+		id_mapping := _LoadIDMapping(dir + name + "-mapping")
+		id_mapping.ReorderSources(mapping)
+		_StoreIDMapping(id_mapping, dir+name+"-mapping")
+	} else if typ == ONLY_TARGET_NODES {
+		panic("not implemented")
+	} else if typ == ALL_NODES {
+		panic("not implemented")
+	} else {
+		panic("not implemented")
+	}
 }
-func (self _TiledDataHandler) _ReorderNodesInplace(data ISpeedUpData, mapping Array[int32]) {
+func (self _TiledDataHandler) _ReorderNodesInplace(data ISpeedUpData, mapping Array[int32], typ ReorderType) {
 	tiled_data := data.(*_TiledData)
-	tiled_data.id_mapping.ReorderSources(mapping)
+	if typ == ONLY_SOURCE_NODES {
+		tiled_data.id_mapping.ReorderSources(mapping)
+	} else if typ == ONLY_TARGET_NODES {
+		tiled_data._ReorderNodes(mapping)
+	} else if typ == ALL_NODES {
+		panic("not implemented")
+	} else {
+		panic("not implemented")
+	}
 }
 
 type _TiledDataMeta struct {

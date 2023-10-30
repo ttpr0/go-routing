@@ -5,23 +5,89 @@ import (
 )
 
 //*******************************************
-// build graph from graphstore
+// build graphs
 //*******************************************
 
-func BuildGraph(store GraphStore) *Graph {
-	weight := _BuildWeighting(store)
+func BuildBaseGraph(base *GraphBase, weight IWeighting) *Graph {
 	return &Graph{
-		base: GraphBase{
-			store:    store,
-			topology: _BuildTopology(store),
-			index:    _BuildKDTreeIndex(store),
-		},
-		weight: &weight,
+		base:   *base,
+		weight: weight,
+	}
+}
+
+func BuildCHGraph(base *GraphBase, weight IWeighting, ch_data ISpeedUpData) *CHGraph {
+	data := ch_data.(*_CHData)
+
+	return &CHGraph{
+		base:   *base,
+		weight: weight,
+
+		id_mapping: data.id_mapping,
+
+		_build_with_tiles: data._build_with_tiles,
+
+		ch_shortcuts: data.shortcuts,
+		ch_topology:  data.topology,
+		node_levels:  data.node_levels,
+	}
+}
+
+func BuildCHGraph2(base *GraphBase, weight IWeighting, ch_data ISpeedUpData) *CHGraph2 {
+	data := ch_data.(*_CHData)
+
+	return &CHGraph2{
+		base:   *base,
+		weight: weight,
+
+		id_mapping: data.id_mapping,
+
+		_build_with_tiles: data._build_with_tiles,
+
+		ch_shortcuts: data.shortcuts,
+		ch_topology:  data.topology,
+		node_levels:  data.node_levels,
+
+		node_tiles: data.node_tiles,
+
+		fwd_down_edges: data.fwd_down_edges,
+		bwd_down_edges: data.bwd_down_edges,
+	}
+}
+
+func BuildTiledGraph(base *GraphBase, weight IWeighting, tiled_data ISpeedUpData) *TiledGraph {
+	data := tiled_data.(*_TiledData)
+
+	return &TiledGraph{
+		base:   *base,
+		weight: weight,
+
+		skip_shortcuts: data.skip_shortcuts,
+		skip_topology:  data.skip_topology,
+		node_tiles:     data.node_tiles,
+		edge_types:     data.edge_types,
+		cell_index:     data.cell_index,
+	}
+}
+
+func BuildTiledGraph2(base *GraphBase, weight IWeighting, tiled_data ISpeedUpData) *TiledGraph2 {
+	data := tiled_data.(*_TiledData)
+
+	return &TiledGraph2{
+		base:   *base,
+		weight: weight,
+
+		id_mapping: data.id_mapping,
+
+		skip_shortcuts: data.skip_shortcuts,
+		skip_topology:  data.skip_topology,
+		node_tiles:     data.node_tiles,
+		edge_types:     data.edge_types,
+		cell_index:     data.cell_index,
 	}
 }
 
 //*******************************************
-// utility methods
+// build graph components
 //*******************************************
 
 func _BuildTopology(store GraphStore) AdjacencyArray {
@@ -37,23 +103,6 @@ func _BuildTopology(store GraphStore) AdjacencyArray {
 	return *AdjacencyListToArray(&dyn)
 }
 
-func _BuildWeighting(store GraphStore) DefaultWeighting {
-	edges := store.edges
-
-	weights := NewArray[int32](edges.Length())
-	for id, edge := range edges {
-		w := edge.Length * 3.6 / float32(edge.Maxspeed)
-		if w < 1 {
-			w = 1
-		}
-		weights[id] = int32(w)
-	}
-
-	return DefaultWeighting{
-		edge_weights: weights,
-	}
-}
-
 func _BuildKDTreeIndex(store GraphStore) KDTree[int32] {
 	node_geoms := store.node_geoms
 
@@ -63,21 +112,4 @@ func _BuildKDTreeIndex(store GraphStore) KDTree[int32] {
 		tree.Insert(geom[:], int32(i))
 	}
 	return tree
-}
-
-func BuildDefaultWeighting(base GraphBase) IWeighting {
-	edges := base.store.edges
-
-	weights := NewArray[int32](edges.Length())
-	for id, edge := range edges {
-		w := edge.Length * 3.6 / float32(edge.Maxspeed)
-		if w < 1 {
-			w = 1
-		}
-		weights[id] = int32(w)
-	}
-
-	return &DefaultWeighting{
-		edge_weights: weights,
-	}
 }

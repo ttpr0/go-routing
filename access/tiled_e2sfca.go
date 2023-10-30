@@ -149,7 +149,7 @@ func CalcTiled2SFCA(g graph.ITiledGraph, dem view.IPointView, sup view.IPointVie
 // using index within active cells
 //*******************************************
 
-func CalcTiled2SFCA2(g *graph.TiledGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcTiled2SFCA2(g graph.ITiledGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// get closest node for every demand point
 	tilecount := g.TileCount() + 2
 	index := g.GetIndex()

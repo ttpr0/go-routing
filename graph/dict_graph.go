@@ -39,7 +39,7 @@ func NewDictGraph() *DictGraph {
 	}
 }
 
-func (self *DictGraph) GetDefaultExplorer() IGraphExplorer {
+func (self *DictGraph) GetGraphExplorer() IGraphExplorer {
 	return &DictGraphExplorer{
 		graph:  self,
 		weight: &self.weight,

@@ -24,10 +24,16 @@ func run_benchmark() {
 
 	// load graphs
 	fmt.Println("Loading graphs ...")
-	g1 := graph.LoadGraph("./graphs/niedersachsen")
-	g2 := graph.LoadCHGraph("./graphs/test_order")
-	graph.PreparePHASTIndex(g2)
-	g3 := graph.LoadTiledGraph("./graphs/test_tiles_ch_index")
+	dir := graph.OpenGraphDir("./graphs/niedersachsen")
+	dir.LoadGraphBase("base")
+	dir.LoadWeighting("default")
+	dir.LoadSpeedUp("ch")
+	dir.LoadSpeedUp("tiled")
+
+	g1 := graph.BuildBaseGraph(dir.GetGraphBase("base"), dir.GetWeighting("default"))
+	graph.PreparePHASTIndex2(g1, dir.GetSpeedUp("ch"))
+	g2 := graph.BuildCHGraph2(dir.GetGraphBase("base"), dir.GetWeighting("default"), dir.GetSpeedUp("ch"))
+	g3 := graph.BuildTiledGraph2(dir.GetGraphBase("base"), dir.GetWeighting("default"), dir.GetSpeedUp("tiled"))
 
 	// prepare benchmark data
 	fmt.Println("Preparing benchmark data ...")

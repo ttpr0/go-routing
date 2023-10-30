@@ -5,7 +5,7 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func CalcPHAST3(g *graph.CHGraph, start int32, max_range int32) Array[int32] {
+func CalcPHAST3(g graph.ICHGraph, start int32, max_range int32) Array[int32] {
 	visited := NewArray[bool](g.NodeCount())
 	dist := NewArray[int32](g.NodeCount())
 	for i := 0; i < len(dist); i++ {

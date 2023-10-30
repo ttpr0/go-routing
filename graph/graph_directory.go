@@ -7,41 +7,12 @@ import (
 )
 
 //*******************************************
-// speed-up data
-//*******************************************
-
-type SpeedUpType byte
-
-const (
-	CH    SpeedUpType = 0
-	TILED SpeedUpType = 1
-)
-
-type ISpeedUpData interface {
-	Type() SpeedUpType
-}
-
-type ISpeedUpHandler interface {
-	Load(dir string, name string, nodecount int) ISpeedUpData
-	Store(dir string, name string, data ISpeedUpData)
-	Remove(dir string, name string)
-	_ReorderNodes(dir string, name string, mapping Array[int32])  // Reorder nodes of base-graph
-	_ReorderNodesInplace(data ISpeedUpData, mapping Array[int32]) // Reorder nodes of base-graph
-}
-
-var SPEEDUP_HANDLERS = Dict[SpeedUpType, ISpeedUpHandler]{
-	CH:    _CHDataHandler{},
-	TILED: _TiledDataHandler{},
-}
-
-//*******************************************
 // graph-dir
 //*******************************************
 
-func NewGraphDir(base GraphBase, dir string) GraphDir {
+func NewGraphDir(dir string) GraphDir {
 	meta := _GraphDirMeta{
-		NodeCount:  int32(base.NodeCount()),
-		EdgeCount:  int32(base.EdgeCount()),
+		Bases:      NewList[_BaseMeta](1),
 		Weightings: NewList[_WeightingMeta](2),
 		SpeedUps:   NewList[_SpeedUpMeta](2),
 	}
@@ -50,8 +21,7 @@ func NewGraphDir(base GraphBase, dir string) GraphDir {
 		base_dir: dir,
 		metadata: meta,
 
-		base: base,
-
+		bases:      NewDict[string, *GraphBase](1),
 		weightings: NewDict[string, IWeighting](2),
 		speed_ups:  NewDict[string, ISpeedUpData](2),
 	}
@@ -60,21 +30,11 @@ func NewGraphDir(base GraphBase, dir string) GraphDir {
 func OpenGraphDir(dir string) GraphDir {
 	metadata := _LoadGraphDirMeta(dir + "-meta")
 
-	store := _LoadGraphStorage(dir)
-	nodecount := store.NodeCount()
-	topology := _LoadAdjacency(dir+"-graph", false, nodecount)
-	index := _BuildKDTreeIndex(store)
-
 	return GraphDir{
 		base_dir: dir,
 		metadata: metadata,
 
-		base: GraphBase{
-			store:    store,
-			topology: *topology,
-			index:    index,
-		},
-
+		bases:      NewDict[string, *GraphBase](1),
 		weightings: NewDict[string, IWeighting](2),
 		speed_ups:  NewDict[string, ISpeedUpData](2),
 	}
@@ -84,127 +44,92 @@ type GraphDir struct {
 	base_dir string
 	metadata _GraphDirMeta
 
-	base GraphBase
+	bases Dict[string, *GraphBase]
 
 	weightings Dict[string, IWeighting]
 
 	speed_ups Dict[string, ISpeedUpData]
 }
 
-func (self *GraphDir) GetGraphBase() GraphBase {
-	return self.base
+func (self *GraphDir) GetBaseDir() string {
+	return self.base_dir
+}
+func (self *GraphDir) GraphBaseCount() int {
+	return self.metadata.Bases.Length()
+}
+func (self *GraphDir) GraphBaseMetadata(index int) _BaseMeta {
+	return self.metadata.Bases[index]
+}
+func (self *GraphDir) WeightingCount() int {
+	return self.metadata.Weightings.Length()
+}
+func (self *GraphDir) WeightingMetadata(index int) _WeightingMeta {
+	return self.metadata.Weightings[index]
 }
 
-func (self *GraphDir) StoreGraphBase() {
-	_StoreAdjacency(&self.base.topology, false, self.base_dir+"-graph")
-	_StoreGraphStorage(self.base.store, self.base_dir)
+func (self *GraphDir) SpeedUpCount() int {
+	return self.metadata.SpeedUps.Length()
 }
-
-//*******************************************
-// modify graph-dir data
-//*******************************************
-
-// reorders node information of base-graph,
-// mapping: old id -> new id
-//
-// If "sync" is true also unloaded speed-ups and weightings will get updated.
-func (self *GraphDir) ReorderBaseNodes(mapping Array[int32], sync bool) {
-	self.base._ReorderNodes(mapping)
-	if sync {
-		self.StoreGraphBase()
-	}
-	for _, w_m := range self.metadata.Weightings {
-		if self.speed_ups.ContainsKey(w_m.Name) {
-			w := self.weightings[w_m.Name]
-			w_h := WEIGHTING_HANDLERS[w.Type()]
-			w_h._ReorderNodesInplace(w, mapping)
-			if sync {
-				w_h.Store(self.base_dir, w_m.Name, w)
-			}
-		} else if sync {
-			su_h := WEIGHTING_HANDLERS[w_m.Type]
-			su_h._ReorderNodes(self.base_dir, w_m.Name, mapping)
-		}
-	}
-	for _, su_m := range self.metadata.SpeedUps {
-		if self.speed_ups.ContainsKey(su_m.Name) {
-			su := self.speed_ups[su_m.Name]
-			su_h := SPEEDUP_HANDLERS[su.Type()]
-			su_h._ReorderNodesInplace(su, mapping)
-			if sync {
-				su_h.Store(self.base_dir, su_m.Name, su)
-			}
-		} else if sync {
-			su_h := SPEEDUP_HANDLERS[su_m.Type]
-			su_h._ReorderNodes(self.base_dir, su_m.Name, mapping)
-		}
-	}
+func (self *GraphDir) SpeedUpMetadata(index int) _SpeedUpMeta {
+	return self.metadata.SpeedUps[index]
 }
 
 //*******************************************
-// get graphs
+// manage graph bases
 //*******************************************
 
-func GetBaseGraph(dir GraphDir, weight string) *Graph {
-	return &Graph{
-		base:         dir.base,
-		weight:       dir.weightings[weight],
-		_weight_name: weight,
+// TODO: join add+store and load+get together
+
+func (self *GraphDir) AddGraphBase(name string, base GraphBase) {
+	if self.bases.ContainsKey(name) {
+		panic("base already exists, remove first")
+	}
+	self.bases[name] = &base
+	self.metadata.AddBaseMeta(_BaseMeta{
+		Name: name,
+	})
+	_StoreGraphDirMeta(self.metadata, self.base_dir+"-meta")
+}
+func (self *GraphDir) GetGraphBase(name string) *GraphBase {
+	return self.bases[name]
+}
+func (self *GraphDir) LoadGraphBase(name string) {
+	if self.bases.ContainsKey(name) {
+		panic("base " + name + " is already loaded")
+	}
+	store := _LoadGraphStorage(self.base_dir + name)
+	nodecount := store.NodeCount()
+	topology := _LoadAdjacency(self.base_dir+name+"-graph", false, nodecount)
+	index := _BuildKDTreeIndex(store)
+	self.bases[name] = &GraphBase{
+		store:    store,
+		topology: *topology,
+		index:    index,
 	}
 }
-
-func GetCHGraph(dir GraphDir, name string) *CHGraph {
-	su := dir.speed_ups[name]
-	data := su.(*_CHData)
-
-	return &CHGraph{
-		base:   dir.base,
-		weight: dir.weightings[data._base_weighting],
-
-		id_mapping: data.id_mapping,
-
-		_build_with_tiles: data._build_with_tiles,
-
-		ch_shortcuts: data.shortcuts,
-		ch_topology:  data.topology,
-		node_levels:  data.node_levels,
+func (self *GraphDir) UnloadGraphBase(name string) {
+	if !self.bases.ContainsKey(name) {
+		panic("base " + name + " doosnt exist")
 	}
+	self.bases.Delete(name)
+	runtime.GC()
 }
-
-func GetCHGraph2(dir GraphDir, name string) *CHGraph2 {
-	su := dir.speed_ups[name]
-	data := su.(*_CHData)
-
-	return &CHGraph2{
-		base:   dir.base,
-		weight: dir.weightings[data._base_weighting],
-
-		id_mapping: data.id_mapping,
-
-		_build_with_tiles: data._build_with_tiles,
-
-		ch_shortcuts: data.shortcuts,
-		ch_topology:  data.topology,
-		node_levels:  data.node_levels,
+func (self *GraphDir) RemoveGraphBase(name string) {
+	panic("TODO: Remove files of graph-base")
+	if self.bases.ContainsKey(name) {
+		self.bases.Delete(name)
+		runtime.GC()
 	}
+	self.metadata.RemoveBaseMeta(name)
+	_StoreGraphDirMeta(self.metadata, self.base_dir+"-meta")
 }
-
-func GetTiledGraph(dir GraphDir, name string) *TiledGraph2 {
-	su := dir.speed_ups[name]
-	data := su.(*_TiledData)
-
-	return &TiledGraph2{
-		base:   dir.base,
-		weight: dir.weightings[data._base_weighting],
-
-		id_mapping: data.id_mapping,
-
-		skip_shortcuts: data.skip_shortcuts,
-		skip_topology:  data.skip_topology,
-		node_tiles:     data.node_tiles,
-		edge_types:     data.edge_types,
-		cell_index:     data.cell_index,
+func (self *GraphDir) StoreGraphBase(name string) {
+	if !self.bases.ContainsKey(name) {
+		panic("base " + name + " doosnt exist")
 	}
+	base := self.bases[name]
+	_StoreAdjacency(&base.topology, false, self.base_dir+name+"-graph")
+	_StoreGraphStorage(base.store, self.base_dir+name)
 }
 
 //*******************************************
@@ -228,32 +153,24 @@ func (self *GraphDir) GetWeighting(name string) IWeighting {
 	}
 	return self.weightings[name]
 }
-func (self *GraphDir) RemoveWeighting(name string, typ WeightType) {
-	w_handler := WEIGHTING_HANDLERS[typ]
+func (self *GraphDir) RemoveWeighting(name string) {
+	meta := self.metadata.GetWeightMeta(name)
+	w_handler := WEIGHTING_HANDLERS[meta.Type]
 	w_handler.Remove(self.base_dir, name)
 	if self.weightings.ContainsKey(name) {
 		self.weightings.Delete(name)
 		runtime.GC()
 	}
-	i := FindFirst(self.metadata.Weightings, func(w_m _WeightingMeta) bool {
-		if w_m.Name == name {
-			return true
-		} else {
-			return false
-		}
-	})
-	if i == -1 {
-		panic("this should not have happened")
-	}
-	self.metadata.Weightings.Remove(i)
+	self.metadata.RemoveWeightMeta(name)
 	_StoreGraphDirMeta(self.metadata, self.base_dir+"-meta")
 }
-func (self *GraphDir) LoadWeighting(name string, typ WeightType) {
+func (self *GraphDir) LoadWeighting(name string) {
 	if self.weightings.ContainsKey(name) {
 		panic("weighting " + name + " is already loaded")
 	}
-	w_handler := WEIGHTING_HANDLERS[typ]
-	weight := w_handler.Load(self.base_dir, name, self.base.NodeCount(), self.base.EdgeCount())
+	meta := self.metadata.GetWeightMeta(name)
+	w_handler := WEIGHTING_HANDLERS[meta.Type]
+	weight := w_handler.Load(self.base_dir, name)
 	self.weightings[name] = weight
 }
 func (self *GraphDir) UnloadWeighting(name string) {
@@ -277,35 +194,32 @@ func (self *GraphDir) StoreWeighting(name string) {
 // manage speed-ups
 //*******************************************
 
+func (self *GraphDir) GetSpeedUp(name string) ISpeedUpData {
+	if !self.speed_ups.ContainsKey(name) {
+		panic("speed-up " + name + " doosnt exist")
+	}
+	return self.speed_ups[name]
+}
 func (self *GraphDir) AddSpeedUp(name string, data ISpeedUpData) {
 	if self.speed_ups.ContainsKey(name) {
 		panic("speed up already exists, remove first")
 	}
 	self.speed_ups[name] = data
-	self.metadata.SpeedUps.Add(_SpeedUpMeta{
+	self.metadata.AddSpeedUpMeta(_SpeedUpMeta{
 		Name: name,
 		Type: data.Type(),
 	})
 	_StoreGraphDirMeta(self.metadata, self.base_dir+"-meta")
 }
-func (self *GraphDir) RemoveSpeedUp(name string, typ SpeedUpType) {
-	su_handler := SPEEDUP_HANDLERS[typ]
+func (self *GraphDir) RemoveSpeedUp(name string) {
+	meta := self.metadata.GetSpeedUpMeta(name)
+	su_handler := SPEEDUP_HANDLERS[meta.Type]
 	su_handler.Remove(self.base_dir, name)
 	if self.speed_ups.ContainsKey(name) {
 		self.speed_ups.Delete(name)
 		runtime.GC()
 	}
-	i := FindFirst(self.metadata.SpeedUps, func(s_m _SpeedUpMeta) bool {
-		if s_m.Name == name {
-			return true
-		} else {
-			return false
-		}
-	})
-	if i == -1 {
-		panic("this should not have happened")
-	}
-	self.metadata.SpeedUps.Remove(i)
+	self.metadata.RemoveSpeedUpMeta(name)
 	_StoreGraphDirMeta(self.metadata, self.base_dir+"-meta")
 }
 func (self *GraphDir) UpdateSpeedUp(name string, data ISpeedUpData) {
@@ -314,12 +228,13 @@ func (self *GraphDir) UpdateSpeedUp(name string, data ISpeedUpData) {
 	}
 	self.speed_ups[name] = data
 }
-func (self *GraphDir) LoadSpeedUp(name string, typ SpeedUpType) {
+func (self *GraphDir) LoadSpeedUp(name string) {
 	if self.speed_ups.ContainsKey(name) {
 		panic("speed up " + name + " is already loaded")
 	}
-	su_handler := SPEEDUP_HANDLERS[typ]
-	su_data := su_handler.Load(self.base_dir, name, self.base.NodeCount())
+	meta := self.metadata.GetSpeedUpMeta(name)
+	su_handler := SPEEDUP_HANDLERS[meta.Type]
+	su_data := su_handler.Load(self.base_dir, name)
 	self.speed_ups[name] = su_data
 }
 func (self *GraphDir) UnloadSpeedUp(name string) {
@@ -344,10 +259,109 @@ func (self *GraphDir) StoreSpeedUp(name string) {
 //*******************************************
 
 type _GraphDirMeta struct {
-	NodeCount  int32
-	EdgeCount  int32
-	Weightings List[_WeightingMeta]
-	SpeedUps   List[_SpeedUpMeta]
+	Bases      List[_BaseMeta]      `json:"bases"`
+	Weightings List[_WeightingMeta] `json:"weightings"`
+	SpeedUps   List[_SpeedUpMeta]   `json:"speedups"`
+}
+
+func (self *_GraphDirMeta) _FindBaseMeta(name string) int {
+	return FindFirst(self.Bases, func(m _BaseMeta) bool {
+		if m.Name == name {
+			return true
+		} else {
+			return false
+		}
+	})
+}
+func (self *_GraphDirMeta) AddBaseMeta(meta _BaseMeta) {
+	i := self._FindBaseMeta(meta.Name)
+	if i == -1 {
+		self.Bases.Add(meta)
+	} else {
+		panic("meta already exists")
+	}
+}
+func (self *_GraphDirMeta) RemoveBaseMeta(name string) {
+	i := self._FindBaseMeta(name)
+	if i != -1 {
+		self.Bases.Remove(i)
+	}
+}
+func (self *_GraphDirMeta) GetBaseMeta(name string) _BaseMeta {
+	i := self._FindBaseMeta(name)
+	if i != -1 {
+		return self.Bases[i]
+	} else {
+		panic("meta doesnt exist")
+	}
+}
+
+func (self *_GraphDirMeta) _FindWeightMeta(name string) int {
+	return FindFirst(self.Weightings, func(m _WeightingMeta) bool {
+		if m.Name == name {
+			return true
+		} else {
+			return false
+		}
+	})
+}
+func (self *_GraphDirMeta) AddWeightMeta(meta _WeightingMeta) {
+	i := self._FindWeightMeta(meta.Name)
+	if i == -1 {
+		self.Weightings.Add(meta)
+	} else {
+		panic("meta already exists")
+	}
+}
+func (self *_GraphDirMeta) RemoveWeightMeta(name string) {
+	i := self._FindWeightMeta(name)
+	if i != -1 {
+		self.Weightings.Remove(i)
+	}
+}
+func (self *_GraphDirMeta) GetWeightMeta(name string) _WeightingMeta {
+	i := self._FindWeightMeta(name)
+	if i != -1 {
+		return self.Weightings[i]
+	} else {
+		panic("meta doesnt exist")
+	}
+}
+
+func (self *_GraphDirMeta) _FindSpeedUpMeta(name string) int {
+	return FindFirst(self.SpeedUps, func(m _SpeedUpMeta) bool {
+		if m.Name == name {
+			return true
+		} else {
+			return false
+		}
+	})
+}
+func (self *_GraphDirMeta) AddSpeedUpMeta(meta _SpeedUpMeta) {
+	i := self._FindSpeedUpMeta(meta.Name)
+	if i == -1 {
+		self.SpeedUps.Add(meta)
+	} else {
+		panic("meta already exists")
+	}
+}
+func (self *_GraphDirMeta) RemoveSpeedUpMeta(name string) {
+	i := self._FindSpeedUpMeta(name)
+	if i != -1 {
+		self.SpeedUps.Remove(i)
+	}
+}
+func (self *_GraphDirMeta) GetSpeedUpMeta(name string) _SpeedUpMeta {
+	i := self._FindSpeedUpMeta(name)
+	if i != -1 {
+		return self.SpeedUps[i]
+	} else {
+		panic("meta doesnt exist")
+	}
+}
+
+type _BaseMeta struct {
+	Name string `json:"name"`
 }
 
 type _WeightingMeta struct {
