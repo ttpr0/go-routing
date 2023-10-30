@@ -40,7 +40,7 @@ func NewDijkstra(graph graph.IGraph, start, end int32) *Dijkstra {
 }
 
 func (self *Dijkstra) CalcShortestPath() bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for {
 		curr_id, ok := self.heap.Dequeue()
@@ -80,7 +80,7 @@ func (self *Dijkstra) CalcShortestPath() bool {
 }
 
 func (self *Dijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for c := 0; c < count; c++ {
 		curr_id, ok := self.heap.Dequeue()
@@ -122,7 +122,7 @@ func (self *Dijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool 
 }
 
 func (self *Dijkstra) GetShortestPath() Path {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	path := make([]int32, 0, 10)
 	length := int32(self.flags[self.end_id].path_length)

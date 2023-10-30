@@ -5,7 +5,7 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func CalcPHAST3(g *graph.CHGraph3, start int32, max_range int32) Array[int32] {
+func CalcPHAST3(g *graph.CHGraph, start int32, max_range int32) Array[int32] {
 	visited := NewArray[bool](g.NodeCount())
 	dist := NewArray[int32](g.NodeCount())
 	for i := 0; i < len(dist); i++ {
@@ -16,7 +16,7 @@ func CalcPHAST3(g *graph.CHGraph3, start int32, max_range int32) Array[int32] {
 	heap := NewPriorityQueue[int32, int32](100)
 	heap.Enqueue(start, 0)
 
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 
 	for {
 		curr_id, ok := heap.Dequeue()
@@ -47,14 +47,15 @@ func CalcPHAST3(g *graph.CHGraph3, start int32, max_range int32) Array[int32] {
 		})
 	}
 
-	down_edges := g.GetDownEdges(graph.FORWARD)
+	down_edges, _ := g.GetDownEdges(graph.FORWARD)
 	num_edges := int32(len(down_edges))
 	i := int32(0)
 	for i < num_edges {
 		edge := down_edges[i]
 		curr_len := dist[edge.From]
 		if curr_len > max_range {
-			i += edge.Count
+			count := graph.Shortcut_get_payload[int32](&edge, 0)
+			i += count
 			continue
 		}
 		new_len := curr_len + edge.Weight

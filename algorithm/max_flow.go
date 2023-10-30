@@ -31,7 +31,7 @@ func ComputeMaxFlow(g graph.IGraph, source, sink int32) int {
 
 		end := int32(-1)
 
-		explorer := g.GetDefaultExplorer()
+		explorer := g.GetGraphExplorer()
 		for {
 			curr, ok := queue.Pop()
 			if !ok {

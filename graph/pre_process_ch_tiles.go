@@ -11,25 +11,127 @@ import (
 // preprocess tiled graph 4
 //*******************************************
 
-func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
+// func PreprocessTiledGraph4(graph *Graph, node_tiles Array[int16]) *TiledGraph {
+// 	fmt.Println("Compute node ordering:")
+// 	// contraction_order, border_nodes := TiledNodeOrdering(graph)
+
+// 	fmt.Println("Compute subset contraction:")
+// 	dg := TransformToCHPreprocGraph(graph)
+// 	CalcPartialContraction5(dg, node_tiles)
+// 	// CalcContraction2(dg, contraction_order)
+
+// 	fmt.Println("Set border nodes to maxlevel:")
+// 	border_nodes := _IsBorderNode3(graph, node_tiles)
+// 	max_level := int16(0)
+// 	node_levels := dg.node_levels
+// 	for i := 0; i < node_levels.Length(); i++ {
+// 		if node_levels[i] > max_level {
+// 			max_level = node_levels[i]
+// 		}
+// 	}
+// 	for i := 0; i < node_levels.Length(); i++ {
+// 		if border_nodes[i] {
+// 			node_levels[i] = max_level + 1
+// 		}
+// 	}
+
+// 	fmt.Println("Create topology from shortcuts:")
+// 	edge_types := NewArray[byte](graph.EdgeCount())
+// 	_UpdateCrossBorder(graph, node_tiles, edge_types)
+// 	skip_topology, skip_shortcuts := CreateCHSkipTopology(dg, border_nodes, node_tiles)
+// 	new_graph := &TiledGraph{
+// 		store:    graph.store,
+// 		topology: graph.topology,
+// 		weight:   graph.weight,
+// 		index:    graph.index,
+
+// 		skip_shortcuts: skip_shortcuts,
+// 		skip_topology:  *skip_topology,
+// 		node_tiles:     node_tiles,
+// 		edge_types:     edge_types,
+// 	}
+
+// 	// reorder graph
+// 	order := ComputeTileLevelOrdering(graph, node_tiles, node_levels)
+// 	mapping := NewArray[int32](graph.NodeCount())
+// 	for i := 0; i < graph.NodeCount(); i++ {
+// 		id := order[i]
+// 		new_id := int32(i)
+// 		mapping[id] = new_id
+// 	}
+// 	ReorderTiledGraph(new_graph, mapping)
+// 	node_levels = Reorder[int16](node_levels, mapping)
+// 	node_tiles = new_graph.node_tiles
+
+// 	// remap shortcuts
+// 	dg.shortcuts._ReorderNodes(mapping)
+// 	ch_shortcuts := dg.shortcuts
+
+// 	fmt.Println("Create downwards edge lists:")
+// 	edges := new_graph.store.edges
+// 	edge_weigths := new_graph.weight.edge_weights
+// 	tiles := _GetTiles(new_graph.node_tiles)
+// 	cell_index := _NewCellIndex()
+// 	for index, tile := range tiles {
+// 		fmt.Println("Process Tile:", index+1, "/", len(tiles))
+// 		// get all down edges or shortcuts
+// 		edge_list := NewList[Shortcut](100)
+// 		for i := 0; i < ch_shortcuts.ShortcutCount(); i++ {
+// 			shc := ch_shortcuts.GetShortcut(int32(i))
+// 			if node_tiles[shc.From] != tile || node_tiles[shc.To] != tile {
+// 				continue
+// 			}
+// 			if node_levels[shc.From] > node_levels[shc.To] {
+// 				edge_list.Add(Shortcut{
+// 					From:   shc.From,
+// 					To:     shc.From,
+// 					Weight: shc.Weight,
+// 				})
+// 			}
+// 		}
+// 		for i := 0; i < edges.Length(); i++ {
+// 			edge := edges[i]
+// 			if node_tiles[edge.NodeA] != tile || node_tiles[edge.NodeB] != tile {
+// 				continue
+// 			}
+// 			if node_levels[edge.NodeA] > node_levels[edge.NodeB] {
+// 				edge_list.Add(Shortcut{
+// 					From:   edge.NodeA,
+// 					To:     edge.NodeB,
+// 					Weight: edge_weigths[i],
+// 				})
+// 			}
+// 		}
+
+// 		// sort down edges by node level
+// 		sort.Slice(edge_list, func(i, j int) bool {
+// 			e_i := edge_list[i]
+// 			level_i := node_levels[e_i.From]
+// 			e_j := edge_list[j]
+// 			level_j := node_levels[e_j.From]
+// 			return level_i > level_j
+// 		})
+
+// 		// add edges to index_edges
+// 		cell_index.SetFWDIndexEdges(tile, Array[Shortcut](edge_list))
+// 	}
+// 	new_graph.cell_index = Some(cell_index)
+
+// 	return new_graph
+// }
+
+func PreprocessTiledGraph5(graph *Graph, node_tiles Array[int16]) *_TiledData {
 	fmt.Println("Compute node ordering:")
 	// contraction_order, border_nodes := TiledNodeOrdering(graph)
 
 	fmt.Println("Compute subset contraction:")
-	g := &Graph{
-		store:    graph.store,
-		topology: graph.topology,
-		weight:   graph.weight,
-		index:    graph.index,
-	}
-	dg := TransformToCHPreprocGraph(g)
-	CalcPartialContraction5(dg, graph.skip_store.node_tiles)
+	ch_data := CalcPartialContraction5(graph, node_tiles)
 	// CalcContraction2(dg, contraction_order)
 
 	fmt.Println("Set border nodes to maxlevel:")
-	border_nodes := _IsBorderNode3(graph)
+	border_nodes := _IsBorderNode3(graph, node_tiles)
 	max_level := int16(0)
-	node_levels := dg.node_levels
+	node_levels := ch_data.node_levels
 	for i := 0; i < node_levels.Length(); i++ {
 		if node_levels[i] > max_level {
 			max_level = node_levels[i]
@@ -42,81 +144,76 @@ func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 	}
 
 	fmt.Println("Create topology from shortcuts:")
-	node_tiles := graph.skip_store.node_tiles
-	skip_topology, shortcuts, skip_weights := CreateCHSkipTopology(dg, border_nodes, node_tiles)
-	new_graph := &TiledGraph{
-		store:    graph.store,
-		topology: graph.topology,
-		weight:   graph.weight,
-		index:    graph.index,
+	edge_types := NewArray[byte](graph.EdgeCount())
+	_UpdateCrossBorder(graph, node_tiles, edge_types)
+	skip_topology, skip_shortcuts := CreateCHSkipTopology2(graph, ch_data, border_nodes, node_tiles)
+	tiled_data := &_TiledData{
+		skip_shortcuts: skip_shortcuts,
+		skip_topology:  *skip_topology,
+		node_tiles:     node_tiles,
+		edge_types:     edge_types,
 
-		skip_store: TiledStore{
-			node_tiles:   graph.skip_store.node_tiles,
-			shortcuts:    shortcuts,
-			edge_refs:    NewList[Tuple[int32, byte]](0),
-			skip_weights: skip_weights,
-			edge_types:   graph.skip_store.edge_types,
-		},
-		skip_topology: *skip_topology,
+		_base_weighting: graph._weight_name,
 	}
 
 	// reorder graph
-	order := ComputeTileLevelOrdering2(new_graph, node_levels)
-	mapping := NewArray[int32](g.NodeCount())
-	reordered_node_levels := NewArray[int16](g.NodeCount())
-	for i := 0; i < g.NodeCount(); i++ {
-		id := order[i]
-		new_id := int32(i)
-		mapping[id] = new_id
-		reordered_node_levels[new_id] = node_levels[id]
-	}
-	ReorderTiledGraph(new_graph, mapping)
-	node_levels = reordered_node_levels
-	node_tiles = new_graph.skip_store.node_tiles
+	order := ComputeTileLevelOrdering(graph, node_tiles, node_levels)
+	mapping := NodeOrderToNodeMapping(order)
+	tiled_data._ReorderNodes(mapping)
+	node_tiles = tiled_data.node_tiles
 
 	// remap shortcuts
-	ch_shortcuts := dg.shortcuts
-	ch_weights := dg.sh_weight
-	for i := 0; i < ch_shortcuts.Length(); i++ {
-		shc := ch_shortcuts[i]
-		shc.NodeA = mapping[shc.NodeA]
-		shc.NodeB = mapping[shc.NodeB]
-		ch_shortcuts[i] = shc
+	ch_data._ReorderNodes(mapping)
+	ch_shortcuts := ch_data.shortcuts
+	node_levels = ch_data.node_levels
+
+	// create temporary graph
+	temp_graph := &TiledGraph2{
+		base:   graph.base,
+		weight: graph.weight,
+
+		id_mapping: tiled_data.id_mapping,
+
+		skip_shortcuts: tiled_data.skip_shortcuts,
+		skip_topology:  tiled_data.skip_topology,
+		node_tiles:     tiled_data.node_tiles,
+		edge_types:     tiled_data.edge_types,
+		cell_index:     tiled_data.cell_index,
 	}
 
 	fmt.Println("Create downwards edge lists:")
-	edges := new_graph.store.edges
-	edge_weigths := new_graph.weight.edge_weights
-	tiles := _GetTiles(new_graph)
-	index_edges := NewList[TiledSHEdge](100)
-	tile_ranges := NewDict[int16, Tuple[int32, int32]](tiles.Length())
+	// edges := temp_graph.store.edges
+	// edge_weigths := temp_graph.weight.edge_weights
+	explorer := temp_graph.GetGraphExplorer()
+	tiles := _GetTiles(temp_graph.node_tiles)
+	cell_index := _NewCellIndex()
 	for index, tile := range tiles {
 		fmt.Println("Process Tile:", index+1, "/", len(tiles))
 		// get all down edges or shortcuts
-		edge_list := NewList[TiledSHEdge](100)
-		for i := 0; i < ch_shortcuts.Length(); i++ {
-			shc := ch_shortcuts[i]
-			if node_tiles[shc.NodeA] != tile || node_tiles[shc.NodeB] != tile {
+		edge_list := NewList[Shortcut](100)
+		for i := 0; i < ch_shortcuts.ShortcutCount(); i++ {
+			shc := ch_shortcuts.GetShortcut(int32(i))
+			if node_tiles[shc.From] != tile || node_tiles[shc.To] != tile {
 				continue
 			}
-			if node_levels[shc.NodeA] > node_levels[shc.NodeB] {
-				edge_list.Add(TiledSHEdge{
-					From:   shc.NodeA,
-					To:     shc.NodeB,
-					Weight: ch_weights[i],
+			if node_levels[shc.From] > node_levels[shc.To] {
+				edge_list.Add(Shortcut{
+					From:   shc.From,
+					To:     shc.From,
+					Weight: shc.Weight,
 				})
 			}
 		}
-		for i := 0; i < edges.Length(); i++ {
-			edge := edges[i]
+		for i := 0; i < temp_graph.EdgeCount(); i++ {
+			edge := temp_graph.GetEdge(int32(i))
 			if node_tiles[edge.NodeA] != tile || node_tiles[edge.NodeB] != tile {
 				continue
 			}
 			if node_levels[edge.NodeA] > node_levels[edge.NodeB] {
-				edge_list.Add(TiledSHEdge{
+				edge_list.Add(Shortcut{
 					From:   edge.NodeA,
 					To:     edge.NodeB,
-					Weight: edge_weigths[i],
+					Weight: explorer.GetEdgeWeight(CreateEdgeRef(int32(i))),
 				})
 			}
 		}
@@ -131,20 +228,11 @@ func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 		})
 
 		// add edges to index_edges
-		start := index_edges.Length()
-		count := 0
-		for _, e := range edge_list {
-			index_edges.Add(e)
-			count += 1
-		}
-		tile_ranges[tile] = MakeTuple(int32(start), int32(count))
+		cell_index.SetFWDIndexEdges(tile, Array[Shortcut](edge_list))
 	}
 
-	return &TiledGraph3{
-		TiledGraph:  *new_graph,
-		tile_ranges: tile_ranges,
-		index_edges: Array[TiledSHEdge](index_edges),
-	}
+	tiled_data.cell_index = Some(cell_index)
+	return tiled_data
 }
 
 //*******************************************
@@ -152,10 +240,10 @@ func TransformToTiled4(graph *TiledGraph) *TiledGraph3 {
 //*******************************************
 
 func TiledNodeOrdering(graph *TiledGraph) (Array[int32], Array[bool]) {
-	tiles := _GetTiles(graph)
+	tiles := _GetTiles(graph.node_tiles)
 	border_nodes := NewArray[bool](graph.NodeCount())
 	sp_counts := NewArray[int](graph.NodeCount())
-	explorer := graph.GetDefaultExplorer()
+	explorer := graph.GetGraphExplorer()
 
 	// compute border_nodes and sp_counts for every tile
 	fmt.Println("start computing tiles...")
@@ -215,10 +303,9 @@ func TiledNodeOrdering(graph *TiledGraph) (Array[int32], Array[bool]) {
 //*******************************************
 
 // creates topology with cross-border edges (type 10), skip-edges (type 20) and shortcuts (type 100)
-func CreateCHSkipTopology(dg *CHPreprocGraph, border_nodes Array[bool], node_tiles Array[int16]) (*AdjacencyArray, List[Shortcut], List[int32]) {
+func CreateCHSkipTopology(dg *CHPreprocGraph, border_nodes Array[bool], node_tiles Array[int16]) (*AdjacencyArray, ShortcutStore) {
 	dyn_top := NewAdjacencyList(dg.NodeCount())
-	shortcuts := NewList[Shortcut](100)
-	shortcut_weights := NewList[int32](100)
+	shortcuts := NewShortcutStore(100, true)
 
 	explorer := dg.GetExplorer()
 
@@ -232,13 +319,10 @@ func CreateCHSkipTopology(dg *CHPreprocGraph, border_nodes Array[bool], node_til
 			}
 			if ref.IsShortcut() {
 				shc := dg.GetShortcut(ref.EdgeID)
-				shc_id := int32(shortcuts.Length())
-				shortcuts.Add(Shortcut{
-					NodeA: shc.NodeA,
-					NodeB: shc.NodeB,
-				})
-				shortcut_weights.Add(explorer.GetEdgeWeight(ref))
-				dyn_top.AddEdgeEntries(shc.NodeA, shc.NodeB, shc_id, 100)
+				shc_n := NewShortcut(shc.From, shc.To, explorer.GetEdgeWeight(ref))
+				edges_n := [2]Tuple[int32, byte]{}
+				shc_id, _ := shortcuts.AddCHShortcut(shc_n, edges_n)
+				dyn_top.AddEdgeEntries(shc.From, shc.To, shc_id, 100)
 			} else {
 				edge := dg.GetEdge(ref.EdgeID)
 				if node_tiles[edge.NodeA] != node_tiles[edge.NodeB] {
@@ -250,7 +334,51 @@ func CreateCHSkipTopology(dg *CHPreprocGraph, border_nodes Array[bool], node_til
 		})
 	}
 
-	return AdjacencyListToArray(&dyn_top), shortcuts, shortcut_weights
+	return AdjacencyListToArray(&dyn_top), shortcuts
+}
+func CreateCHSkipTopology2(graph *Graph, ch_data *_CHData, border_nodes Array[bool], node_tiles Array[int16]) (*AdjacencyArray, ShortcutStore) {
+	dyn_top := NewAdjacencyList(graph.NodeCount())
+	shortcuts := NewShortcutStore(100, true)
+
+	temp_graph := CHGraph2{
+		base:   graph.base,
+		weight: graph.weight,
+
+		id_mapping: ch_data.id_mapping,
+
+		ch_shortcuts: ch_data.shortcuts,
+		ch_topology:  ch_data.topology,
+		node_levels:  ch_data.node_levels,
+		node_tiles:   ch_data.node_tiles,
+	}
+	explorer := temp_graph.GetGraphExplorer()
+
+	for i := 0; i < temp_graph.NodeCount(); i++ {
+		if !border_nodes[i] {
+			continue
+		}
+		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
+			if !border_nodes[ref.OtherID] {
+				return
+			}
+			if ref.IsShortcut() {
+				shc := temp_graph.GetShortcut(ref.EdgeID)
+				shc_n := NewShortcut(shc.From, shc.To, explorer.GetEdgeWeight(ref))
+				edges_n := [2]Tuple[int32, byte]{}
+				shc_id, _ := shortcuts.AddCHShortcut(shc_n, edges_n)
+				dyn_top.AddEdgeEntries(shc.From, shc.To, shc_id, 100)
+			} else {
+				edge := temp_graph.GetEdge(ref.EdgeID)
+				if node_tiles[edge.NodeA] != node_tiles[edge.NodeB] {
+					dyn_top.AddEdgeEntries(edge.NodeA, edge.NodeB, ref.EdgeID, 10)
+				} else {
+					dyn_top.AddEdgeEntries(edge.NodeA, edge.NodeB, ref.EdgeID, 20)
+				}
+			}
+		})
+	}
+
+	return AdjacencyListToArray(&dyn_top), shortcuts
 }
 
 // computes border and interior nodes of graph tile
@@ -258,7 +386,7 @@ func GetBorderNodes2(graph ITiledGraph, tile_id int16) (Array[int32], Array[int3
 	border := NewList[int32](100)
 	interior := NewList[int32](100)
 
-	explorer := graph.GetDefaultExplorer()
+	explorer := graph.GetGraphExplorer()
 	for i := 0; i < graph.NodeCount(); i++ {
 		curr_tile := graph.GetNodeTile(int32(i))
 		if curr_tile != tile_id {

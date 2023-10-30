@@ -12,7 +12,7 @@ import (
 //*******************************************
 
 func RemoveNodes(graph *Graph, nodes List[int32]) *Graph {
-	store := graph.store
+	store := graph.base.store
 
 	remove := NewArray[bool](store.NodeCount())
 	for _, n := range nodes {
@@ -57,11 +57,14 @@ func RemoveNodes(graph *Graph, nodes List[int32]) *Graph {
 		node_geoms: new_node_geoms,
 		edge_geoms: new_edge_geoms,
 	}
+	weight := _BuildWeighting(new_store)
 	return &Graph{
-		store:    new_store,
-		topology: _BuildTopology(new_store),
-		weight:   _BuildWeighting(new_store),
-		index:    _BuildKDTreeIndex(new_store),
+		base: GraphBase{
+			store:    new_store,
+			topology: _BuildTopology(new_store),
+			index:    _BuildKDTreeIndex(new_store),
+		},
+		weight: &weight,
 	}
 }
 
@@ -93,41 +96,51 @@ func SortNodesByLevel(g *CHGraph) {
 // Reorders nodes in graph inplace.
 // "node_mapping" maps old id -> new id.
 func ReorderGraph(g *Graph, node_mapping Array[int32]) {
-	g.store._ReorderNodes(node_mapping)
-	g.topology._ReorderNodes(node_mapping)
-	g.weight._ReorderNodes(node_mapping)
-	g.index = _BuildKDTreeIndex(g.store)
+	g.base._ReorderNodes(node_mapping)
+	panic("dont use this")
+	// g.weight._ReorderNodes(node_mapping)
 }
 
 // Reorders nodes in graph inplace.
 // "node_mapping" maps old id -> new id.
 func ReorderCHGraph(g *CHGraph, node_mapping Array[int32]) {
-	g.store._ReorderNodes(node_mapping)
-	g.topology._ReorderNodes(node_mapping)
-	g.weight._ReorderNodes(node_mapping)
-	g.index = _BuildKDTreeIndex(g.store)
+	g.base._ReorderNodes(node_mapping)
+	panic("dont use this")
+	// g.weight._ReorderNodes(node_mapping)
 
-	g.ch_store._ReorderNodes(node_mapping)
+	g.ch_shortcuts._ReorderNodes(node_mapping)
 	g.ch_topology._ReorderNodes(node_mapping)
+	Reorder[int16](g.node_levels, node_mapping)
+
+	if g._build_with_tiles {
+		Reorder[int16](g.node_tiles.Value, node_mapping)
+	}
+
+	if g.HasDownEdges(FORWARD) || g.HasDownEdges(BACKWARD) {
+		panic("not implemented")
+	}
 }
 
 // Reorders nodes in graph inplace.
 // "node_mapping" maps old id -> new id.
 func ReorderTiledGraph(g *TiledGraph, node_mapping Array[int32]) {
-	g.store._ReorderNodes(node_mapping)
-	g.topology._ReorderNodes(node_mapping)
-	g.weight._ReorderNodes(node_mapping)
-	g.index = _BuildKDTreeIndex(g.store)
+	g.base._ReorderNodes(node_mapping)
+	panic("dont use this")
+	// g.weight._ReorderNodes(node_mapping)
 
-	g.skip_store._ReorderNodes(node_mapping)
+	g.skip_shortcuts._ReorderNodes(node_mapping)
 	g.skip_topology._ReorderNodes(node_mapping)
+	Reorder[int16](g.node_tiles, node_mapping)
+	if g.HasCellIndex() {
+		g.cell_index.Value._ReorderNodes(node_mapping)
+	}
 }
 
 // Orders nodes by CH-level.
-func ComputeLevelOrdering(g ICHGraph) Array[int32] {
+func ComputeLevelOrdering(g IGraph, node_levels Array[int16]) Array[int32] {
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), g.GetNodeLevel(int32(i))))
+		indices.Add(MakeTuple(int32(i), node_levels[i]))
 	}
 	sort.SliceStable(indices, func(i, j int) bool {
 		return indices[i].B > indices[j].B
@@ -142,17 +155,17 @@ func ComputeLevelOrdering(g ICHGraph) Array[int32] {
 // Orders nodes by tiles and levels.
 // Border nodes are pushed to front of all nodes.
 // Within their tiles nodes are ordered by level.
-func ComputeTileLevelOrdering(g ICHGraph, node_tiles Array[int16]) Array[int32] {
+func ComputeTileLevelOrdering(g IGraph, node_tiles Array[int16], node_levels Array[int16]) Array[int32] {
 	// sort by level
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), g.GetNodeLevel(int32(i))))
+		indices.Add(MakeTuple(int32(i), node_levels[i]))
 	}
 	sort.SliceStable(indices, func(i, j int) bool {
 		return indices[i].B > indices[j].B
 	})
 	// sort by tile
-	is_border := _IsBorderNode2(g, node_tiles)
+	is_border := _IsBorderNode3(g, node_tiles)
 	for i := 0; i < int(g.NodeCount()); i++ {
 		index := indices[i]
 		tile := node_tiles[index.A]
@@ -172,46 +185,13 @@ func ComputeTileLevelOrdering(g ICHGraph, node_tiles Array[int16]) Array[int32] 
 	return order
 }
 
-// Orders nodes by tiles and levels.
-// Border nodes are pushed to front of all nodes.
-// Within their tiles nodes are ordered by level.
-func ComputeTileLevelOrdering2(g ITiledGraph, node_levels Array[int16]) Array[int32] {
-	// sort by level
-	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
-	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), node_levels[i]))
-	}
-	sort.SliceStable(indices, func(i, j int) bool {
-		return indices[i].B > indices[j].B
-	})
-	// sort by tile
-	is_border := _IsBorderNode3(g)
-	for i := 0; i < int(g.NodeCount()); i++ {
-		index := indices[i]
-		tile := g.GetNodeTile(index.A)
-		if is_border[index.A] {
-			tile = -10000
-		}
-		index.B = tile
-		indices[i] = index
-	}
-	sort.SliceStable(indices, func(i, j int) bool {
-		return indices[i].B < indices[j].B
-	})
-	order := NewArray[int32](len(indices))
-	for i, index := range indices {
-		order[i] = index.A
-	}
-	return order
-}
-
 // Orders nodes by tiles.
 // Border nodes are pushed to front of all nodes.
-func ComputeTileOrdering(g ITiledGraph) Array[int32] {
-	is_border := _IsBorderNode3(g)
+func ComputeTileOrdering(g IGraph, node_tiles Array[int16]) Array[int32] {
+	is_border := _IsBorderNode3(g, node_tiles)
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
-		tile := g.GetNodeTile(int32(i))
+		tile := node_tiles[i]
 		if is_border[i] {
 			tile = -10000
 		}

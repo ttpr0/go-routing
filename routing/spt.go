@@ -49,7 +49,7 @@ func NewShortestPathTree(graph graph.IGraph, start, max_val int32, consumer ISPT
 }
 
 func (self *ShortestPathTree) CalcShortestPathTree() {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for {
 		curr_id, _ := self.heap.Dequeue()

@@ -80,7 +80,7 @@ func (self *EdmondsKarp) ComputeMinCut() {
 		}
 	}
 
-	explorer := self.g.GetDefaultExplorer()
+	explorer := self.g.GetGraphExplorer()
 	for {
 		curr, ok := queue.Pop()
 		if !ok {
@@ -150,7 +150,7 @@ func (self *EdmondsKarp) BFS() int {
 		}
 	}
 
-	explorer := self.g.GetDefaultExplorer()
+	explorer := self.g.GetGraphExplorer()
 
 	end := int32(-1)
 	for {

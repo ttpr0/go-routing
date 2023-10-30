@@ -9,10 +9,45 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
+//*******************************************
+// weighting interface
+//*******************************************
+
 type IWeighting interface {
 	GetEdgeWeight(edge int32) int32
 	GetTurnCost(from, via, to int32) int32
+
+	Type() WeightType
+
+	HasTurnCosts() bool
+	IsDynamic() bool
+	IsTimeDependant() bool
 }
+
+type WeightType byte
+
+const (
+	DEFAULT_WEIGHT   WeightType = 0
+	TURN_COST_WEIGHT WeightType = 1
+	TRAFFIC_WEIGHT   WeightType = 2
+)
+
+type IWeightHandler interface {
+	Load(dir string, name string, nodecount, edgecount int) IWeighting
+	Store(dir string, name string, weight IWeighting)
+	Remove(dir string, name string)
+	_ReorderNodes(dir string, name string, mapping Array[int32])  // Reorder nodes of base-graph
+	_ReorderNodesInplace(weight IWeighting, mapping Array[int32]) // Reorder nodes of base-graph
+}
+
+var WEIGHTING_HANDLERS = Dict[WeightType, IWeightHandler]{
+	DEFAULT_WEIGHT:   _DefaultWeightingHandler{},
+	TURN_COST_WEIGHT: _TCWeightingHandler{},
+}
+
+//*******************************************
+// default weighting without turn costs
+//*******************************************
 
 type DefaultWeighting struct {
 	edge_weights []int32
@@ -23,6 +58,35 @@ func (self *DefaultWeighting) GetEdgeWeight(edge int32) int32 {
 }
 func (self *DefaultWeighting) GetTurnCost(from, via, to int32) int32 {
 	return 0
+}
+
+func (self *DefaultWeighting) Type() WeightType {
+	return DEFAULT_WEIGHT
+}
+func (self *DefaultWeighting) HasTurnCosts() bool {
+	return false
+}
+func (self *DefaultWeighting) IsDynamic() bool {
+	return false
+}
+func (self *DefaultWeighting) IsTimeDependant() bool {
+	return false
+}
+
+type _DefaultWeightingHandler struct{}
+
+func (self _DefaultWeightingHandler) Load(dir string, name string, nodecount, edgecount int) IWeighting {
+	return _LoadDefaultWeighting(dir+name+"-weight", edgecount)
+}
+func (self _DefaultWeightingHandler) Store(dir string, name string, weight IWeighting) {
+	_StoreDefaultWeighting(weight.(*DefaultWeighting), dir+name+"-weight")
+}
+func (self _DefaultWeightingHandler) Remove(dir string, name string) {
+	os.Remove(dir + name + "-weight")
+}
+func (self _DefaultWeightingHandler) _ReorderNodes(dir string, name string, mapping Array[int32]) {
+}
+func (self _DefaultWeightingHandler) _ReorderNodesInplace(weight IWeighting, mapping Array[int32]) {
 }
 
 // reorders nodes in weightstore,
@@ -69,6 +133,10 @@ func _LoadDefaultWeighting(file string, edgecout int) *DefaultWeighting {
 	}
 }
 
+//*******************************************
+// weighting with turn costs
+//*******************************************
+
 type TCWeighting struct {
 	edge_weights List[int32]
 	edge_indices List[Tuple[byte, byte]]
@@ -88,6 +156,37 @@ func (self *TCWeighting) GetTurnCost(from, via, to int32) int32 {
 	return int32(self.turn_weights[loc+int(cols*bwd_index)+int(fwd_index)])
 }
 
+func (self *TCWeighting) Type() WeightType {
+	return TURN_COST_WEIGHT
+}
+func (self *TCWeighting) HasTurnCosts() bool {
+	return true
+}
+func (self *TCWeighting) IsDynamic() bool {
+	return false
+}
+func (self *TCWeighting) IsTimeDependant() bool {
+	return false
+}
+
+type _TCWeightingHandler struct{}
+
+func (self _TCWeightingHandler) Load(dir string, name string, nodecount, edgecount int) IWeighting {
+	panic("not implemented")
+}
+func (self _TCWeightingHandler) Store(dir string, name string, weight IWeighting) {
+	_StoreTCWeighting(weight.(*TCWeighting), dir+name+"-weight")
+}
+func (self _TCWeightingHandler) Remove(dir string, name string) {
+	os.Remove(dir + name + "-weight")
+}
+func (self _TCWeightingHandler) _ReorderNodes(dir string, name string, mapping Array[int32]) {
+	panic("not implemented")
+}
+func (self _TCWeightingHandler) _ReorderNodesInplace(weight IWeighting, mapping Array[int32]) {
+	panic("not implemented")
+}
+
 func _CreateTCWeighting(graph *Graph) *TCWeighting {
 	edge_weights := NewArray[int32](int(graph.EdgeCount()))
 	edge_indices := NewArray[Tuple[byte, byte]](int(graph.EdgeCount()))
@@ -98,7 +197,7 @@ func _CreateTCWeighting(graph *Graph) *TCWeighting {
 		edge_weights[i] = int32(edge.Length / float32(edge.Maxspeed))
 	}
 	size := 0
-	explorer := graph.GetDefaultExplorer()
+	explorer := graph.GetGraphExplorer()
 	for i := 0; i < int(graph.NodeCount()); i++ {
 		fwd_index := 0
 		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
@@ -158,6 +257,10 @@ func _StoreTCWeighting(weight *TCWeighting, filename string) {
 	weightfile.Write(weightbuffer.Bytes())
 }
 
+//*******************************************
+// weighting with traffic updates
+//*******************************************
+
 type TrafficWeighting struct {
 	EdgeWeight []int32
 	Traffic    *TrafficTable
@@ -170,6 +273,19 @@ func (self *TrafficWeighting) GetEdgeWeight(edge int32) int32 {
 }
 func (self *TrafficWeighting) GetTurnCost(from, via, to int32) int32 {
 	return 0
+}
+
+func (self *TrafficWeighting) Type() WeightType {
+	return TRAFFIC_WEIGHT
+}
+func (self *TrafficWeighting) HasTurnCosts() bool {
+	return false
+}
+func (self *TrafficWeighting) IsDynamic() bool {
+	return true
+}
+func (self *TrafficWeighting) IsTimeDependant() bool {
+	return false
 }
 
 type TrafficTable struct {

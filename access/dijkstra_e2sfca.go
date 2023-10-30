@@ -53,7 +53,7 @@ func CalcDijkstra2SFCA(g graph.IGraph, dem view.IPointView, sup view.IPointView,
 			visited := NewArray[bool](g.NodeCount())
 			dist := NewArray[int32](g.NodeCount())
 			heap := NewPriorityQueue[int32, int32](100)
-			explorer := g.GetDefaultExplorer()
+			explorer := g.GetGraphExplorer()
 
 			for {
 				// read supply entry from chan
@@ -183,7 +183,7 @@ func CalcDijkstra2SFCA2(g graph.IGraph, dem view.IPointView, sup view.IPointView
 			visited := NewArray[bool](g.NodeCount())
 			dist := NewArray[int32](g.NodeCount())
 			heap := NewPriorityQueue[int32, int32](100)
-			explorer := g.GetDefaultExplorer()
+			explorer := g.GetGraphExplorer()
 
 			for {
 				// read supply entry from chan

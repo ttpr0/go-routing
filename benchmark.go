@@ -17,19 +17,6 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func test() {
-	demand_locs, demand_weights, supply_locs, supply_weights := load_data("./data/population_aurich_emden.json", "./data/physicians_aurich_emden.json")
-
-	_g := graph.LoadCHGraph("./graphs/test_order")
-	g2 := graph.CreateCHGraph3(_g.(*graph.CHGraph))
-
-	distance_decay := decay.NewLinearDecay(1800)
-	demand_view := view.NewPointView(demand_locs, demand_weights)
-	supply_view := view.NewPointView(supply_locs, supply_weights)
-
-	access.CalcRPHAST2SFCA3(g2, demand_view, supply_view, distance_decay)
-}
-
 func run_benchmark() {
 	// load locations and weights
 	fmt.Println("Loading location data ...")
@@ -38,10 +25,9 @@ func run_benchmark() {
 	// load graphs
 	fmt.Println("Loading graphs ...")
 	g1 := graph.LoadGraph("./graphs/niedersachsen")
-	_g := graph.LoadCHGraph("./graphs/test_order")
-	g2 := graph.CreateCHGraph3(_g.(*graph.CHGraph))
-	g3 := graph.LoadTiledGraph3("./graphs/test_tiles_ch_index")
-	g4 := graph.TransformToTiled5(g3)
+	g2 := graph.LoadCHGraph("./graphs/test_order")
+	graph.PreparePHASTIndex(g2)
+	g3 := graph.LoadTiledGraph("./graphs/test_tiles_ch_index")
 
 	// prepare benchmark data
 	fmt.Println("Preparing benchmark data ...")
@@ -124,23 +110,15 @@ func run_benchmark() {
 		dt = time.Since(t)
 		r7 := int(dt.Milliseconds() / REPEAT_COUNT)
 
-		t = time.Now()
-		for j := 0; j < REPEAT_COUNT; j++ {
-			view := views[j]
-			access.CalcTiled2SFCA3(g4, demand_view, view, distance_decay)
-		}
-		dt = time.Since(t)
-		r8 := int(dt.Milliseconds() / REPEAT_COUNT)
-
 		results[i] = Result{
 			value: count,
-			times: []int{r1, r2, r3, r4, r5, r6, r7, r8},
+			times: []int{r1, r2, r3, r4, r5, r6, r7},
 		}
 	}
 
 	// write results to csv file
 	fmt.Println("Write results to file ...")
-	headers := []string{"Standortanzahl (Angebot)", "Range-Dijkstra", "RPHAST", "Range-PHAST", "Range-RPHAST", "Range-RPHAST2", "Tiled-Dijkstra", "Index-Dijkstra", "Index-Dijkstra2"}
+	headers := []string{"Standortanzahl (Angebot)", "Range-Dijkstra", "RPHAST", "Range-PHAST", "Range-RPHAST", "Range-RPHAST2", "Tiled-Dijkstra", "Index-Dijkstra"}
 	write_results("./results.csv", results, headers)
 }
 

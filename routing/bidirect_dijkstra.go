@@ -50,7 +50,7 @@ func NewBidirectDijkstra(graph graph.IGraph, start, end int32) *BidirectDijkstra
 }
 
 func (self *BidirectDijkstra) CalcShortestPath() bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	finished := false
 	for !finished {
@@ -153,7 +153,7 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 }
 
 func (self *BidirectDijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	is_finished := false
 	for c := 0; c < count; c++ {
@@ -252,7 +252,7 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *List[geo.CoordArray
 }
 
 func (self *BidirectDijkstra) GetShortestPath() Path {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	path := make([]int32, 0, 10)
 	length := int32(self.flags[self.mid_id].path_length1 + self.flags[self.mid_id].path_length2)

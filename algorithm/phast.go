@@ -22,7 +22,7 @@ func CalcPHAST(g graph.ICHGraph, start int32) Array[int32] {
 	heap := NewPriorityQueue[int32, int32](100)
 	heap.Enqueue(start, 0)
 
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 
 	for {
 		curr_id, ok := heap.Dequeue()

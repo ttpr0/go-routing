@@ -32,7 +32,7 @@ func DijkstraTDMatrix(g graph.IGraph, sources Array[int32], destinations Array[i
 			visited := NewArray[bool](g.NodeCount())
 			dist := NewArray[int32](g.NodeCount())
 			heap := NewPriorityQueue[int32, int32](100)
-			explorer := g.GetDefaultExplorer()
+			explorer := g.GetGraphExplorer()
 
 			for {
 				// read supply entry from chan

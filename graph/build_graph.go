@@ -5,6 +5,22 @@ import (
 )
 
 //*******************************************
+// build graph from graphstore
+//*******************************************
+
+func BuildGraph(store GraphStore) *Graph {
+	weight := _BuildWeighting(store)
+	return &Graph{
+		base: GraphBase{
+			store:    store,
+			topology: _BuildTopology(store),
+			index:    _BuildKDTreeIndex(store),
+		},
+		weight: &weight,
+	}
+}
+
+//*******************************************
 // utility methods
 //*******************************************
 
@@ -47,4 +63,21 @@ func _BuildKDTreeIndex(store GraphStore) KDTree[int32] {
 		tree.Insert(geom[:], int32(i))
 	}
 	return tree
+}
+
+func BuildDefaultWeighting(base GraphBase) IWeighting {
+	edges := base.store.edges
+
+	weights := NewArray[int32](edges.Length())
+	for id, edge := range edges {
+		w := edge.Length * 3.6 / float32(edge.Maxspeed)
+		if w < 1 {
+			w = 1
+		}
+		weights[id] = int32(w)
+	}
+
+	return &DefaultWeighting{
+		edge_weights: weights,
+	}
 }

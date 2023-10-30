@@ -1,43 +1,40 @@
 package main
 
 import (
-	"encoding/json"
-	"errors"
 	"math"
-	"os"
 
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/decay"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/view"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/algorithm/partitioning"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
 )
 
 func LoadOrCreate(graph_path string, osm_file string, partition_file string) graph.ITiledGraph {
-	// check if graph files already exist
-	_, err1 := os.Stat(graph_path + "-nodes")
-	_, err2 := os.Stat(graph_path + "-edges")
-	_, err3 := os.Stat(graph_path + "-geom")
-	_, err4 := os.Stat(graph_path + "-tiles")
-	if errors.Is(err1, os.ErrNotExist) || errors.Is(err2, os.ErrNotExist) || errors.Is(err3, os.ErrNotExist) || errors.Is(err4, os.ErrNotExist) {
-		// create graph
-		g := graph.ParseGraph(osm_file)
+	// // check if graph files already exist
+	// _, err1 := os.Stat(graph_path + "-nodes")
+	// _, err2 := os.Stat(graph_path + "-edges")
+	// _, err3 := os.Stat(graph_path + "-geom")
+	// _, err4 := os.Stat(graph_path + "-tiles")
+	// if errors.Is(err1, os.ErrNotExist) || errors.Is(err2, os.ErrNotExist) || errors.Is(err3, os.ErrNotExist) || errors.Is(err4, os.ErrNotExist) {
+	// 	// create graph
+	// 	g := graph.ParseGraph(osm_file)
 
-		file_str, _ := os.ReadFile(partition_file)
-		collection := geo.FeatureCollection{}
-		_ = json.Unmarshal(file_str, &collection)
+	// 	file_str, _ := os.ReadFile(partition_file)
+	// 	collection := geo.FeatureCollection{}
+	// 	_ = json.Unmarshal(file_str, &collection)
 
-		graph.BuildGraphIndex(g)
+	// 	graph.BuildGraphIndex(g)
 
-		tiles := partitioning.GeometricPartitioning(g, collection.Features())
-		tg := graph.PreprocessTiledGraph(g, tiles)
+	// 	tiles := partitioning.GeometricPartitioning(g, collection.Features())
+	// 	tg := graph.PreprocessTiledGraph(g, tiles)
 
-		graph.StoreTiledGraph(tg, graph_path)
+	// 	graph.StoreTiledGraph(tg, graph_path)
 
-		return tg
-	} else {
-		return graph.LoadTiledGraph(graph_path)
-	}
+	// 	return tg
+	// } else {
+	// 	return graph.LoadTiledGraph(graph_path)
+	// }
+	return nil
 }
 
 func GetClosestNode2(point geo.Coord, graph graph.IGraph) int32 {

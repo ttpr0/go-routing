@@ -56,7 +56,7 @@ func CalcTiled2SFCA(g graph.ITiledGraph, dem view.IPointView, sup view.IPointVie
 			visited := NewArray[bool](g.NodeCount())
 			dist := NewArray[int32](g.NodeCount())
 			heap := NewPriorityQueue[int32, int32](100)
-			explorer := g.GetDefaultExplorer()
+			explorer := g.GetGraphExplorer()
 
 			for {
 				// read supply entry from chan
@@ -149,7 +149,7 @@ func CalcTiled2SFCA(g graph.ITiledGraph, dem view.IPointView, sup view.IPointVie
 // using index within active cells
 //*******************************************
 
-func CalcTiled2SFCA2(g *graph.TiledGraph3, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcTiled2SFCA2(g *graph.TiledGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// get closest node for every demand point
 	tilecount := g.TileCount() + 2
 	index := g.GetIndex()
@@ -194,7 +194,7 @@ func CalcTiled2SFCA2(g *graph.TiledGraph3, dem view.IPointView, sup view.IPointV
 			visited := NewArray[bool](g.NodeCount())
 			dist := NewArray[int32](g.NodeCount())
 			heap := NewPriorityQueue[int32, int32](100)
-			explorer := g.GetDefaultExplorer()
+			explorer := g.GetGraphExplorer()
 
 			for {
 				// read supply entry from chan
@@ -258,7 +258,7 @@ func CalcTiled2SFCA2(g *graph.TiledGraph3, dem view.IPointView, sup view.IPointV
 					if !active_tiles[i] || !found_tiles[i] {
 						continue
 					}
-					down_edges := g.GetDownEdges(int16(i), graph.FORWARD)
+					down_edges, _ := g.GetIndexEdges(int16(i), graph.FORWARD)
 					for j := 0; j < down_edges.Length(); j++ {
 						edge := down_edges[j]
 						curr_len := dist[edge.From]

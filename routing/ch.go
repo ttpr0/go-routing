@@ -55,7 +55,7 @@ func NewCH(graph graph.ICHGraph, start, end int32) *CH {
 }
 
 func (self *CH) CalcShortestPath() bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for {
 		if self.startheap.Len() == 0 && self.endheap.Len() == 0 {
@@ -160,7 +160,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 		}
 	}()
 
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 	for c := 0; c < count; c++ {
 		if self.startheap.Len() == 0 && self.endheap.Len() == 0 {
 			return false
@@ -267,7 +267,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 }
 
 func (self *CH) GetShortestPath() Path {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	path := NewList[int32](10)
 	length := int32(self.flags[self.mid_id].path_length1 + self.flags[self.mid_id].path_length2)

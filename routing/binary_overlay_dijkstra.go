@@ -39,7 +39,7 @@ func NewBODijkstra(graph graph.ITiledGraph, start, end int32) *BODijkstra {
 }
 
 func (self *BODijkstra) CalcShortestPath() bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for {
 		curr_flag, ok := self.heap.Dequeue()
@@ -100,7 +100,7 @@ func (self *BODijkstra) CalcShortestPath() bool {
 }
 
 func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for c := 0; c < count; c++ {
 		curr_flag, ok := self.heap.Dequeue()
@@ -165,7 +165,7 @@ func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) boo
 }
 
 func (self *BODijkstra) GetShortestPath() Path {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	path := NewList[int32](10)
 	length := int32(self.flags[self.end_id].path_length)

@@ -42,7 +42,7 @@ func (self *ShortestPathTree2) Init(start int32, max_range float64) {
 	self.flags[start].PathLength = 0
 }
 func (self *ShortestPathTree2) CalcSPT() {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for {
 		curr_id, ok := self.heap.Dequeue()

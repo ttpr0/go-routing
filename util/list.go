@@ -87,3 +87,12 @@ func Contains[T comparable](list List[T], value T) bool {
 	}
 	return false
 }
+
+func FindFirst[T any](list List[T], filt func(T) bool) int {
+	for i, v := range list {
+		if filt(v) {
+			return i
+		}
+	}
+	return -1
+}

@@ -5,7 +5,7 @@ import (
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
-func CalcPHAST4(g *graph.CHGraph4, start int32, max_range int32) Array[int32] {
+func CalcPHAST4(g *graph.CHGraph, start int32, max_range int32) Array[int32] {
 	active_tiles := NewArray[bool](g.TileCount())
 	visited := NewArray[bool](g.NodeCount())
 	dist := NewArray[int32](g.NodeCount())
@@ -17,7 +17,7 @@ func CalcPHAST4(g *graph.CHGraph4, start int32, max_range int32) Array[int32] {
 	heap := NewPriorityQueue[int32, int32](100)
 	heap.Enqueue(start, 0)
 
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 
 	// upwards search
 	for {
@@ -51,7 +51,7 @@ func CalcPHAST4(g *graph.CHGraph4, start int32, max_range int32) Array[int32] {
 		})
 	}
 	// iterative down-sweep
-	down_edges := g.GetDownEdges(graph.FORWARD)
+	down_edges, _ := g.GetDownEdges(graph.FORWARD)
 	overlay_dummy := down_edges[0]
 	overlay_start := 1
 	overlay_end := 1 + overlay_dummy.To
@@ -64,12 +64,13 @@ func CalcPHAST4(g *graph.CHGraph4, start int32, max_range int32) Array[int32] {
 		}
 		if dist[edge.To] > new_len {
 			dist[edge.To] = new_len
-			active_tiles[edge.ToTile] = true
+			to_tile := graph.Shortcut_get_payload[int16](&edge, 0)
+			active_tiles[to_tile] = true
 		}
 	}
 	for i := int(overlay_end); i < down_edges.Length(); i++ {
 		curr_dummy := down_edges[i]
-		curr_tile := curr_dummy.ToTile
+		curr_tile := graph.Shortcut_get_payload[int16](&curr_dummy, 0)
 		curr_count := curr_dummy.To
 		if active_tiles[curr_tile] {
 			tile_start := i + 1
@@ -92,7 +93,7 @@ func CalcPHAST4(g *graph.CHGraph4, start int32, max_range int32) Array[int32] {
 	return dist
 }
 
-func CalcPHAST5(g *graph.CHGraph4, start int32, max_range int32) Array[int32] {
+func CalcPHAST5(g *graph.CHGraph, start int32, max_range int32) Array[int32] {
 	active_tiles := NewArray[bool](g.TileCount())
 	visited := NewArray[bool](g.NodeCount())
 	dist := NewArray[int32](g.NodeCount())
@@ -104,7 +105,7 @@ func CalcPHAST5(g *graph.CHGraph4, start int32, max_range int32) Array[int32] {
 	heap := NewPriorityQueue[int32, int32](100)
 	heap.Enqueue(start, 0)
 
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 
 	// upwards search
 	for {
@@ -138,7 +139,7 @@ func CalcPHAST5(g *graph.CHGraph4, start int32, max_range int32) Array[int32] {
 		})
 	}
 	// iterative down-sweep
-	down_edges := g.GetDownEdges(graph.FORWARD)
+	down_edges, _ := g.GetDownEdges(graph.FORWARD)
 	overlay_dummy := down_edges[0]
 	overlay_start := 1
 	overlay_end := 1 + int(overlay_dummy.To)
@@ -151,15 +152,18 @@ func CalcPHAST5(g *graph.CHGraph4, start int32, max_range int32) Array[int32] {
 		}
 		if dist[edge.To] > new_len {
 			dist[edge.To] = new_len
-			active_tiles[edge.ToTile] = true
+			to_tile := graph.Shortcut_get_payload[int16](&edge, 0)
+			active_tiles[to_tile] = true
 		}
 	}
 	tiles_start := overlay_end
 	tiles_end := int(down_edges.Length())
 	for i := tiles_start; i < tiles_end; i++ {
 		edge := down_edges[i]
-		if edge.IsDummy {
-			curr_tile := edge.ToTile
+		is_dummy := graph.Shortcut_get_payload[bool](&edge, 2)
+		to_tile := graph.Shortcut_get_payload[int16](&edge, 0)
+		if is_dummy {
+			curr_tile := to_tile
 			if !active_tiles[curr_tile] {
 				i += int(edge.To)
 			}

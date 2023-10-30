@@ -104,7 +104,7 @@ func (self *DistributedRoutingRunner) HandleRetrivalRequest() {
 		curr_id := request
 		var edge int32
 
-		explorer := self.graph.GetDefaultExplorer()
+		explorer := self.graph.GetGraphExplorer()
 		for {
 			if curr_id == self.start_id {
 				close(self.path_chan)
@@ -136,7 +136,7 @@ func (self *DistributedRoutingRunner) HandleExitRequest() {
 }
 
 func (self *DistributedRoutingRunner) RunRouting() {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for !self.finished {
 		curr_flag, ok := self.heap.Dequeue()

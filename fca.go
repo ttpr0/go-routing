@@ -45,7 +45,7 @@ func HandleFCARequest(w http.ResponseWriter, r *http.Request) {
 		weights = access.CalcEnhanced2SFCA(GRAPH, demand_view, supply_view, distance_decay)
 	} else if req.Mode == "ch" {
 		fmt.Println("run ch fca")
-		// weights = access.CalcRPHASTEnhanced2SFCA(GRAPH, demand_view, supply_view, distance_decay)
+		// weights = access.CalcRPHAST2SFCA(GRAPH, demand_view, supply_view, distance_decay)
 	} else if req.Mode == "default" {
 		fmt.Println("run default fca")
 		weights = access.CalcEnhanced2SFCA(GRAPH, demand_view, supply_view, distance_decay)

@@ -45,7 +45,7 @@ func (self *RPHAST) Init(start int32, max_range float64) {
 	self.flags[start].PathLength = 0
 }
 func (self *RPHAST) CalcSPT() {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for {
 		curr_id, ok := self.heap.Dequeue()
