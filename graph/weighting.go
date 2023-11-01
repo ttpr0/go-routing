@@ -155,6 +155,23 @@ func BuildEqualWeighting(base GraphBase) IWeighting {
 	}
 }
 
+func BuildPedestrianWeighting(base GraphBase) IWeighting {
+	edges := base.store.edges
+
+	weights := NewArray[int32](edges.Length())
+	for id, edge := range edges {
+		w := edge.Length * 3.6 / 3
+		if w < 1 {
+			w = 1
+		}
+		weights[id] = int32(w)
+	}
+
+	return &DefaultWeighting{
+		edge_weights: weights,
+	}
+}
+
 //*******************************************
 // weighting with turn costs
 //*******************************************
