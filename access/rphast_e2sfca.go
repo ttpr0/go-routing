@@ -13,7 +13,7 @@ import (
 // simple 2sfca using rphast
 // *******************************************
 
-func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcRPHAST2SFCA(g graph.ICHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// node queue for selecting graph subset
 	node_queue := NewQueue[int32]()
 
@@ -46,7 +46,7 @@ func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView
 	close(supply_chan)
 
 	// select graph subset by marking visited nodes
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 	graph_subset := NewArray[bool](int(g.NodeCount()))
 	for {
 		if node_queue.Size() == 0 {
@@ -69,8 +69,8 @@ func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView
 		})
 	}
 	// selecting subset of downward edges for linear sweep
-	down_edges_subset := NewList[graph.CHEdge](dem.PointCount())
-	down_edges := g.GetDownEdges(graph.FORWARD)
+	down_edges_subset := NewList[graph.Shortcut](dem.PointCount())
+	down_edges, _ := g.GetDownEdges(graph.FORWARD)
 	for i := 0; i < len(down_edges); i++ {
 		edge := down_edges[i]
 		if !graph_subset[edge.From] {
@@ -92,7 +92,7 @@ func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView
 			visited := NewArray[bool](g.NodeCount())
 			dist := NewArray[int32](g.NodeCount())
 			heap := NewPriorityQueue[int32, int32](100)
-			explorer := g.GetDefaultExplorer()
+			explorer := g.GetGraphExplorer()
 
 			for {
 				// read supply entry from chan
@@ -186,7 +186,7 @@ func CalcRPHAST2SFCA(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView
 // phast with range restriction
 // *******************************************
 
-func CalcRPHAST2SFCA2(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcRPHAST2SFCA2(g graph.ICHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// node queue for selecting graph subset
 	node_queue := NewQueue[int32]()
 
@@ -231,7 +231,7 @@ func CalcRPHAST2SFCA2(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 			visited := NewArray[bool](g.NodeCount())
 			dist := NewArray[int32](g.NodeCount())
 			heap := NewPriorityQueue[int32, int32](100)
-			explorer := g.GetDefaultExplorer()
+			explorer := g.GetGraphExplorer()
 
 			for {
 				// read supply entry from chan
@@ -280,7 +280,7 @@ func CalcRPHAST2SFCA2(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 					})
 				}
 				// downwards sweep
-				down_edges := g.GetDownEdges(graph.FORWARD)
+				down_edges, _ := g.GetDownEdges(graph.FORWARD)
 				for i := 0; i < len(down_edges); i++ {
 					edge := down_edges[i]
 					curr_len := dist[edge.From]
@@ -332,7 +332,7 @@ func CalcRPHAST2SFCA2(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 // rphast with range
 // *******************************************
 
-func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcRPHAST2SFCA3(g graph.ICHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// node queue for selecting graph subset
 	node_queue := NewQueue[int32]()
 
@@ -365,7 +365,7 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 	close(supply_chan)
 
 	// select graph subset by marking visited nodes
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 	graph_subset := NewArray[bool](int(g.NodeCount()))
 	for {
 		if node_queue.Size() == 0 {
@@ -388,8 +388,8 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 		})
 	}
 	// selecting subset of downward edges for linear sweep
-	down_edges_subset := NewList[graph.CHEdge](dem.PointCount())
-	down_edges := g.GetDownEdges(graph.FORWARD)
+	down_edges_subset := NewList[graph.Shortcut](dem.PointCount())
+	down_edges, _ := g.GetDownEdges(graph.FORWARD)
 	for i := 0; i < len(down_edges); i++ {
 		edge := down_edges[i]
 		if !graph_subset[edge.From] {
@@ -411,7 +411,7 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 			visited := NewArray[bool](g.NodeCount())
 			dist := NewArray[int32](g.NodeCount())
 			heap := NewPriorityQueue[int32, int32](100)
-			explorer := g.GetDefaultExplorer()
+			explorer := g.GetGraphExplorer()
 
 			for {
 				// read supply entry from chan
@@ -511,7 +511,7 @@ func CalcRPHAST2SFCA3(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 // rphast with range selected edge subset
 // *******************************************
 
-func CalcRPHAST2SFCA4(g *graph.CHGraph3, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
+func CalcRPHAST2SFCA4(g graph.ICHGraph, dem view.IPointView, sup view.IPointView, dec decay.IDistanceDecay) []float32 {
 	// node queue for selecting graph subset
 	node_queue := NewPriorityQueue[int32, int32](10000)
 
@@ -547,7 +547,7 @@ func CalcRPHAST2SFCA4(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 	max_range := int32(dec.GetMaxDistance())
 
 	// select graph subset by marking visited nodes
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 	lengths := NewArray[int32](g.NodeCount())
 	graph_subset := NewArray[bool](g.NodeCount())
 	for {
@@ -579,8 +579,8 @@ func CalcRPHAST2SFCA4(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 		})
 	}
 	// selecting subset of downward edges for linear sweep
-	down_edges_subset := NewList[graph.CHEdge](dem.PointCount())
-	down_edges := g.GetDownEdges(graph.FORWARD)
+	down_edges_subset := NewList[graph.Shortcut](dem.PointCount())
+	down_edges, _ := g.GetDownEdges(graph.FORWARD)
 	for i := 0; i < len(down_edges); i++ {
 		edge := down_edges[i]
 		if !graph_subset[edge.From] {
@@ -601,7 +601,7 @@ func CalcRPHAST2SFCA4(g *graph.CHGraph3, dem view.IPointView, sup view.IPointVie
 			visited := NewArray[bool](g.NodeCount())
 			dist := NewArray[int32](g.NodeCount())
 			heap := NewPriorityQueue[int32, int32](100)
-			explorer := g.GetDefaultExplorer()
+			explorer := g.GetGraphExplorer()
 
 			for {
 				// read supply entry from chan

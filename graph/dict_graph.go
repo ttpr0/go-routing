@@ -39,16 +39,10 @@ func NewDictGraph() *DictGraph {
 	}
 }
 
-func (self *DictGraph) GetDefaultExplorer() IGraphExplorer {
+func (self *DictGraph) GetGraphExplorer() IGraphExplorer {
 	return &DictGraphExplorer{
 		graph:  self,
 		weight: &self.weight,
-	}
-}
-func (self *DictGraph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
-	return &DictGraphExplorer{
-		graph:  self,
-		weight: weighting,
 	}
 }
 func (self *DictGraph) NodeCount() int32 {
@@ -254,4 +248,17 @@ func (self *DictWeighting) GetEdgeWeight(edge int32) int32 {
 }
 func (self *DictWeighting) GetTurnCost(from, via, to int32) int32 {
 	return 0
+}
+
+func (self *DictWeighting) Type() WeightType {
+	return DEFAULT_WEIGHT
+}
+func (self *DictWeighting) HasTurnCosts() bool {
+	return false
+}
+func (self *DictWeighting) IsDynamic() bool {
+	return false
+}
+func (self *DictWeighting) IsTimeDependant() bool {
+	return false
 }

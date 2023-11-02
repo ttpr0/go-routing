@@ -10,8 +10,7 @@ import (
 //******************************************
 
 type IGraph interface {
-	GetDefaultExplorer() IGraphExplorer
-	GetGraphExplorer(weighting IWeighting) IGraphExplorer
+	GetGraphExplorer() IGraphExplorer
 	GetIndex() IGraphIndex
 	NodeCount() int
 	EdgeCount() int
@@ -44,50 +43,42 @@ type IGraphIndex interface {
 //******************************************
 
 type Graph struct {
-	store    GraphStore
-	topology AdjacencyArray
-	weight   DefaultWeighting
-	index    KDTree[int32]
+	base         GraphBase
+	weight       IWeighting
+	_weight_name string
 }
 
-func (self *Graph) GetDefaultExplorer() IGraphExplorer {
+func (self *Graph) GetGraphExplorer() IGraphExplorer {
 	return &BaseGraphExplorer{
 		graph:    self,
-		accessor: self.topology.GetAccessor(),
-		weight:   &self.weight,
-	}
-}
-func (self *Graph) GetGraphExplorer(weighting IWeighting) IGraphExplorer {
-	return &BaseGraphExplorer{
-		graph:    self,
-		accessor: self.topology.GetAccessor(),
-		weight:   weighting,
+		accessor: self.base.GetAccessor(),
+		weight:   self.weight,
 	}
 }
 func (self *Graph) NodeCount() int {
-	return self.store.NodeCount()
+	return self.base.NodeCount()
 }
 func (self *Graph) EdgeCount() int {
-	return self.store.EdgeCount()
+	return self.base.EdgeCount()
 }
 func (self *Graph) IsNode(node int32) bool {
-	return self.store.IsNode(node)
+	return int32(self.base.NodeCount()) < node
 }
 func (self *Graph) GetNode(node int32) Node {
-	return self.store.GetNode(node)
+	return self.base.GetNode(node)
 }
 func (self *Graph) GetEdge(edge int32) Edge {
-	return self.store.GetEdge(edge)
+	return self.base.GetEdge(edge)
 }
 func (self *Graph) GetNodeGeom(node int32) geo.Coord {
-	return self.store.GetNodeGeom(node)
+	return self.base.GetNodeGeom(node)
 }
 func (self *Graph) GetEdgeGeom(edge int32) geo.CoordArray {
-	return self.store.GetEdgeGeom(edge)
+	return self.base.GetEdgeGeom(edge)
 }
 func (self *Graph) GetIndex() IGraphIndex {
 	return &BaseGraphIndex{
-		index: self.index,
+		index: self.base.GetKDTree(),
 	}
 }
 

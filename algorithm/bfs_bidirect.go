@@ -8,7 +8,7 @@ import (
 // Computes breath-first-search using both forward and backward search.
 // Only marks nodes visited by both searches
 func CalcBidirectBFS(g graph.IGraph, start int32) Array[bool] {
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 
 	// bidirectional search
 	visited_fwd := NewArray[bool](g.NodeCount())

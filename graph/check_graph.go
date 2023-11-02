@@ -4,7 +4,7 @@ import "fmt"
 
 // checks graph topology
 func CheckGraph(g IGraph) {
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 	for i := 0; i < int(g.NodeCount()); i++ {
 		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if ref.IsShortcut() {
@@ -35,15 +35,15 @@ func CheckGraph(g IGraph) {
 
 // checks topology of ch graph
 func CheckCHGraph(g ICHGraph) {
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 	for i := 0; i < int(g.NodeCount()); i++ {
 		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				edge := g.GetShortcut(ref.EdgeID)
-				if edge.NodeA != int32(i) {
+				if edge.From != int32(i) {
 					fmt.Println("error 1")
 				}
-				if edge.NodeB != ref.OtherID {
+				if edge.To != ref.OtherID {
 					fmt.Println("error 2")
 				}
 			} else {
@@ -59,10 +59,10 @@ func CheckCHGraph(g ICHGraph) {
 		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				edge := g.GetShortcut(ref.EdgeID)
-				if edge.NodeB != int32(i) {
+				if edge.To != int32(i) {
 					fmt.Println("error 5")
 				}
-				if edge.NodeA != ref.OtherID {
+				if edge.From != ref.OtherID {
 					fmt.Println("error 6")
 				}
 			} else {
@@ -80,7 +80,7 @@ func CheckCHGraph(g ICHGraph) {
 
 // checks graph topology
 func CheckTiledGraph(g ITiledGraph) {
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 
 	// check edges
 	for i := 0; i < int(g.NodeCount()); i++ {
@@ -111,7 +111,7 @@ func CheckTiledGraph(g ITiledGraph) {
 		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_SKIP, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				edge := g.GetShortcut(ref.EdgeID)
-				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) {
+				if g.GetNodeTile(edge.From) != g.GetNodeTile(edge.To) {
 					fmt.Println("error 33")
 				}
 			} else {
@@ -124,7 +124,7 @@ func CheckTiledGraph(g ITiledGraph) {
 		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_SKIP, func(ref EdgeRef) {
 			if ref.IsShortcut() {
 				edge := g.GetShortcut(ref.EdgeID)
-				if g.GetNodeTile(edge.NodeA) != g.GetNodeTile(edge.NodeB) {
+				if g.GetNodeTile(edge.From) != g.GetNodeTile(edge.To) {
 					fmt.Println("error 35")
 				}
 			} else {

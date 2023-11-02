@@ -17,13 +17,12 @@ type CHPreprocGraph struct {
 	// added attributes to build ch
 	ch_topology AdjacencyList
 	node_levels Array[int16]
-	shortcuts   List[CHShortcut]
-	sh_weight   List[int32]
+	shortcuts   ShortcutStore
 
 	// underlying base graph
 	store    GraphStore
 	topology AdjacencyArray
-	weight   DefaultWeighting
+	weight   IWeighting
 	index    KDTree[int32]
 }
 
@@ -51,12 +50,13 @@ func (self *CHPreprocGraph) GetNode(node int32) Node {
 func (self *CHPreprocGraph) GetEdge(edge int32) Edge {
 	return self.store.GetEdge(edge)
 }
-func (self *CHPreprocGraph) GetShortcut(id int32) CHShortcut {
-	return self.shortcuts[id]
+func (self *CHPreprocGraph) GetShortcut(id int32) Shortcut {
+	return self.shortcuts.GetShortcut(id)
 }
 func (self *CHPreprocGraph) GetWeight(id int32, is_shortcut bool) int32 {
 	if is_shortcut {
-		return self.sh_weight[id]
+		shc := self.shortcuts.GetShortcut(id)
+		return shc.Weight
 	} else {
 		return self.weight.GetEdgeWeight(id)
 	}
@@ -75,14 +75,12 @@ func (self *CHPreprocGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int
 	weight := int32(0)
 	weight += self.GetWeight(edges[0].A, edges[0].B == 2 || edges[0].B == 3)
 	weight += self.GetWeight(edges[1].A, edges[1].B == 2 || edges[1].B == 3)
-	shortcut := CHShortcut{
-		NodeA:  node_a,
-		NodeB:  node_b,
-		_Edges: edges,
+	shc := Shortcut{
+		From:   node_a,
+		To:     node_b,
+		Weight: weight,
 	}
-	shc_id := self.shortcuts.Length()
-	self.sh_weight.Add(weight)
-	self.shortcuts.Add(shortcut)
+	shc_id, _ := self.shortcuts.AddCHShortcut(shc, edges)
 
 	self.ch_topology.AddEdgeEntries(node_a, node_b, int32(shc_id), 100)
 }
@@ -124,11 +122,11 @@ func (self *CHPreprocGraphExplorer) GetTurnCost(from EdgeRef, via int32, to Edge
 func (self *CHPreprocGraphExplorer) GetOtherNode(edge_id, node int32, is_shortcut bool) int32 {
 	if is_shortcut {
 		e := self.graph.GetShortcut(edge_id)
-		if node == e.NodeA {
-			return e.NodeB
+		if node == e.From {
+			return e.To
 		}
-		if node == e.NodeB {
-			return e.NodeA
+		if node == e.To {
+			return e.From
 		}
 		return -1
 	} else {
@@ -202,14 +200,14 @@ func TransformToCHPreprocGraph(g *Graph) *CHPreprocGraph {
 	}
 
 	dg := CHPreprocGraph{
+		store:    g.base.store,
+		topology: g.base.topology,
+		weight:   g.weight,
+		index:    g.base.index,
+
+		shortcuts:   NewShortcutStore(100, true),
 		ch_topology: ch_topology,
 		node_levels: node_levels,
-		shortcuts:   NewList[CHShortcut](100),
-		sh_weight:   NewList[int32](100),
-		store:       g.store,
-		topology:    g.topology,
-		weight:      g.weight,
-		index:       g.index,
 	}
 
 	return &dg
@@ -217,19 +215,31 @@ func TransformToCHPreprocGraph(g *Graph) *CHPreprocGraph {
 
 func TransformFromCHPreprocGraph(dg *CHPreprocGraph) *CHGraph {
 	g := CHGraph{
-		store:       dg.store,
-		topology:    dg.topology,
-		ch_topology: *AdjacencyListToArray(&dg.ch_topology),
-		ch_store: CHStore{
-			shortcuts:   Array[CHShortcut](dg.shortcuts),
-			node_levels: dg.node_levels,
-			sh_weight:   Array[int32](dg.sh_weight),
+		base: GraphBase{
+			store:    dg.store,
+			topology: dg.topology,
+			index:    dg.index,
 		},
 		weight: dg.weight,
-		index:  dg.index,
+
+		ch_shortcuts: dg.shortcuts,
+		ch_topology:  *AdjacencyListToArray(&dg.ch_topology),
+		node_levels:  dg.node_levels,
 	}
 
 	return &g
+}
+
+func TransformFromCHPreprocGraph2(dg *CHPreprocGraph) *_CHData {
+	return &_CHData{
+		id_mapping: NewIDMapping(dg.NodeCount()),
+
+		_build_with_tiles: false,
+
+		shortcuts:   dg.shortcuts,
+		topology:    *AdjacencyListToArray(&dg.ch_topology),
+		node_levels: dg.node_levels,
+	}
 }
 
 //*******************************************
@@ -390,7 +400,9 @@ func _GetShortcut(from, to, via int32, explorer *CHPreprocGraphExplorer, flags F
 // preprocess ch
 //*******************************************
 
-func CalcContraction(graph *CHPreprocGraph) {
+func CalcContraction(base_graph *Graph) *_CHData {
+	graph := TransformToCHPreprocGraph(base_graph)
+
 	fmt.Println("started contracting graph")
 	// initialize graph
 	//graph.resetContraction();
@@ -431,7 +443,7 @@ func CalcContraction(graph *CHPreprocGraph) {
 		fmt.Println("finished ordering nodes")
 
 		// contract nodes
-		sc1 := graph.shortcuts.Length()
+		sc1 := graph.shortcuts.ShortcutCount()
 		nc1 := 0
 		for i := 0; i < graph.NodeCount(); i++ {
 			if graph.GetNodeLevel(int32(i)) == level {
@@ -478,7 +490,7 @@ func CalcContraction(graph *CHPreprocGraph) {
 				graph.SetNodeLevel(out_neigbours[i], int16(level+1))
 			}
 		}
-		sc2 := graph.shortcuts.Length()
+		sc2 := graph.shortcuts.ShortcutCount()
 		nc2 := 0
 		for i := 0; i < graph.NodeCount(); i++ {
 			if graph.GetNodeLevel(int32(i)) == int16(level+1) {
@@ -492,13 +504,19 @@ func CalcContraction(graph *CHPreprocGraph) {
 		nodes.Clear()
 	}
 	fmt.Println("finished contracting graph")
+
+	ch_data := TransformFromCHPreprocGraph2(graph)
+	ch_data._base_weighting = base_graph._weight_name
+	return ch_data
 }
 
 //*******************************************
 // preprocess ch 2
 //*******************************************
 
-func CalcContraction2(graph *CHPreprocGraph, contraction_order Array[int32]) {
+func CalcContraction2(base_graph *Graph, contraction_order Array[int32]) *_CHData {
+	graph := TransformToCHPreprocGraph(base_graph)
+
 	fmt.Println("started contracting graph")
 	// initialize graph
 	for i := 0; i < graph.NodeCount(); i++ {
@@ -558,6 +576,10 @@ func CalcContraction2(graph *CHPreprocGraph, contraction_order Array[int32]) {
 		dt_1 += time.Since(t1).Nanoseconds()
 	}
 	fmt.Println("finished contracting graph")
+
+	ch_data := TransformFromCHPreprocGraph2(graph)
+	ch_data._base_weighting = base_graph._weight_name
+	return ch_data
 }
 
 func SimpleNodeOrdering(graph *CHPreprocGraph) Array[int32] {
@@ -638,7 +660,7 @@ func MarkNodesOnPath(start, end int32, sp_counts Array[int32], graph IGraph, hea
 	heap.Clear()
 	heap.Enqueue(start, 0)
 
-	explorer := graph.GetDefaultExplorer()
+	explorer := graph.GetGraphExplorer()
 	for {
 		curr_id, ok := heap.Dequeue()
 		if !ok {
@@ -690,7 +712,9 @@ func MarkNodesOnPath(start, end int32, sp_counts Array[int32], graph IGraph, hea
 //*******************************************
 
 // Computes contraction using 2*ED + CN + EC + 5*L with hop-limits.
-func CalcContraction3(graph *CHPreprocGraph) {
+func CalcContraction3(base_graph *Graph) *_CHData {
+	graph := TransformToCHPreprocGraph(base_graph)
+
 	fmt.Println("started contracting graph...")
 
 	// initialize
@@ -811,6 +835,10 @@ func CalcContraction3(graph *CHPreprocGraph) {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
 	fmt.Println("finished contracting graph")
+
+	ch_data := TransformFromCHPreprocGraph2(graph)
+	ch_data._base_weighting = base_graph._weight_name
+	return ch_data
 }
 
 func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Flags[_FlagSH], is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int], shortcut_edgecount List[int8], hop_limit int32) int {
@@ -855,7 +883,9 @@ func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap Pri
 }
 
 // Computes contraction using 2*ED + CN.
-func CalcContraction4(graph *CHPreprocGraph) {
+func CalcContraction4(base_graph *Graph) *_CHData {
+	graph := TransformToCHPreprocGraph(base_graph)
+
 	fmt.Println("started contracting graph...")
 
 	// initialize
@@ -946,6 +976,10 @@ func CalcContraction4(graph *CHPreprocGraph) {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
 	fmt.Println("finished contracting graph")
+
+	ch_data := TransformFromCHPreprocGraph2(graph)
+	ch_data._base_weighting = base_graph._weight_name
+	return ch_data
 }
 
 func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap PriorityQueue[int32, int32], flags Flags[_FlagSH], is_contracted Array[bool], node_levels Array[int16], contracted_neighbours Array[int]) int {
@@ -979,7 +1013,9 @@ func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap Pr
 
 // Computes contraction using 2*ED + CN + EC + 5*L.
 // Ignores border nodes until all interior nodes are contracted.
-func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
+func CalcContraction5(base_graph *Graph, node_tiles Array[int16]) *_CHData {
+	graph := TransformToCHPreprocGraph(base_graph)
+
 	fmt.Println("started contracting graph...")
 
 	// initialize
@@ -1109,6 +1145,11 @@ func CalcContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
 	fmt.Println("finished contracting graph")
+
+	ch_data := TransformFromCHPreprocGraph2(graph)
+	ch_data._build_with_tiles = true
+	ch_data._base_weighting = base_graph._weight_name
+	return ch_data
 }
 
 func _IsBorderNode(graph *CHPreprocGraph, node_tiles Array[int16]) Array[bool] {
@@ -1133,7 +1174,9 @@ func _IsBorderNode(graph *CHPreprocGraph, node_tiles Array[int16]) Array[bool] {
 
 // Computes contraction using 2*ED + CN + EC + 5*L.
 // Ignores border nodes until all interior nodes are contracted.
-func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
+func CalcPartialContraction5(base_graph *Graph, node_tiles Array[int16]) *_CHData {
+	graph := TransformToCHPreprocGraph(base_graph)
+
 	fmt.Println("started contracting graph...")
 
 	// initialize
@@ -1252,10 +1295,16 @@ func CalcPartialContraction5(graph *CHPreprocGraph, node_tiles Array[int16]) {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
 	fmt.Println("finished contracting graph")
+
+	ch_data := TransformFromCHPreprocGraph2(graph)
+	ch_data._build_with_tiles = true
+	ch_data._base_weighting = base_graph._weight_name
+	return ch_data
 }
 
 // Computes contraction using 2*ED + CN + EC + 5*L without hop-limits.
-func CalcContraction6(graph *CHPreprocGraph) {
+func CalcContraction6(base_graph *Graph) *_CHData {
+	graph := TransformToCHPreprocGraph(base_graph)
 	fmt.Println("started contracting graph...")
 
 	// initialize
@@ -1366,4 +1415,8 @@ func CalcContraction6(graph *CHPreprocGraph) {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
 	fmt.Println("finished contracting graph")
+
+	ch_data := TransformFromCHPreprocGraph2(graph)
+	ch_data._base_weighting = base_graph._weight_name
+	return ch_data
 }

@@ -11,7 +11,7 @@ import (
 )
 
 func BuildGraphIndex(g *Graph) {
-	g.index = _BuildKDTreeIndex(g.store)
+	g.base.index = _BuildKDTreeIndex(g.base.store)
 }
 
 func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollection) {
@@ -32,13 +32,13 @@ func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollec
 	}
 
 	nodes := NewList[geo.Feature](int(graph.NodeCount()))
-	for i, node := range graph.topology.node_entries {
+	for i, node := range graph.base.topology.node_entries {
 		if i%1000 == 0 {
 			fmt.Println("node ", i)
 		}
 		e := NewList[int32](3)
 		for j := 0; j < int(node.FWDEdgeCount); j++ {
-			e.Add(graph.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
+			e.Add(graph.base.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
 		}
 		node_tile := graph.GetNodeTile(int32(i))
 		point := geo.NewPoint(graph.GetNodeGeom(int32(i)))
@@ -66,13 +66,13 @@ func GraphToGeoJSON2(graph *Graph, node_tiles Array[int16]) (geo.FeatureCollecti
 	}
 
 	nodes := NewList[geo.Feature](int(graph.NodeCount()))
-	for i, node := range graph.topology.node_entries {
+	for i, node := range graph.base.topology.node_entries {
 		if i%1000 == 0 {
 			fmt.Println("node ", i)
 		}
 		e := NewList[int32](3)
 		for j := 0; j < int(node.FWDEdgeCount); j++ {
-			e.Add(graph.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
+			e.Add(graph.base.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
 		}
 		node_tile := node_tiles[i]
 		point := geo.NewPoint(graph.GetNodeGeom(int32(i)))
@@ -194,22 +194,31 @@ func ReadNodeOrdering(filename string) Array[int32] {
 	return ordering
 }
 
-func _IsBorderNode3(graph ITiledGraph) Array[bool] {
+func _IsBorderNode3(graph IGraph, node_tiles Array[int16]) Array[bool] {
 	is_border := NewArray[bool](graph.NodeCount())
 
-	explorer := graph.GetDefaultExplorer()
+	explorer := graph.GetGraphExplorer()
 	for i := 0; i < graph.NodeCount(); i++ {
 		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if graph.GetNodeTile(int32(i)) != graph.GetNodeTile(ref.OtherID) {
+			if node_tiles[i] != node_tiles[ref.OtherID] {
 				is_border[i] = true
 			}
 		})
 		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if graph.GetNodeTile(int32(i)) != graph.GetNodeTile(ref.OtherID) {
+			if node_tiles[i] != node_tiles[ref.OtherID] {
 				is_border[i] = true
 			}
 		})
 	}
 
 	return is_border
+}
+
+// Reorders Array based on mapping (old-id -> new-id).
+func Reorder[T any](arr Array[T], mapping Array[int32]) Array[T] {
+	new_arr := NewArray[T](arr.Length())
+	for i, id := range mapping {
+		new_arr[id] = arr[i]
+	}
+	return new_arr
 }

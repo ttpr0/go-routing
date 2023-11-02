@@ -1,5 +1,7 @@
 package util
 
+import "fmt"
+
 type Optional[T any] struct {
 	Value      T
 	_has_value bool
@@ -8,6 +10,10 @@ type Optional[T any] struct {
 // Returns if the optional value is set.
 func (self *Optional[T]) HasValue() bool {
 	return self._has_value
+}
+
+func (self Optional[T]) String() string {
+	return fmt.Sprintf("%v", self.Value)
 }
 
 // Creates an optional with set value.

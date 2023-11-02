@@ -11,7 +11,7 @@ func CalcBreathFirstSearch(g graph.IGraph, start int32) Array[bool] {
 	queue := NewQueue[int32]()
 	queue.Push(start)
 
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 
 	for {
 		curr_id, ok := queue.Pop()

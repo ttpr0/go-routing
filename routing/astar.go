@@ -43,7 +43,7 @@ func NewAStar(graph graph.IGraph, start, end int32) *AStar {
 }
 
 func (self *AStar) CalcShortestPath() bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 	for {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -83,7 +83,7 @@ func (self *AStar) CalcShortestPath() bool {
 }
 
 func (self *AStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 	for c := 0; c < count; c++ {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -126,7 +126,7 @@ func (self *AStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 
 func (self *AStar) GetShortestPath() Path {
 	path := make([]int32, 0, 10)
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 	curr_id := self.end_id
 	var edge int32
 	for {

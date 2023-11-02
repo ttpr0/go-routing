@@ -55,7 +55,7 @@ func NewBidirectAStar(graph graph.IGraph, start, end int32) *BidirectAStar {
 }
 
 func (self *BidirectAStar) CalcShortestPath() bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
 	finished := false
@@ -156,7 +156,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 }
 
 func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
 	is_finished := false
@@ -270,7 +270,7 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 }
 
 func (self *BidirectAStar) GetShortestPath() Path {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	path := make([]int32, 0, 10)
 	curr_id := self.mid_id

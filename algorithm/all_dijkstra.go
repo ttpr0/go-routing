@@ -16,7 +16,7 @@ func CalcAllDijkstra(g graph.IGraph, start int32, max_range int32) Array[int32] 
 	heap := NewPriorityQueue[int32, int32](100)
 	heap.Enqueue(start, 0)
 
-	explorer := g.GetDefaultExplorer()
+	explorer := g.GetGraphExplorer()
 
 	for {
 		curr_id, ok := heap.Dequeue()

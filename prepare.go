@@ -14,20 +14,25 @@ import (
 
 func prepare() {
 	const DATA_DIR = "./data"
-	const GRAPH_DIR = "./graphs"
+	const GRAPH_DIR = "./graphs/niedersachsen/"
 	const GRAPH_NAME = "niedersachsen"
 	const KAHIP_EXE = "D:/Dokumente/BA/KaHIP/kaffpa"
 	var PARTITIONS = []int{1000}
 	//*******************************************
 	// Parse graph
 	//*******************************************
-	g := graph.ParseGraph(DATA_DIR + "/" + GRAPH_NAME + ".pbf")
-	graph.StoreGraph(g, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
+	base := graph.ParseGraph(DATA_DIR + "/" + GRAPH_NAME + ".pbf")
+	dir := graph.NewGraphDir(GRAPH_DIR)
+	dir.AddGraphBase(GRAPH_NAME+"_pre", base)
+	dir.StoreGraphBase(GRAPH_NAME + "_pre")
+	dir.UnloadGraphBase(GRAPH_NAME + "_pre")
 
 	//*******************************************
 	// Remove unconnected components
 	//*******************************************
 	// compute closely connected components
+	weight := graph.BuildEqualWeighting(base)
+	g := graph.BuildBaseGraph(&base, weight)
 	groups := algorithm.ConnectedComponents(g)
 	// get largest group
 	max_group := GetMostCommon(groups)
@@ -40,8 +45,15 @@ func prepare() {
 	}
 	fmt.Println("remove", remove.Length(), "nodes")
 	// remove nodes from graph
-	g = graph.RemoveNodes(g, remove)
-	graph.StoreGraph(g, GRAPH_DIR+"/"+GRAPH_NAME)
+	graph.RemoveBaseNodes(&base, remove)
+	dir.AddGraphBase(GRAPH_NAME, base)
+	dir.StoreGraphBase(GRAPH_NAME)
+
+	weight = graph.BuildDefaultWeighting(base)
+	dir.AddWeighting("fastest", weight)
+	dir.StoreWeighting("fastest")
+
+	g = graph.BuildBaseGraph(&base, weight)
 
 	//*******************************************
 	// Partition with KaHIP
@@ -76,7 +88,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			create_grasp_graph(GRAPH_DIR+"/"+GRAPH_NAME, GRAPH_DIR+"/"+GRAPH_NAME+"_grasp_"+size, "./tmp_"+size+".txt")
+			create_grasp_graph(dir, GRAPH_NAME, GRAPH_NAME+"_grasp_"+size, "./tmp_"+size+".txt")
 			fmt.Println("	done:", size)
 			wg.Done()
 		}()
@@ -91,7 +103,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			create_isophast_graph(GRAPH_DIR+"/"+GRAPH_NAME, GRAPH_DIR+"/"+GRAPH_NAME+"_isophast_"+size, "./tmp_"+size+".txt")
+			create_isophast_graph(dir, GRAPH_NAME, GRAPH_NAME+"_isophast_"+size, "./tmp_"+size+".txt")
 			fmt.Println("	done:", size)
 			wg.Done()
 		}()
@@ -102,7 +114,7 @@ func prepare() {
 	// Create CH-Graph
 	//*******************************************
 	fmt.Println("start creating ch-graph")
-	create_ch_graph(GRAPH_DIR+"/"+GRAPH_NAME, GRAPH_DIR+"/"+GRAPH_NAME+"_ch")
+	create_ch_graph(dir, GRAPH_NAME, GRAPH_NAME+"_ch")
 	fmt.Println("	done")
 
 	//*******************************************
@@ -113,7 +125,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			create_tiled_ch_graph(GRAPH_DIR+"/"+GRAPH_NAME, GRAPH_DIR+"/"+GRAPH_NAME+"_ch_tiled_"+size, "./tmp_"+size+".txt")
+			create_tiled_ch_graph(dir, GRAPH_NAME, GRAPH_NAME+"_ch_tiled_"+size, "./tmp_"+size+".txt")
 			fmt.Println("	done:", size)
 			wg.Done()
 		}()
@@ -121,60 +133,57 @@ func prepare() {
 	wg.Wait()
 }
 
-func create_grasp_graph(in_name, out_name, tiles_name string) {
-	g := graph.LoadGraph2(in_name)
+func create_grasp_graph(dir graph.GraphDir, graph_name, out_name, tiles_name string) {
+	g := graph.BuildBaseGraph(dir.GetGraphBase(graph_name), dir.GetWeighting("fastest"))
 	tiles := graph.ReadNodeTiles(tiles_name)
 
-	tg := graph.PreprocessTiledGraph3(g, tiles)
+	td := graph.PreprocessTiledGraph3(g, tiles)
 
-	order := graph.ComputeTileOrdering(tg)
+	order := graph.ComputeTileOrdering(g, tiles)
 	mapping := graph.NodeOrderToNodeMapping(order)
-	graph.ReorderTiledGraph(tg, mapping)
+	graph.ReorderSpeedUpNodes(td, mapping, graph.ONLY_TARGET_NODES)
 
-	tg3 := graph.TransformToTiled3(tg)
-	graph.StoreTiledGraph3(tg3, out_name)
+	graph.PrepareGRASPCellIndex2(g, td)
+
+	dir.AddSpeedUp(out_name, td)
+	dir.StoreSpeedUp(out_name)
+	dir.UnloadSpeedUp(out_name)
 }
 
-func create_isophast_graph(in_name, out_name, tiles_name string) {
-	g := graph.LoadGraph2(in_name)
+func create_isophast_graph(dir graph.GraphDir, graph_name, out_name, tiles_name string) {
+	g := graph.BuildBaseGraph(dir.GetGraphBase(graph_name), dir.GetWeighting("fastest"))
 	tiles := graph.ReadNodeTiles(tiles_name)
 
-	tg := graph.PreprocessTiledGraph3(g, tiles)
+	td := graph.PreprocessTiledGraph5(g, tiles)
 
-	tg3 := graph.TransformToTiled4(tg)
-
-	graph.StoreTiledGraph3(tg3, out_name)
+	dir.AddSpeedUp(out_name, td)
+	dir.StoreSpeedUp(out_name)
+	dir.UnloadSpeedUp(out_name)
 }
 
-func create_ch_graph(in_name, out_name string) {
-	g := graph.LoadGraph2(in_name)
+func create_ch_graph(dir graph.GraphDir, graph_name, out_name string) {
+	g := graph.BuildBaseGraph(dir.GetGraphBase(graph_name), dir.GetWeighting("fastest"))
 
-	dg := graph.TransformToCHPreprocGraph(g)
+	cd := graph.CalcContraction6(g)
 
-	graph.CalcContraction6(dg)
+	graph.PreparePHASTIndex2(g, cd)
 
-	cg := graph.TransformFromCHPreprocGraph(dg)
-
-	order := graph.ComputeLevelOrdering(cg)
-	mapping := graph.NodeOrderToNodeMapping(order)
-	graph.ReorderCHGraph(cg, mapping)
-
-	graph.StoreCHGraph(cg, out_name)
+	dir.AddSpeedUp(out_name, cd)
+	dir.StoreSpeedUp(out_name)
+	dir.UnloadSpeedUp(out_name)
 }
 
-func create_tiled_ch_graph(in_name, out_name, tiles_name string) {
-	g := graph.LoadGraph2(in_name)
+func create_tiled_ch_graph(dir graph.GraphDir, graph_name, out_name, tiles_name string) {
+	g := graph.BuildBaseGraph(dir.GetGraphBase(graph_name), dir.GetWeighting("fastest"))
 	tiles := graph.ReadNodeTiles(tiles_name)
 
-	dg := graph.TransformToCHPreprocGraph(g)
+	cd := graph.CalcContraction5(g, tiles)
 
-	graph.CalcContraction5(dg, tiles)
+	graph.PrepareGSPHASTIndex2(g, cd)
 
-	cg := graph.TransformFromCHPreprocGraph(dg)
-
-	cg4 := graph.CreateCHGraph4(cg, tiles)
-
-	graph.StoreCHGraph4(cg4, out_name)
+	dir.AddSpeedUp(out_name, cd)
+	dir.StoreSpeedUp(out_name)
+	dir.UnloadSpeedUp(out_name)
 }
 
 func GetMostCommon[T comparable](arr Array[T]) T {

@@ -8,37 +8,10 @@ import (
 )
 
 //*******************************************
-// ch-graph interface
-//******************************************
-
-type ICHGraph interface {
-	// Base IGraph
-	GetGraphExplorer() IGraphExplorer
-	GetIndex() IGraphIndex
-	NodeCount() int
-	EdgeCount() int
-	IsNode(node int32) bool
-	GetNode(node int32) Node
-	GetEdge(edge int32) Edge
-	GetNodeGeom(node int32) geo.Coord
-	GetEdgeGeom(edge int32) geo.CoordArray
-
-	// CH Specific
-	GetNodeLevel(node int32) int16
-	ShortcutCount() int
-	GetShortcut(shortcut int32) Shortcut
-	GetEdgesFromShortcut(edges *List[int32], shortcut_id int32, reversed bool)
-	HasDownEdges(dir Direction) bool
-	GetDownEdges(dir Direction) (Array[Shortcut], error)
-	GetNodeTile(node int32) int16
-	TileCount() int
-}
-
-//*******************************************
 // ch-graph
 //******************************************
 
-type CHGraph struct {
+type CHGraph2 struct {
 	// Base Graph
 	base   GraphBase
 	weight IWeighting
@@ -61,60 +34,67 @@ type CHGraph struct {
 	bwd_down_edges    Optional[Array[Shortcut]]
 }
 
-func (self *CHGraph) GetGraphExplorer() IGraphExplorer {
-	return &CHGraphExplorer{
+func (self *CHGraph2) GetGraphExplorer() IGraphExplorer {
+	return &CHGraph2Explorer{
 		graph:       self,
+		id_mapping:  self.id_mapping,
 		accessor:    self.base.GetAccessor(),
 		sh_accessor: self.ch_topology.GetAccessor(),
 		weight:      self.weight,
 	}
 }
 
-func (self *CHGraph) GetNodeLevel(node int32) int16 {
+func (self *CHGraph2) GetNodeLevel(node int32) int16 {
 	return self.node_levels[node]
 }
 
-func (self *CHGraph) NodeCount() int {
+func (self *CHGraph2) NodeCount() int {
 	return self.base.NodeCount()
 }
 
-func (self *CHGraph) EdgeCount() int {
+func (self *CHGraph2) EdgeCount() int {
 	return self.base.EdgeCount()
 }
 
-func (self *CHGraph) ShortcutCount() int {
+func (self *CHGraph2) ShortcutCount() int {
 	return self.ch_shortcuts.ShortcutCount()
 }
 
-func (self *CHGraph) IsNode(node int32) bool {
-	return self.base.NodeCount() < int(node)
+func (self *CHGraph2) IsNode(node int32) bool {
+	m_node := self.id_mapping.GetSource(node)
+	return self.base.NodeCount() < int(m_node)
 }
 
-func (self *CHGraph) GetNode(node int32) Node {
-	return self.base.GetNode(node)
+func (self *CHGraph2) GetNode(node int32) Node {
+	m_node := self.id_mapping.GetSource(node)
+	return self.base.GetNode(m_node)
 }
 
-func (self *CHGraph) GetEdge(edge int32) Edge {
-	return self.base.GetEdge(edge)
+func (self *CHGraph2) GetEdge(edge int32) Edge {
+	e := self.base.GetEdge(edge)
+	e.NodeA = self.id_mapping.GetTarget(e.NodeA)
+	e.NodeB = self.id_mapping.GetTarget(e.NodeB)
+	return e
 }
 
-func (self *CHGraph) GetNodeGeom(node int32) geo.Coord {
-	return self.base.GetNodeGeom(node)
+func (self *CHGraph2) GetNodeGeom(node int32) geo.Coord {
+	m_node := self.id_mapping.GetSource(node)
+	return self.base.GetNodeGeom(m_node)
 }
-func (self *CHGraph) GetEdgeGeom(edge int32) geo.CoordArray {
+func (self *CHGraph2) GetEdgeGeom(edge int32) geo.CoordArray {
 	return self.base.GetEdgeGeom(edge)
 }
 
-func (self *CHGraph) GetShortcut(shortcut int32) Shortcut {
+func (self *CHGraph2) GetShortcut(shortcut int32) Shortcut {
 	return self.ch_shortcuts.GetShortcut(shortcut)
 }
 
-func (self *CHGraph) GetEdgesFromShortcut(edges *List[int32], shc_id int32, reversed bool) {
+func (self *CHGraph2) GetEdgesFromShortcut(edges *List[int32], shc_id int32, reversed bool) {
 	self.ch_shortcuts.GetEdgesFromShortcut(shc_id, false, func(edge int32) {
 		edges.Add(edge)
 	})
 }
-func (self *CHGraph) GetDownEdges(dir Direction) (Array[Shortcut], error) {
+func (self *CHGraph2) GetDownEdges(dir Direction) (Array[Shortcut], error) {
 	if dir == FORWARD {
 		if self.fwd_down_edges.HasValue() {
 			return self.fwd_down_edges.Value, nil
@@ -129,21 +109,21 @@ func (self *CHGraph) GetDownEdges(dir Direction) (Array[Shortcut], error) {
 		}
 	}
 }
-func (self *CHGraph) HasDownEdges(dir Direction) bool {
+func (self *CHGraph2) HasDownEdges(dir Direction) bool {
 	if dir == FORWARD {
 		return self.fwd_down_edges.HasValue()
 	} else {
 		return self.bwd_down_edges.HasValue()
 	}
 }
-func (self *CHGraph) GetNodeTile(node int32) int16 {
+func (self *CHGraph2) GetNodeTile(node int32) int16 {
 	if self.node_tiles.HasValue() {
 		return self.node_tiles.Value[node]
 	} else {
 		return -1
 	}
 }
-func (self *CHGraph) TileCount() int {
+func (self *CHGraph2) TileCount() int {
 	if self.node_tiles.HasValue() {
 		max := int16(0)
 		for i := 0; i < len(self.node_tiles.Value); i++ {
@@ -157,9 +137,10 @@ func (self *CHGraph) TileCount() int {
 		return -1
 	}
 }
-func (self *CHGraph) GetIndex() IGraphIndex {
-	return &BaseGraphIndex{
-		index: self.base.GetKDTree(),
+func (self *CHGraph2) GetIndex() IGraphIndex {
+	return &MappedGraphIndex{
+		id_mapping: self.id_mapping,
+		index:      self.base.GetKDTree(),
 	}
 }
 
@@ -167,23 +148,26 @@ func (self *CHGraph) GetIndex() IGraphIndex {
 // ch-graph explorer
 //******************************************
 
-type CHGraphExplorer struct {
-	graph       *CHGraph
+type CHGraph2Explorer struct {
+	graph       *CHGraph2
+	id_mapping  _IDMapping
 	accessor    AdjArrayAccessor
 	sh_accessor AdjArrayAccessor
 	weight      IWeighting
 }
 
-func (self *CHGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
+func (self *CHGraph2Explorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
 	if typ == ADJACENT_ALL {
-		self.accessor.SetBaseNode(node, direction)
+		m_node := self.id_mapping.GetSource(node)
+		self.accessor.SetBaseNode(m_node, direction)
 		self.sh_accessor.SetBaseNode(node, direction)
 		for self.accessor.Next() {
 			edge_id := self.accessor.GetEdgeID()
 			other_id := self.accessor.GetOtherID()
+			m_other_id := self.id_mapping.GetTarget(other_id)
 			callback(EdgeRef{
 				EdgeID:  edge_id,
-				OtherID: other_id,
+				OtherID: m_other_id,
 				_Type:   0,
 			})
 		}
@@ -197,13 +181,15 @@ func (self *CHGraphExplorer) ForAdjacentEdges(node int32, direction Direction, t
 			})
 		}
 	} else if typ == ADJACENT_EDGES {
-		self.accessor.SetBaseNode(node, direction)
+		m_node := self.id_mapping.GetSource(node)
+		self.accessor.SetBaseNode(m_node, direction)
 		for self.accessor.Next() {
 			edge_id := self.accessor.GetEdgeID()
 			other_id := self.accessor.GetOtherID()
+			m_other_id := self.id_mapping.GetTarget(other_id)
 			callback(EdgeRef{
 				EdgeID:  edge_id,
-				OtherID: other_id,
+				OtherID: m_other_id,
 				_Type:   0,
 			})
 		}
@@ -219,18 +205,20 @@ func (self *CHGraphExplorer) ForAdjacentEdges(node int32, direction Direction, t
 			})
 		}
 	} else if typ == ADJACENT_UPWARDS {
-		self.accessor.SetBaseNode(node, direction)
+		m_node := self.id_mapping.GetSource(node)
+		self.accessor.SetBaseNode(m_node, direction)
 		self.sh_accessor.SetBaseNode(node, direction)
 		this_level := self.graph.GetNodeLevel(node)
 		for self.accessor.Next() {
 			other_id := self.accessor.GetOtherID()
-			if this_level >= self.graph.GetNodeLevel(other_id) {
+			m_other_id := self.id_mapping.GetTarget(other_id)
+			if this_level >= self.graph.GetNodeLevel(m_other_id) {
 				continue
 			}
 			edge_id := self.accessor.GetEdgeID()
 			callback(EdgeRef{
 				EdgeID:  edge_id,
-				OtherID: other_id,
+				OtherID: m_other_id,
 				_Type:   0,
 			})
 		}
@@ -247,18 +235,20 @@ func (self *CHGraphExplorer) ForAdjacentEdges(node int32, direction Direction, t
 			})
 		}
 	} else if typ == ADJACENT_DOWNWARDS {
-		self.accessor.SetBaseNode(node, direction)
+		m_node := self.id_mapping.GetSource(node)
+		self.accessor.SetBaseNode(m_node, direction)
 		self.sh_accessor.SetBaseNode(node, direction)
 		this_level := self.graph.GetNodeLevel(node)
 		for self.accessor.Next() {
 			other_id := self.accessor.GetOtherID()
-			if this_level <= self.graph.GetNodeLevel(other_id) {
+			m_other_id := self.id_mapping.GetTarget(other_id)
+			if this_level <= self.graph.GetNodeLevel(m_other_id) {
 				continue
 			}
 			edge_id := self.accessor.GetEdgeID()
 			callback(EdgeRef{
 				EdgeID:  edge_id,
-				OtherID: other_id,
+				OtherID: m_other_id,
 				_Type:   0,
 			})
 		}
@@ -278,7 +268,7 @@ func (self *CHGraphExplorer) ForAdjacentEdges(node int32, direction Direction, t
 		panic("Adjacency-type not implemented for this graph.")
 	}
 }
-func (self *CHGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
+func (self *CHGraph2Explorer) GetEdgeWeight(edge EdgeRef) int32 {
 	if edge.IsCHShortcut() {
 		shc := self.graph.ch_shortcuts.GetShortcut(edge.EdgeID)
 		return shc.Weight
@@ -286,13 +276,13 @@ func (self *CHGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
 		return self.weight.GetEdgeWeight(edge.EdgeID)
 	}
 }
-func (self *CHGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
+func (self *CHGraph2Explorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
 	if from.IsShortcut() || to.IsShortcut() {
 		return 0
 	}
 	return 0
 }
-func (self *CHGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
+func (self *CHGraph2Explorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 	if edge.IsShortcut() {
 		e := self.graph.GetShortcut(edge.EdgeID)
 		if node == e.From {
@@ -312,4 +302,22 @@ func (self *CHGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 		}
 		return -1
 	}
+}
+
+//*******************************************
+// graph index
+//******************************************
+
+type MappedGraphIndex struct {
+	id_mapping _IDMapping
+	index      KDTree[int32]
+}
+
+func (self *MappedGraphIndex) GetClosestNode(point geo.Coord) (int32, bool) {
+	node, ok := self.index.GetClosest(point[:], 0.005)
+	if !ok {
+		return node, ok
+	}
+	mapped_node := self.id_mapping.GetTarget(node)
+	return mapped_node, true
 }

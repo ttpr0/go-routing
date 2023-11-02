@@ -47,7 +47,7 @@ func (self *ShortestPathTree3) Init(start int32, max_range float64) {
 	self.active_tiles.Clear()
 }
 func (self *ShortestPathTree3) CalcSPT() {
-	explorer := self.graph.GetDefaultExplorer()
+	explorer := self.graph.GetGraphExplorer()
 
 	for {
 		curr_id, ok := self.heap.Dequeue()

@@ -1,6 +1,8 @@
 package graph
 
 import (
+	"unsafe"
+
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
@@ -22,18 +24,9 @@ type Node struct {
 	Type int8
 }
 
-type Shortcut struct {
-	NodeA         int32
-	NodeB         int32
-	_EdgeRefStart int32
-	_EdgeRefCount int16
-}
-
-type CHShortcut struct {
-	NodeA  int32
-	NodeB  int32
-	_Edges [2]Tuple[int32, byte]
-}
+//*******************************************
+// edgeref struct
+//*******************************************
 
 type EdgeRef struct {
 	EdgeID  int32
@@ -70,6 +63,39 @@ func CreateCHShortcutRef(edge int32) EdgeRef {
 		_Type:   100,
 		OtherID: -1,
 	}
+}
+
+//*******************************************
+// shortcut struct
+//*******************************************
+
+func NewShortcut(from, to, weight int32) Shortcut {
+	return Shortcut{
+		From:   from,
+		To:     to,
+		Weight: weight,
+	}
+}
+
+type Shortcut struct {
+	From     int32
+	To       int32
+	Weight   int32
+	_payload [4]byte
+}
+
+// Payload size is 4 bytes.
+//
+// Be carefull, this method is unsafe.
+func Shortcut_set_payload[T int32 | int16 | int8 | uint32 | uint16 | uint8 | bool](edge *Shortcut, value T, pos int) {
+	*(*T)(unsafe.Pointer(&edge._payload[pos])) = value
+}
+
+// Payload size is 4 bytes.
+//
+// Be carefull, this method is unsafe.
+func Shortcut_get_payload[T int32 | int16 | int8 | uint32 | uint16 | uint8 | bool](edge *Shortcut, pos int) T {
+	return *(*T)(unsafe.Pointer(&edge._payload[pos]))
 }
 
 //*******************************************
