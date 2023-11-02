@@ -52,8 +52,6 @@ type DistributedRoutingRunner struct {
 	start_id   int32
 	end_id     int32
 	graph      graph.ITiledGraph
-	geom       graph.IGeometry
-	weight     graph.IWeighting
 	flags      SafeDict[int32, flag_dd]
 	finished   bool
 	is_end     bool
@@ -78,8 +76,6 @@ func NewDistributedRoutingRunner(key int, handler IDistributedHandler, path_chan
 		start_id:   start,
 		end_id:     end,
 		graph:      graph,
-		geom:       graph.GetGeometry(),
-		weight:     graph.GetWeighting(),
 		finished:   false,
 		is_end:     false,
 		block:      NewBlock(),
@@ -107,6 +103,8 @@ func (self *DistributedRoutingRunner) HandleRetrivalRequest() {
 		}
 		curr_id := request
 		var edge int32
+
+		explorer := self.graph.GetGraphExplorer()
 		for {
 			if curr_id == self.start_id {
 				close(self.path_chan)
@@ -115,7 +113,7 @@ func (self *DistributedRoutingRunner) HandleRetrivalRequest() {
 			curr_flag := self.flags.Get(curr_id)
 			edge = curr_flag.prev_edge
 			self.path_chan <- edge
-			curr_id, _ = self.graph.GetOtherNode(edge, curr_id)
+			curr_id = explorer.GetOtherNode(graph.CreateEdgeRef(edge), curr_id)
 			if self.graph.GetNodeTile(curr_id) != self.tile_id {
 				self.handler.SendRetrivelRequest(MakeTuple(self.key, curr_id))
 				break
@@ -138,6 +136,8 @@ func (self *DistributedRoutingRunner) HandleExitRequest() {
 }
 
 func (self *DistributedRoutingRunner) RunRouting() {
+	explorer := self.graph.GetGraphExplorer()
+
 	for !self.finished {
 		curr_flag, ok := self.heap.Dequeue()
 		if !ok {
@@ -162,24 +162,19 @@ func (self *DistributedRoutingRunner) RunRouting() {
 			self.handler.SendStopRequest(self.key, curr_flag.path_length)
 		}
 		self.flags.Set(curr_id, curr_flag)
-		edges := self.graph.GetAdjacentEdges(curr_id)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
-			if ref.IsReversed() {
-				continue
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
+			if !ref.IsEdge() {
+				return
 			}
 			if self.skip && !ref.IsCrossBorder() && !ref.IsSkip() {
-				continue
+				return
 			}
 			edge_id := ref.EdgeID
-			new_length := curr_flag.path_length + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if new_length > self.max_length {
-				continue
+				return
 			}
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			var other_flag flag_dd
 			if self.flags.ContainsKey(other_id) {
 				other_flag = self.flags.Get(other_id)
@@ -209,7 +204,7 @@ func (self *DistributedRoutingRunner) RunRouting() {
 				}
 			}
 			self.flags.Set(other_id, other_flag)
-		}
+		})
 	}
 }
 
@@ -650,7 +645,7 @@ func (self *DistributedDijkstra) Steps(count int, visitededges *List[geo.CoordAr
 		if !ok {
 			return false
 		}
-		visitededges.Add(self.manager.graph.GetGeometry().GetEdge(edge_id))
+		visitededges.Add(self.manager.graph.GetEdgeGeom(edge_id))
 	}
 	return true
 }

@@ -3,28 +3,26 @@ package routing
 import (
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
 type Path struct {
-	path      []int32
-	lines     []geo.CoordArray
-	graph     graph.IGraph
-	geometry  graph.IGeometry
-	weighting graph.IWeighting
-	changed   bool
+	path    []int32
+	lines   []geo.CoordArray
+	graph   graph.IGraph
+	changed bool
 }
 
 func (self *Path) GetGeometry() []geo.CoordArray {
 	if self.lines == nil || self.changed {
 		self.lines = make([]geo.CoordArray, 0, 10)
 		for _, edge_id := range self.path {
-			self.lines = append(self.lines, self.geometry.GetEdge(edge_id))
+			self.lines = append(self.lines, self.graph.GetEdgeGeom(edge_id))
 		}
 	}
 	return self.lines
 }
-func (self *Path) EdgeIterator() util.IIterator[int32] {
+func (self *Path) EdgeIterator() IIterator[int32] {
 	return &EdgeIterator{&self.path, 0}
 }
 
@@ -43,5 +41,5 @@ func (self *EdgeIterator) Next() (int32, bool) {
 }
 
 func NewPath(graph graph.IGraph, path []int32) Path {
-	return Path{graph: graph, weighting: graph.GetWeighting(), geometry: graph.GetGeometry(), path: path}
+	return Path{graph: graph, path: path}
 }

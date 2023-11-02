@@ -16,13 +16,11 @@ type ShortestPathTree2 struct {
 	start_id  int32
 	max_range float64
 	graph     graph.IGraph
-	geom      graph.IGeometry
-	weight    graph.IWeighting
 	flags     []FlagSPT
 }
 
 func NewSPT2(graph graph.IGraph) *ShortestPathTree2 {
-	d := ShortestPathTree2{graph: graph, geom: graph.GetGeometry(), weight: graph.GetWeighting()}
+	d := ShortestPathTree2{graph: graph}
 
 	flags := make([]FlagSPT, graph.NodeCount())
 	d.flags = flags
@@ -44,6 +42,8 @@ func (self *ShortestPathTree2) Init(start int32, max_range float64) {
 	self.flags[start].PathLength = 0
 }
 func (self *ShortestPathTree2) CalcSPT() {
+	explorer := self.graph.GetGraphExplorer()
+
 	for {
 		curr_id, ok := self.heap.Dequeue()
 		if !ok {
@@ -59,30 +59,25 @@ func (self *ShortestPathTree2) CalcSPT() {
 		if curr_flag.PathLength > self.max_range {
 			return
 		}
-		edges := self.graph.GetAdjacentEdges(curr_id)
-		for {
-			ref, ok := edges.Next()
-			if !ok {
-				break
-			}
-			if ref.IsReversed() {
-				continue
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
+			if !ref.IsEdge() {
+				return
 			}
 			edge_id := ref.EdgeID
-			other_id, _ := self.graph.GetOtherNode(edge_id, curr_id)
+			other_id := ref.OtherID
 			//other := (*d.graph).GetNode(other_id)
 			other_flag := self.flags[other_id]
 			if other_flag.Visited {
-				continue
+				return
 			}
-			new_length := curr_flag.PathLength + float64(self.weight.GetEdgeWeight(edge_id))
+			new_length := curr_flag.PathLength + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.PathLength > new_length {
 				other_flag.PrevEdge = edge_id
 				other_flag.PathLength = new_length
 				self.heap.Enqueue(other_id, new_length)
 			}
 			self.flags[other_id] = other_flag
-		}
+		})
 	}
 }
 

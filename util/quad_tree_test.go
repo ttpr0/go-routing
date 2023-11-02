@@ -111,7 +111,7 @@ func TestGet(t *testing.T) {
 	}
 }
 
-func TestQuadTreeGetCloset(t *testing.T) {
+func TestQuadTreeGetClosest(t *testing.T) {
 	tree := NewQuadTree(func(a, b int) int { return a })
 
 	values := NewList[Triple[int32, int32, int]](100)

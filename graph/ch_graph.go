@@ -1,330 +1,315 @@
 package graph
 
 import (
+	"errors"
+
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
 	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
 )
 
+//*******************************************
+// ch-graph interface
+//******************************************
+
 type ICHGraph interface {
-	GetGeometry() IGeometry
-	GetWeighting() IWeighting
-	GetShortcutWeighting() IWeighting
-	GetOtherNode(edge, node int32) (int32, Direction)
-	GetOtherShortcutNode(shortcut, node int32) (int32, Direction)
-	GetNodeLevel(node int32) int16
-	GetAdjacentEdges(node int32) IIterator[EdgeRef]
-	GetAdjacentShortcuts(node int32) IIterator[EdgeRef]
-	ForEachEdge(node int32, f func(int32))
-	NodeCount() int32
-	EdgeCount() int32
-	ShortcutCount() int32
+	// Base IGraph
+	GetGraphExplorer() IGraphExplorer
+	GetIndex() IGraphIndex
+	NodeCount() int
+	EdgeCount() int
 	IsNode(node int32) bool
-	GetNode(node int32) NodeAttributes
-	GetEdge(edge int32) EdgeAttributes
+	GetNode(node int32) Node
+	GetEdge(edge int32) Edge
+	GetNodeGeom(node int32) geo.Coord
+	GetEdgeGeom(edge int32) geo.CoordArray
+
+	// CH Specific
+	GetNodeLevel(node int32) int16
+	ShortcutCount() int
 	GetShortcut(shortcut int32) Shortcut
 	GetEdgesFromShortcut(edges *List[int32], shortcut_id int32, reversed bool)
-	GetNodeIndex() KDTree[int32]
+	HasDownEdges(dir Direction) bool
+	GetDownEdges(dir Direction) (Array[Shortcut], error)
+	GetNodeTile(node int32) int16
+	TileCount() int
 }
+
+//*******************************************
+// ch-graph
+//******************************************
 
 type CHGraph struct {
-	nodes           List[Node]
-	node_attributes List[NodeAttributes]
-	node_levels     List[int16]
-	edge_refs       List[EdgeRef]
-	edges           List[Edge]
-	edge_attributes List[EdgeAttributes]
-	shortcuts       List[Shortcut]
-	geom            IGeometry
-	weight          IWeighting
-	sh_weight       IWeighting
-	index           KDTree[int32]
+	// Base Graph
+	base   GraphBase
+	weight IWeighting
+
+	// ID-mapping
+	id_mapping _IDMapping
+
+	// Additional Storage
+	ch_shortcuts ShortcutStore
+	ch_topology  AdjacencyArray
+	node_levels  Array[int16]
+
+	// contraction order build with tiles
+	_build_with_tiles bool
+	node_tiles        Optional[Array[int16]]
+
+	// index for PHAST
+	_contains_dummies bool
+	fwd_down_edges    Optional[Array[Shortcut]]
+	bwd_down_edges    Optional[Array[Shortcut]]
 }
 
-func (self *CHGraph) GetGeometry() IGeometry {
-	return self.geom
-}
-
-func (self *CHGraph) GetWeighting() IWeighting {
-	return self.weight
-}
-
-func (self *CHGraph) GetShortcutWeighting() IWeighting {
-	return self.sh_weight
-}
-
-func (self *CHGraph) GetOtherNode(edge int32, node int32) (int32, Direction) {
-	e := self.edges[edge]
-	if node == e.NodeA {
-		return e.NodeB, FORWARD
+func (self *CHGraph) GetGraphExplorer() IGraphExplorer {
+	return &CHGraphExplorer{
+		graph:       self,
+		accessor:    self.base.GetAccessor(),
+		sh_accessor: self.ch_topology.GetAccessor(),
+		weight:      self.weight,
 	}
-	if node == e.NodeB {
-		return e.NodeA, BACKWARD
-	}
-	return 0, 0
-}
-
-func (self *CHGraph) GetOtherShortcutNode(shortcut int32, node int32) (int32, Direction) {
-	e := self.shortcuts[shortcut]
-	if node == e.NodeA {
-		return e.NodeB, FORWARD
-	}
-	if node == e.NodeB {
-		return e.NodeA, BACKWARD
-	}
-	return 0, 0
 }
 
 func (self *CHGraph) GetNodeLevel(node int32) int16 {
 	return self.node_levels[node]
 }
 
-func (self *CHGraph) GetAdjacentEdges(node int32) IIterator[EdgeRef] {
-	n := self.nodes[node]
-	return &EdgeRefIterator{
-		state:     int(n.EdgeRefStart),
-		end:       int(n.EdgeRefStart) + int(n.EdgeRefCount),
-		edge_refs: &self.edge_refs,
-	}
+func (self *CHGraph) NodeCount() int {
+	return self.base.NodeCount()
 }
 
-func (self *CHGraph) GetAdjacentShortcuts(node int32) IIterator[EdgeRef] {
-	n := self.nodes[node]
-	return &CHEdgeRefIterator{
-		state:     int(n.EdgeRefStart),
-		end:       int(n.EdgeRefStart) + int(n.EdgeRefCount),
-		edge_refs: &self.edge_refs,
-	}
+func (self *CHGraph) EdgeCount() int {
+	return self.base.EdgeCount()
 }
 
-func (self *CHGraph) ForEachEdge(node int32, f func(int32)) {
-	panic("not implemented") // TODO: Implement
-}
-
-func (self *CHGraph) NodeCount() int32 {
-	return int32(len(self.nodes))
-}
-
-func (self *CHGraph) EdgeCount() int32 {
-	return int32(len(self.edges))
-}
-
-func (self *CHGraph) ShortcutCount() int32 {
-	return int32(len(self.shortcuts))
+func (self *CHGraph) ShortcutCount() int {
+	return self.ch_shortcuts.ShortcutCount()
 }
 
 func (self *CHGraph) IsNode(node int32) bool {
-	if node < int32(len(self.nodes)) {
-		return true
-	} else {
-		return false
-	}
+	return self.base.NodeCount() < int(node)
 }
 
-func (self *CHGraph) GetNode(node int32) NodeAttributes {
-	return self.node_attributes[node]
+func (self *CHGraph) GetNode(node int32) Node {
+	return self.base.GetNode(node)
 }
 
-func (self *CHGraph) GetEdge(edge int32) EdgeAttributes {
-	return self.edge_attributes[edge]
+func (self *CHGraph) GetEdge(edge int32) Edge {
+	return self.base.GetEdge(edge)
+}
+
+func (self *CHGraph) GetNodeGeom(node int32) geo.Coord {
+	return self.base.GetNodeGeom(node)
+}
+func (self *CHGraph) GetEdgeGeom(edge int32) geo.CoordArray {
+	return self.base.GetEdgeGeom(edge)
 }
 
 func (self *CHGraph) GetShortcut(shortcut int32) Shortcut {
-	return self.shortcuts[shortcut]
+	return self.ch_shortcuts.GetShortcut(shortcut)
 }
 
-func (self *CHGraph) GetEdgesFromShortcut(edges *List[int32], shortcut_id int32, reversed bool) {
-	shortcut := self.GetShortcut(shortcut_id)
-	if reversed {
-		e := shortcut.Edges[1]
-		if e.IsShortcut() {
-			self.GetEdgesFromShortcut(edges, e.EdgeID, reversed)
+func (self *CHGraph) GetEdgesFromShortcut(edges *List[int32], shc_id int32, reversed bool) {
+	self.ch_shortcuts.GetEdgesFromShortcut(shc_id, false, func(edge int32) {
+		edges.Add(edge)
+	})
+}
+func (self *CHGraph) GetDownEdges(dir Direction) (Array[Shortcut], error) {
+	if dir == FORWARD {
+		if self.fwd_down_edges.HasValue() {
+			return self.fwd_down_edges.Value, nil
 		} else {
-			edges.Add(e.EdgeID)
-		}
-		e = shortcut.Edges[0]
-		if e.IsShortcut() {
-			self.GetEdgesFromShortcut(edges, e.EdgeID, reversed)
-		} else {
-			edges.Add(e.EdgeID)
+			return nil, errors.New("forward downedges not build for this graph")
 		}
 	} else {
-		e := shortcut.Edges[0]
-		if e.IsShortcut() {
-			self.GetEdgesFromShortcut(edges, e.EdgeID, reversed)
+		if self.bwd_down_edges.HasValue() {
+			return self.bwd_down_edges.Value, nil
 		} else {
-			edges.Add(e.EdgeID)
-		}
-		e = shortcut.Edges[1]
-		if e.IsShortcut() {
-			self.GetEdgesFromShortcut(edges, e.EdgeID, reversed)
-		} else {
-			edges.Add(e.EdgeID)
+			return nil, errors.New("backward downedges not build for this graph")
 		}
 	}
 }
-func (self *CHGraph) GetNodeIndex() KDTree[int32] {
-	return self.index
-}
-
-// func LoadCHGraph(file string) ICHGraph {
-// 	file_info, err := os.Stat(file)
-// 	if errors.Is(err, os.ErrNotExist) || strings.Split(file_info.Name(), ".")[1] != "graph" {
-// 		panic("file not found")
-// 	}
-
-// 	graphdata, _ := os.ReadFile(file)
-// 	graphreader := bytes.NewReader(graphdata)
-// 	var nodecount int32
-// 	binary.Read(graphreader, binary.LittleEndian, &nodecount)
-// 	var edgecount int32
-// 	binary.Read(graphreader, binary.LittleEndian, &edgecount)
-// 	startindex := 8 + nodecount*5 + edgecount*8
-// 	edgerefreader := bytes.NewReader(graphdata[startindex:])
-// 	nodearr := make([]CHNode, nodecount)
-// 	for i := 0; i < int(nodecount); i++ {
-// 		var s int32
-// 		binary.Read(graphreader, binary.LittleEndian, &s)
-// 		var c int8
-// 		binary.Read(graphreader, binary.LittleEndian, &c)
-// 		edges := make([]int32, c)
-// 		for j := 0; j < int(c); j++ {
-// 			var e int32
-// 			binary.Read(edgerefreader, binary.LittleEndian, &e)
-// 			edges[j] = e
-// 		}
-// 		nodearr[i] = CHNode{Edges: edges}
-// 	}
-// 	edgearr := make([]Edge, edgecount)
-// 	for i := 0; i < int(edgecount); i++ {
-// 		var start int32
-// 		binary.Read(graphreader, binary.LittleEndian, &start)
-// 		var end int32
-// 		binary.Read(graphreader, binary.LittleEndian, &end)
-// 		edgearr[i] = Edge{NodeA: start, NodeB: end}
-// 	}
-
-// 	attribdata, _ := os.ReadFile(strings.Replace(file, ".graph", "-attrib", 1))
-// 	attribreader := bytes.NewReader(attribdata)
-// 	nodeattribarr := make([]NodeAttributes, nodecount)
-// 	for i := 0; i < int(nodecount); i++ {
-// 		var t int8
-// 		binary.Read(attribreader, binary.LittleEndian, &t)
-// 		nodeattribarr[i] = NodeAttributes{Type: t}
-// 	}
-// 	edgeattribarr := make([]EdgeAttributes, edgecount)
-// 	for i := 0; i < int(edgecount); i++ {
-// 		var t int8
-// 		binary.Read(attribreader, binary.LittleEndian, &t)
-// 		var length float32
-// 		binary.Read(attribreader, binary.LittleEndian, &length)
-// 		var maxspeed byte
-// 		binary.Read(attribreader, binary.LittleEndian, &maxspeed)
-// 		var oneway bool
-// 		binary.Read(attribreader, binary.LittleEndian, &oneway)
-// 		edgeattribarr[i] = EdgeAttributes{Type: RoadType(t), Length: length, Maxspeed: maxspeed, Oneway: oneway}
-// 	}
-
-// 	weightdata, _ := os.ReadFile(strings.Replace(file, ".graph", "-weight", 1))
-// 	weightreader := bytes.NewReader(weightdata)
-// 	edgeweights := make([]int32, edgecount)
-// 	for i := 0; i < int(edgecount); i++ {
-// 		var w byte
-// 		binary.Read(weightreader, binary.LittleEndian, &w)
-// 		edgeweights[i] = int32(w)
-// 	}
-
-// 	geomdata, _ := os.ReadFile(strings.Replace(file, ".graph", "-geom", 1))
-// 	startindex = nodecount*8 + edgecount*5
-// 	geomreader := bytes.NewReader(geomdata)
-// 	linereader := bytes.NewReader(geomdata[startindex:])
-// 	pointarr := make([]geo.Coord, nodecount)
-// 	for i := 0; i < int(nodecount); i++ {
-// 		var lon float32
-// 		binary.Read(geomreader, binary.LittleEndian, &lon)
-// 		var lat float32
-// 		binary.Read(geomreader, binary.LittleEndian, &lat)
-// 		pointarr[i] = geo.Coord{lon, lat}
-// 	}
-// 	linearr := make([]geo.CoordArray, edgecount)
-// 	for i := 0; i < int(edgecount); i++ {
-// 		var s int32
-// 		binary.Read(geomreader, binary.LittleEndian, &s)
-// 		var c byte
-// 		binary.Read(geomreader, binary.LittleEndian, &c)
-// 		points := make([]geo.Coord, c)
-// 		for j := 0; j < int(c); j++ {
-// 			var lon float32
-// 			binary.Read(linereader, binary.LittleEndian, &lon)
-// 			var lat float32
-// 			binary.Read(linereader, binary.LittleEndian, &lat)
-// 			points[j].Lon = lon
-// 			points[j].Lat = lat
-// 		}
-// 		linearr[i] = points
-// 	}
-
-// 	leveldata, _ := os.ReadFile(strings.Replace(file, ".graph", "-level", 1))
-// 	levelreader := bytes.NewReader(leveldata)
-// 	for i := 0; i < int(nodecount); i++ {
-// 		var l int16
-// 		binary.Read(levelreader, binary.LittleEndian, &l)
-// 		nodearr[i].Level = l
-// 		nodearr[i].Shortcuts = make([]int32, 0, 3)
-// 	}
-
-// 	shdata, _ := os.ReadFile(strings.Replace(file, ".graph", "-shortcut", 1))
-// 	shreader := bytes.NewReader(shdata)
-// 	var shcount int32
-// 	binary.Read(shreader, binary.LittleEndian, &shcount)
-// 	startindex = shcount * 12
-// 	shweights := make([]int32, shcount)
-// 	sharr := make([]Shortcut, shcount)
-// 	for i := 0; i < int(shcount); i++ {
-// 		var start int32
-// 		binary.Read(shreader, binary.LittleEndian, &start)
-// 		var end int32
-// 		binary.Read(shreader, binary.LittleEndian, &end)
-// 		var weight int32
-// 		binary.Read(shreader, binary.LittleEndian, &weight)
-// 		sharr[i] = Shortcut{NodeA: start, NodeB: end, Oneway: false}
-// 		shweights[i] = weight
-// 		nodearr[start].Shortcuts = append(nodearr[start].Shortcuts, int32(i))
-// 		nodearr[end].Shortcuts = append(nodearr[end].Shortcuts, int32(i))
-// 	}
-// 	for i := 0; i < int(shcount); i++ {
-// 		edges := make([]EdgeRef, 2)
-// 		for j := 0; j < 2; j++ {
-// 			var id int32
-// 			binary.Read(shreader, binary.LittleEndian, &id)
-// 			var is bool
-// 			binary.Read(shreader, binary.LittleEndian, &is)
-// 			edges[j] = EdgeRef{id, is}
-// 		}
-// 		sharr[i].egdes = edges
-// 	}
-
-// 	return &CHGraph{
-// 		edges:           edgearr,
-// 		edge_attributes: edgeattribarr,
-// 		nodes:           nodearr,
-// 		node_attributes: nodeattribarr,
-// 		shortcuts:       sharr,
-// 		geom:            &Geometry{pointarr, linearr},
-// 		weight:          &Weighting{edgeweights},
-// 		sh_weight:       &Weighting{shweights},
-// 	}
-// }
-
-type CHEdgeRefIterator struct {
-	state     int
-	end       int
-	edge_refs *List[EdgeRef]
-}
-
-func (self *CHEdgeRefIterator) Next() (EdgeRef, bool) {
-	if self.state == self.end {
-		var t EdgeRef
-		return t, false
+func (self *CHGraph) HasDownEdges(dir Direction) bool {
+	if dir == FORWARD {
+		return self.fwd_down_edges.HasValue()
+	} else {
+		return self.bwd_down_edges.HasValue()
 	}
-	self.state += 1
-	return self.edge_refs.Get(self.state - 1), true
+}
+func (self *CHGraph) GetNodeTile(node int32) int16 {
+	if self.node_tiles.HasValue() {
+		return self.node_tiles.Value[node]
+	} else {
+		return -1
+	}
+}
+func (self *CHGraph) TileCount() int {
+	if self.node_tiles.HasValue() {
+		max := int16(0)
+		for i := 0; i < len(self.node_tiles.Value); i++ {
+			tile := self.node_tiles.Value[i]
+			if tile > max {
+				max = tile
+			}
+		}
+		return int(max + 1)
+	} else {
+		return -1
+	}
+}
+func (self *CHGraph) GetIndex() IGraphIndex {
+	return &BaseGraphIndex{
+		index: self.base.GetKDTree(),
+	}
+}
+
+//*******************************************
+// ch-graph explorer
+//******************************************
+
+type CHGraphExplorer struct {
+	graph       *CHGraph
+	accessor    AdjArrayAccessor
+	sh_accessor AdjArrayAccessor
+	weight      IWeighting
+}
+
+func (self *CHGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
+	if typ == ADJACENT_ALL {
+		self.accessor.SetBaseNode(node, direction)
+		self.sh_accessor.SetBaseNode(node, direction)
+		for self.accessor.Next() {
+			edge_id := self.accessor.GetEdgeID()
+			other_id := self.accessor.GetOtherID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   0,
+			})
+		}
+		for self.sh_accessor.Next() {
+			edge_id := self.sh_accessor.GetEdgeID()
+			other_id := self.sh_accessor.GetOtherID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   100,
+			})
+		}
+	} else if typ == ADJACENT_EDGES {
+		self.accessor.SetBaseNode(node, direction)
+		for self.accessor.Next() {
+			edge_id := self.accessor.GetEdgeID()
+			other_id := self.accessor.GetOtherID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   0,
+			})
+		}
+	} else if typ == ADJACENT_SHORTCUTS {
+		self.sh_accessor.SetBaseNode(node, direction)
+		for self.sh_accessor.Next() {
+			edge_id := self.sh_accessor.GetEdgeID()
+			other_id := self.sh_accessor.GetOtherID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   100,
+			})
+		}
+	} else if typ == ADJACENT_UPWARDS {
+		self.accessor.SetBaseNode(node, direction)
+		self.sh_accessor.SetBaseNode(node, direction)
+		this_level := self.graph.GetNodeLevel(node)
+		for self.accessor.Next() {
+			other_id := self.accessor.GetOtherID()
+			if this_level >= self.graph.GetNodeLevel(other_id) {
+				continue
+			}
+			edge_id := self.accessor.GetEdgeID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   0,
+			})
+		}
+		for self.sh_accessor.Next() {
+			other_id := self.sh_accessor.GetOtherID()
+			if this_level >= self.graph.GetNodeLevel(other_id) {
+				continue
+			}
+			edge_id := self.sh_accessor.GetEdgeID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   100,
+			})
+		}
+	} else if typ == ADJACENT_DOWNWARDS {
+		self.accessor.SetBaseNode(node, direction)
+		self.sh_accessor.SetBaseNode(node, direction)
+		this_level := self.graph.GetNodeLevel(node)
+		for self.accessor.Next() {
+			other_id := self.accessor.GetOtherID()
+			if this_level <= self.graph.GetNodeLevel(other_id) {
+				continue
+			}
+			edge_id := self.accessor.GetEdgeID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   0,
+			})
+		}
+		for self.sh_accessor.Next() {
+			other_id := self.sh_accessor.GetOtherID()
+			if this_level <= self.graph.GetNodeLevel(other_id) {
+				continue
+			}
+			edge_id := self.sh_accessor.GetEdgeID()
+			callback(EdgeRef{
+				EdgeID:  edge_id,
+				OtherID: other_id,
+				_Type:   100,
+			})
+		}
+	} else {
+		panic("Adjacency-type not implemented for this graph.")
+	}
+}
+func (self *CHGraphExplorer) GetEdgeWeight(edge EdgeRef) int32 {
+	if edge.IsCHShortcut() {
+		shc := self.graph.ch_shortcuts.GetShortcut(edge.EdgeID)
+		return shc.Weight
+	} else {
+		return self.weight.GetEdgeWeight(edge.EdgeID)
+	}
+}
+func (self *CHGraphExplorer) GetTurnCost(from EdgeRef, via int32, to EdgeRef) int32 {
+	if from.IsShortcut() || to.IsShortcut() {
+		return 0
+	}
+	return 0
+}
+func (self *CHGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
+	if edge.IsShortcut() {
+		e := self.graph.GetShortcut(edge.EdgeID)
+		if node == e.From {
+			return e.To
+		}
+		if node == e.To {
+			return e.From
+		}
+		return -1
+	} else {
+		e := self.graph.GetEdge(edge.EdgeID)
+		if node == e.NodeA {
+			return e.NodeB
+		}
+		if node == e.NodeB {
+			return e.NodeA
+		}
+		return -1
+	}
 }

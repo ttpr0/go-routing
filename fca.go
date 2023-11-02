@@ -1,21 +1,18 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"sync"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access"
 )
 
 type FCARequest struct {
-	PopulationLocations [][2]float32 `json:"population_locations"`
-	PopulationWeights   []float32    `json:"population_weights"`
-	FacilityLocations   [][2]float32 `json:"facility_locations"`
-	MaxRange            float64      `json:"max_range"`
+	Demand        DemandRequestParams  `json:"demand"`
+	DistanceDecay DecayRequestParams   `json:"distance_decay"`
+	Routing       RoutingRequestParams `json:"routing"`
+	Supply        SupplyRequestParams  `json:"supply"`
+	Mode          string               `json:"mode"`
 }
 
 type FCAResponse struct {
@@ -23,90 +20,58 @@ type FCAResponse struct {
 }
 
 func HandleFCARequest(w http.ResponseWriter, r *http.Request) {
-	data, _ := io.ReadAll(r.Body)
-	req := FCARequest{}
-	err := json.Unmarshal(data, &req)
-	if err != nil {
-		fmt.Println(err.Error())
+	req := ReadRequestBody[FCARequest](r)
+	fmt.Println("Run FCA Request")
+
+	demand_view := GetDemandView(req.Demand)
+	if demand_view == nil {
+		WriteResponse(w, NewErrorResponse("2sfca/enhanced", "failed to get demand-view, parameters are invalid"), http.StatusBadRequest)
+		return
+	}
+	supply_view := GetSupplyView(req.Supply)
+	if supply_view == nil {
+		WriteResponse(w, NewErrorResponse("2sfca/enhanced", "failed to get supply-view, parameters are invalid"), http.StatusBadRequest)
+		return
+	}
+	distance_decay := GetDistanceDecay(req.DistanceDecay)
+	if distance_decay == nil {
+		WriteResponse(w, NewErrorResponse("2sfca/enhanced", "failed to get distance-decay, parameters are invalid"), http.StatusBadRequest)
+		return
 	}
 
-	node_index := GRAPH.GetNodeIndex()
-	population_nodes := NewArray[int32](len(req.PopulationLocations))
-	for i, loc := range req.PopulationLocations {
-		id, ok := node_index.GetClosest(loc[:], 0.005)
-		if ok {
-			population_nodes[i] = id
+	var weights []float32
+	if req.Mode == "tiled" {
+		fmt.Println("run tiled fca")
+		weights = access.CalcEnhanced2SFCA(GRAPH, demand_view, supply_view, distance_decay)
+	} else if req.Mode == "ch" {
+		fmt.Println("run ch fca")
+		// weights = access.CalcRPHAST2SFCA(GRAPH, demand_view, supply_view, distance_decay)
+	} else if req.Mode == "default" {
+		fmt.Println("run default fca")
+		weights = access.CalcEnhanced2SFCA(GRAPH, demand_view, supply_view, distance_decay)
+	} else {
+		weights = access.CalcEnhanced2SFCA(GRAPH, demand_view, supply_view, distance_decay)
+	}
+
+	max_weight := float32(0)
+	for i := 0; i < len(weights); i++ {
+		w := weights[i]
+		if w > max_weight {
+			max_weight = w
+		}
+	}
+	factor := 100 / max_weight
+	for i := 0; i < len(weights); i++ {
+		w := weights[i]
+		if w != 0 {
+			w = w * factor
 		} else {
-			population_nodes[i] = -1
+			w = -9999
 		}
-	}
-	facility_chan := make(chan [2]float32, len(req.FacilityLocations))
-	for _, facility := range req.FacilityLocations {
-		facility_chan <- facility
+		weights[i] = w
 	}
 
-	access := NewArray[float32](len(req.PopulationLocations))
-	wg := sync.WaitGroup{}
-	for i := 0; i < 8; i++ {
-		wg.Add(1)
-		go func() {
-			spt := routing.NewSPT2(GRAPH)
-			for {
-				if len(facility_chan) == 0 {
-					break
-				}
-				facility := <-facility_chan
-				id, ok := node_index.GetClosest(facility[:], 0.005)
-				if !ok {
-					continue
-				}
-				spt.Init(id, req.MaxRange)
-				spt.CalcSPT()
-				flags := spt.GetSPT()
-
-				facility_weight := float32(0.0)
-				for i, node := range population_nodes {
-					if node == -1 {
-						continue
-					}
-					flag := flags[node]
-					if !flag.Visited {
-						continue
-					}
-					distance_decay := float32(1 - flag.PathLength/req.MaxRange)
-					facility_weight += req.PopulationWeights[i] * distance_decay
-				}
-				for i, node := range population_nodes {
-					if node == -1 {
-						continue
-					}
-					flag := flags[node]
-					if !flag.Visited {
-						continue
-					}
-					distance_decay := float32(1 - flag.PathLength/req.MaxRange)
-					access[i] += (1 / facility_weight) * distance_decay
-				}
-			}
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-	max_val := float32(0.0)
-	for _, val := range access {
-		if val > max_val {
-			max_val = val
-		}
-	}
-	for i, val := range access {
-		if val == 0 {
-			access[i] = -9999
-		} else {
-			access[i] = val * 100 / max_val
-		}
-	}
-
-	resp := FCAResponse{Access: access}
-	data, _ = json.Marshal(resp)
-	w.Write(data)
+	resp := FCAResponse{weights}
+	fmt.Println("reponse build")
+	WriteResponse(w, resp, http.StatusOK)
 }

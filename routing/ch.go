@@ -27,9 +27,6 @@ type CH struct {
 	end_id      int32
 	path_length float64
 	graph       graph.ICHGraph
-	geom        graph.IGeometry
-	weight      graph.IWeighting
-	shweight    graph.IWeighting
 	flags       Dict[int32, flag_ch]
 }
 
@@ -51,9 +48,6 @@ func NewCH(graph graph.ICHGraph, start, end int32) *CH {
 		end_id:      end,
 		path_length: 100000000,
 		graph:       graph,
-		geom:        graph.GetGeometry(),
-		weight:      graph.GetWeighting(),
-		shweight:    graph.GetShortcutWeighting(),
 		flags:       flags,
 	}
 
@@ -61,6 +55,8 @@ func NewCH(graph graph.ICHGraph, start, end int32) *CH {
 }
 
 func (self *CH) CalcShortestPath() bool {
+	explorer := self.graph.GetGraphExplorer()
+
 	for {
 		if self.startheap.Len() == 0 && self.endheap.Len() == 0 {
 			break
@@ -87,24 +83,11 @@ func (self *CH) CalcShortestPath() bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			edges := self.graph.GetAdjacentShortcuts(curr_id)
-			for {
-				ref, ok := edges.Next()
-				if !ok {
-					break
-				}
-				if ref.IsReversed() {
-					continue
-				}
+			explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 				edge_id := ref.EdgeID
-				var other_id int32
-				if ref.IsShortcut() {
-					other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
-				} else {
-					other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
-				}
+				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
-					continue
+					return
 				}
 				var other_flag flag_ch
 				if self.flags.ContainsKey(other_id) {
@@ -112,12 +95,7 @@ func (self *CH) CalcShortestPath() bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				var weight int32
-				if ref.IsShortcut() {
-					weight = self.shweight.GetEdgeWeight(edge_id)
-				} else {
-					weight = self.weight.GetEdgeWeight(edge_id)
-				}
+				weight := explorer.GetEdgeWeight(ref)
 				new_length := curr_flag.path_length1 + float64(weight)
 				if new_length < other_flag.path_length1 {
 					other_flag.path_length1 = new_length
@@ -126,7 +104,7 @@ func (self *CH) CalcShortestPath() bool {
 					self.startheap.Enqueue(other_id, new_length)
 				}
 				self.flags[other_id] = other_flag
-			}
+			})
 			self.flags[curr_id] = curr_flag
 		}
 
@@ -142,24 +120,11 @@ func (self *CH) CalcShortestPath() bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			edges := self.graph.GetAdjacentShortcuts(curr_id)
-			for {
-				ref, ok := edges.Next()
-				if !ok {
-					break
-				}
-				if !ref.IsReversed() {
-					continue
-				}
+			explorer.ForAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 				edge_id := ref.EdgeID
-				var other_id int32
-				if ref.IsShortcut() {
-					other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
-				} else {
-					other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
-				}
+				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
-					continue
+					return
 				}
 				var other_flag flag_ch
 				if self.flags.ContainsKey(other_id) {
@@ -167,12 +132,7 @@ func (self *CH) CalcShortestPath() bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				var weight int32
-				if ref.IsShortcut() {
-					weight = self.shweight.GetEdgeWeight(edge_id)
-				} else {
-					weight = self.weight.GetEdgeWeight(edge_id)
-				}
+				weight := explorer.GetEdgeWeight(ref)
 				new_length := curr_flag.path_length2 + float64(weight)
 				if new_length < other_flag.path_length2 {
 					other_flag.path_length2 = new_length
@@ -181,7 +141,7 @@ func (self *CH) CalcShortestPath() bool {
 					self.endheap.Enqueue(other_id, new_length)
 				}
 				self.flags[other_id] = other_flag
-			}
+			})
 			self.flags[curr_id] = curr_flag
 		}
 	}
@@ -196,9 +156,11 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 	defer func() {
 		fmt.Println("running")
 		for _, edge := range edges {
-			visitededges.Add(self.geom.GetEdge(edge))
+			visitededges.Add(self.graph.GetEdgeGeom(edge))
 		}
 	}()
+
+	explorer := self.graph.GetGraphExplorer()
 	for c := 0; c < count; c++ {
 		if self.startheap.Len() == 0 && self.endheap.Len() == 0 {
 			return false
@@ -224,24 +186,11 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			shortcuts := self.graph.GetAdjacentShortcuts(curr_id)
-			for {
-				ref, ok := shortcuts.Next()
-				if !ok {
-					break
-				}
-				if ref.IsReversed() {
-					continue
-				}
+			explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 				edge_id := ref.EdgeID
-				var other_id int32
-				if ref.IsShortcut() {
-					other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
-				} else {
-					other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
-				}
+				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
-					continue
+					return
 				}
 				var other_flag flag_ch
 				if self.flags.ContainsKey(other_id) {
@@ -249,12 +198,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				var weight int32
-				if ref.IsShortcut() {
-					weight = self.shweight.GetEdgeWeight(edge_id)
-				} else {
-					weight = self.weight.GetEdgeWeight(edge_id)
-				}
+				weight := explorer.GetEdgeWeight(ref)
 
 				if ref.IsShortcut() {
 					self.graph.GetEdgesFromShortcut(&edges, edge_id, false)
@@ -270,7 +214,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 					self.startheap.Enqueue(other_id, new_length)
 				}
 				self.flags[other_id] = other_flag
-			}
+			})
 			self.flags[curr_id] = curr_flag
 		}
 
@@ -289,24 +233,11 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				self.mid_id = curr_id
 				self.path_length = curr_flag.path_length1 + curr_flag.path_length2
 			}
-			shortcuts := self.graph.GetAdjacentShortcuts(curr_id)
-			for {
-				ref, ok := shortcuts.Next()
-				if !ok {
-					break
-				}
-				if !ref.IsReversed() {
-					continue
-				}
+			explorer.ForAdjacentEdges(curr_id, graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 				edge_id := ref.EdgeID
-				var other_id int32
-				if ref.IsShortcut() {
-					other_id, _ = self.graph.GetOtherShortcutNode(edge_id, curr_id)
-				} else {
-					other_id, _ = self.graph.GetOtherNode(edge_id, curr_id)
-				}
+				other_id := ref.OtherID
 				if self.graph.GetNodeLevel(other_id) <= self.graph.GetNodeLevel(curr_id) {
-					continue
+					return
 				}
 				var other_flag flag_ch
 				if self.flags.ContainsKey(other_id) {
@@ -314,12 +245,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				} else {
 					other_flag = flag_ch{path_length1: 1000000, visited1: false, prev_edge1: -1, is_shortcut1: false, path_length2: 1000000, visited2: false, prev_edge2: -1, is_shortcut2: false}
 				}
-				var weight int32
-				if ref.IsShortcut() {
-					weight = self.shweight.GetEdgeWeight(edge_id)
-				} else {
-					weight = self.weight.GetEdgeWeight(edge_id)
-				}
+				weight := explorer.GetEdgeWeight(ref)
 				if ref.IsShortcut() {
 					self.graph.GetEdgesFromShortcut(&edges, edge_id, false)
 				} else {
@@ -333,7 +259,7 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 					self.endheap.Enqueue(other_id, new_length)
 				}
 				self.flags[other_id] = other_flag
-			}
+			})
 			self.flags[curr_id] = curr_flag
 		}
 	}
@@ -341,7 +267,10 @@ func (self *CH) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 }
 
 func (self *CH) GetShortestPath() Path {
+	explorer := self.graph.GetGraphExplorer()
+
 	path := NewList[int32](10)
+	length := int32(self.flags[self.mid_id].path_length1 + self.flags[self.mid_id].path_length2)
 	curr_id := self.mid_id
 	for {
 		if curr_id == self.start_id {
@@ -350,10 +279,10 @@ func (self *CH) GetShortestPath() Path {
 		curr_flag := self.flags[curr_id]
 		if curr_flag.is_shortcut1 {
 			self.graph.GetEdgesFromShortcut(&path, curr_flag.prev_edge1, true)
-			curr_id, _ = self.graph.GetOtherShortcutNode(curr_flag.prev_edge1, curr_id)
+			curr_id = explorer.GetOtherNode(graph.CreateCHShortcutRef(curr_flag.prev_edge1), curr_id)
 		} else {
 			path.Add(curr_flag.prev_edge1)
-			curr_id, _ = self.graph.GetOtherNode(curr_flag.prev_edge1, curr_id)
+			curr_id = explorer.GetOtherNode(graph.CreateEdgeRef(curr_flag.prev_edge1), curr_id)
 		}
 	}
 	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
@@ -367,12 +296,12 @@ func (self *CH) GetShortestPath() Path {
 		curr_flag := self.flags[curr_id]
 		if curr_flag.is_shortcut2 {
 			self.graph.GetEdgesFromShortcut(&path, curr_flag.prev_edge2, false)
-			curr_id, _ = self.graph.GetOtherShortcutNode(curr_flag.prev_edge2, curr_id)
+			curr_id = explorer.GetOtherNode(graph.CreateCHShortcutRef(curr_flag.prev_edge2), curr_id)
 		} else {
 			path.Add(curr_flag.prev_edge2)
-			curr_id, _ = self.graph.GetOtherNode(curr_flag.prev_edge2, curr_id)
+			curr_id = explorer.GetOtherNode(graph.CreateEdgeRef(curr_flag.prev_edge2), curr_id)
 		}
 	}
-	fmt.Println("count:", len(path))
+	fmt.Println("length:", length)
 	return NewPath(self.graph, path)
 }
