@@ -1,4 +1,4 @@
-module github.com/ttpr0/simple-routing-visualizer/src/go-routing
+module github.com/ttpr0/go-routing
 
 go 1.19
 

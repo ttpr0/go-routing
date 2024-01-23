@@ -6,9 +6,9 @@ import (
 	"math"
 	"net/http"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/routing"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/go-routing/geo"
+	"github.com/ttpr0/go-routing/routing"
+	"github.com/ttpr0/go-routing/util"
 )
 
 type IsoRasterRequest struct {

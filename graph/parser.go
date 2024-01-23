@@ -9,8 +9,8 @@ import (
 
 	"github.com/paulmach/osm"
 	"github.com/paulmach/osm/osmpbf"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/go-routing/geo"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 func ParseGraph(pbf_file string) GraphBase {
@@ -31,12 +31,8 @@ func ParseGraphFromOSM(pbf_file string) GraphBase {
 	_ParseOsm(pbf_file, &nodes, &edges, &index_mapping)
 	print("edges: ", edges.Length(), ", nodes: ", nodes.Length())
 	_CalcEdgeWeights(&edges)
-	store := _CreateGraphStore(&nodes, &edges)
-	return GraphBase{
-		store:    store,
-		topology: _BuildTopology(store),
-		index:    _BuildKDTreeIndex(store),
-	}
+	base := _CreateGraphStore(&nodes, &edges)
+	return base
 }
 
 func _ParseOsm(filename string, nodes *List[OSMNode], edges *List[OSMEdge], index_mapping *Dict[int64, int]) {
@@ -158,27 +154,24 @@ func _CreateGraphBase(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) (GraphBa
 		node_geoms.Add(osmnode.Point)
 	}
 
-	store := GraphStore{
-		nodes:      Array[Node](nodes),
-		edges:      Array[Edge](edges),
-		node_geoms: node_geoms,
-		edge_geoms: edge_geoms,
-	}
-	topology := AdjacencyArray{
+	topology := _AdjacencyArray{
 		node_entries:     Array[_NodeEntry](node_refs),
 		fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs),
 		bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs),
 	}
 	weighting := DefaultWeighting{edge_weights: edge_weights}
 
-	return GraphBase{
-		store:    store,
-		topology: topology,
-		index:    _BuildKDTreeIndex(store),
-	}, weighting
+	base := GraphBase{
+		nodes:      Array[Node](nodes),
+		edges:      Array[Edge](edges),
+		node_geoms: node_geoms,
+		edge_geoms: edge_geoms,
+		topology:   topology,
+	}
+	return base, weighting
 }
 
-func _CreateGraphStore(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) GraphStore {
+func _CreateGraphStore(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) GraphBase {
 	nodes := NewList[Node](osmnodes.Length())
 	edges := NewList[Edge](osmedges.Length() * 2)
 	node_geoms := NewList[geo.Coord](osmnodes.Length())
@@ -215,12 +208,14 @@ func _CreateGraphStore(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) GraphSt
 		node_geoms.Add(osmnode.Point)
 	}
 
-	return GraphStore{
+	base := GraphBase{
 		nodes:      Array[Node](nodes),
 		edges:      Array[Edge](edges),
 		node_geoms: node_geoms,
 		edge_geoms: edge_geoms,
 	}
+	base.topology = _BuildTopology(base.nodes, base.edges)
+	return base
 }
 
 //*******************************************

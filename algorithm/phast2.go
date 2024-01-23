@@ -1,8 +1,8 @@
 package algorithm
 
 import (
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/go-routing/graph"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 func CalcPHAST2(g graph.ICHGraph, start int32, max_range int32) Array[int32] {

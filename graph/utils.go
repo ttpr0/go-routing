@@ -6,81 +6,76 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/go-routing/util"
 )
 
-func BuildGraphIndex(g *Graph) {
-	g.base.index = _BuildKDTreeIndex(g.base.store)
-}
+// func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollection) {
+// 	edges := NewList[geo.Feature](int(graph.EdgeCount()))
+// 	for i := 0; i < graph.EdgeCount(); i++ {
+// 		edge := graph.GetEdge(int32(i))
+// 		if i%1000 == 0 {
+// 			fmt.Println("edge ", i)
+// 		}
+// 		var edge_type int16
+// 		if graph.GetNodeTile(edge.NodeA) == graph.GetNodeTile(edge.NodeB) {
+// 			edge_type = graph.GetNodeTile(edge.NodeA)
+// 		} else {
+// 			edge_type = -10
+// 		}
+// 		line := geo.NewLineString(graph.GetEdgeGeom(int32(i)))
+// 		edges.Add(geo.NewFeature(&line, map[string]any{"index": i, "nodeA": edge.NodeA, "nodeB": edge.NodeB, "type": edge_type}))
+// 	}
 
-func GraphToGeoJSON(graph *TiledGraph) (geo.FeatureCollection, geo.FeatureCollection) {
-	edges := NewList[geo.Feature](int(graph.EdgeCount()))
-	for i := 0; i < graph.EdgeCount(); i++ {
-		edge := graph.GetEdge(int32(i))
-		if i%1000 == 0 {
-			fmt.Println("edge ", i)
-		}
-		var edge_type int16
-		if graph.GetNodeTile(edge.NodeA) == graph.GetNodeTile(edge.NodeB) {
-			edge_type = graph.GetNodeTile(edge.NodeA)
-		} else {
-			edge_type = -10
-		}
-		line := geo.NewLineString(graph.GetEdgeGeom(int32(i)))
-		edges.Add(geo.NewFeature(&line, map[string]any{"index": i, "nodeA": edge.NodeA, "nodeB": edge.NodeB, "type": edge_type}))
-	}
+// 	nodes := NewList[geo.Feature](int(graph.NodeCount()))
+// 	for i, node := range graph.base.topology.node_entries {
+// 		if i%1000 == 0 {
+// 			fmt.Println("node ", i)
+// 		}
+// 		e := NewList[int32](3)
+// 		for j := 0; j < int(node.FWDEdgeCount); j++ {
+// 			e.Add(graph.base.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
+// 		}
+// 		node_tile := graph.GetNodeTile(int32(i))
+// 		point := geo.NewPoint(graph.GetNodeGeom(int32(i)))
+// 		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.FWDEdgeCount, "edges": e, "tile": node_tile}))
+// 	}
 
-	nodes := NewList[geo.Feature](int(graph.NodeCount()))
-	for i, node := range graph.base.topology.node_entries {
-		if i%1000 == 0 {
-			fmt.Println("node ", i)
-		}
-		e := NewList[int32](3)
-		for j := 0; j < int(node.FWDEdgeCount); j++ {
-			e.Add(graph.base.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
-		}
-		node_tile := graph.GetNodeTile(int32(i))
-		point := geo.NewPoint(graph.GetNodeGeom(int32(i)))
-		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.FWDEdgeCount, "edges": e, "tile": node_tile}))
-	}
+// 	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)
+// }
 
-	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)
-}
+// func GraphToGeoJSON2(graph *Graph, node_tiles Array[int16]) (geo.FeatureCollection, geo.FeatureCollection) {
+// 	edges := NewList[geo.Feature](int(graph.EdgeCount()))
+// 	for i := 0; i < graph.EdgeCount(); i++ {
+// 		edge := graph.GetEdge(int32(i))
+// 		if i%1000 == 0 {
+// 			fmt.Println("edge ", i)
+// 		}
+// 		var edge_type int16
+// 		if node_tiles[edge.NodeA] == node_tiles[edge.NodeB] {
+// 			edge_type = node_tiles[edge.NodeA]
+// 		} else {
+// 			edge_type = -10
+// 		}
+// 		line := geo.NewLineString(graph.GetEdgeGeom(int32(i)))
+// 		edges.Add(geo.NewFeature(&line, map[string]any{"index": i, "nodeA": edge.NodeA, "nodeB": edge.NodeB, "type": edge_type}))
+// 	}
 
-func GraphToGeoJSON2(graph *Graph, node_tiles Array[int16]) (geo.FeatureCollection, geo.FeatureCollection) {
-	edges := NewList[geo.Feature](int(graph.EdgeCount()))
-	for i := 0; i < graph.EdgeCount(); i++ {
-		edge := graph.GetEdge(int32(i))
-		if i%1000 == 0 {
-			fmt.Println("edge ", i)
-		}
-		var edge_type int16
-		if node_tiles[edge.NodeA] == node_tiles[edge.NodeB] {
-			edge_type = node_tiles[edge.NodeA]
-		} else {
-			edge_type = -10
-		}
-		line := geo.NewLineString(graph.GetEdgeGeom(int32(i)))
-		edges.Add(geo.NewFeature(&line, map[string]any{"index": i, "nodeA": edge.NodeA, "nodeB": edge.NodeB, "type": edge_type}))
-	}
+// 	nodes := NewList[geo.Feature](int(graph.NodeCount()))
+// 	for i, node := range graph.base.topology.node_entries {
+// 		if i%1000 == 0 {
+// 			fmt.Println("node ", i)
+// 		}
+// 		e := NewList[int32](3)
+// 		for j := 0; j < int(node.FWDEdgeCount); j++ {
+// 			e.Add(graph.base.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
+// 		}
+// 		node_tile := node_tiles[i]
+// 		point := geo.NewPoint(graph.GetNodeGeom(int32(i)))
+// 		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.FWDEdgeCount, "edges": e, "tile": node_tile}))
+// 	}
 
-	nodes := NewList[geo.Feature](int(graph.NodeCount()))
-	for i, node := range graph.base.topology.node_entries {
-		if i%1000 == 0 {
-			fmt.Println("node ", i)
-		}
-		e := NewList[int32](3)
-		for j := 0; j < int(node.FWDEdgeCount); j++ {
-			e.Add(graph.base.topology.fwd_edge_entries[int(node.FWDEdgeStart)+j].EdgeID)
-		}
-		node_tile := node_tiles[i]
-		point := geo.NewPoint(graph.GetNodeGeom(int32(i)))
-		nodes.Add(geo.NewFeature(&point, map[string]any{"index": i, "edgecount": node.FWDEdgeCount, "edges": e, "tile": node_tile}))
-	}
-
-	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)
-}
+// 	return geo.NewFeatureCollection(nodes), geo.NewFeatureCollection(edges)
+// }
 
 func GraphToMETIS(g IGraph) string {
 	n := g.NodeCount()
@@ -194,18 +189,18 @@ func ReadNodeOrdering(filename string) Array[int32] {
 	return ordering
 }
 
-func _IsBorderNode3(graph IGraph, node_tiles Array[int16]) Array[bool] {
+func _IsBorderNode3(graph IGraph, partition *Partition) Array[bool] {
 	is_border := NewArray[bool](graph.NodeCount())
 
 	explorer := graph.GetGraphExplorer()
 	for i := 0; i < graph.NodeCount(); i++ {
 		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if node_tiles[i] != node_tiles[ref.OtherID] {
+			if partition.GetNodeTile(int32(i)) != partition.GetNodeTile(ref.OtherID) {
 				is_border[i] = true
 			}
 		})
 		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if node_tiles[i] != node_tiles[ref.OtherID] {
+			if partition.GetNodeTile(int32(i)) != partition.GetNodeTile(ref.OtherID) {
 				is_border[i] = true
 			}
 		})

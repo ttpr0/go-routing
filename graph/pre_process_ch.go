@@ -6,7 +6,7 @@ import (
 	"sort"
 	"time"
 
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
@@ -15,40 +15,33 @@ import (
 
 type CHPreprocGraph struct {
 	// added attributes to build ch
-	ch_topology AdjacencyList
+	ch_topology _AdjacencyList
 	node_levels Array[int16]
-	shortcuts   ShortcutStore
+	shortcuts   _ShortcutStore
 
 	// underlying base graph
-	store    GraphStore
-	topology AdjacencyArray
-	weight   IWeighting
-	index    KDTree[int32]
-}
-
-type DynamicNodeRef struct {
-	FWDEdgeRefs List[EdgeRef]
-	BWDEdgeRefs List[EdgeRef]
+	base   IGraphBase
+	weight IWeighting
 }
 
 func (self *CHPreprocGraph) GetExplorer() *CHPreprocGraphExplorer {
 	return &CHPreprocGraphExplorer{
 		graph:       self,
-		accessor:    self.topology.GetAccessor(),
+		accessor:    self.base.GetAccessor(),
 		sh_accessor: self.ch_topology.GetAccessor(),
 	}
 }
 func (self *CHPreprocGraph) NodeCount() int {
-	return self.store.NodeCount()
+	return self.base.NodeCount()
 }
 func (self *CHPreprocGraph) EdgeCount() int {
-	return self.store.EdgeCount()
+	return self.base.EdgeCount()
 }
 func (self *CHPreprocGraph) GetNode(node int32) Node {
-	return self.store.GetNode(node)
+	return self.base.GetNode(node)
 }
 func (self *CHPreprocGraph) GetEdge(edge int32) Edge {
-	return self.store.GetEdge(edge)
+	return self.base.GetEdge(edge)
 }
 func (self *CHPreprocGraph) GetShortcut(id int32) Shortcut {
 	return self.shortcuts.GetShortcut(id)
@@ -87,8 +80,8 @@ func (self *CHPreprocGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int
 
 type CHPreprocGraphExplorer struct {
 	graph       *CHPreprocGraph
-	accessor    AdjArrayAccessor
-	sh_accessor AdjListAccessor
+	accessor    _AdjArrayAccessor
+	sh_accessor _AdjListAccessor
 }
 
 func (self *CHPreprocGraphExplorer) ForAdjacentEdges(node int32, direction Direction, typ Adjacency, callback func(EdgeRef)) {
@@ -192,7 +185,7 @@ func (self *CHPreprocGraphExplorer) GetEdgeBetween(from, to int32) (EdgeRef, boo
 //*******************************************
 
 func TransformToCHPreprocGraph(g *Graph) *CHPreprocGraph {
-	ch_topology := NewAdjacencyList(g.NodeCount())
+	ch_topology := _NewAdjacencyList(g.NodeCount())
 	node_levels := NewArray[int16](g.NodeCount())
 
 	for i := 0; i < g.NodeCount(); i++ {
@@ -200,12 +193,10 @@ func TransformToCHPreprocGraph(g *Graph) *CHPreprocGraph {
 	}
 
 	dg := CHPreprocGraph{
-		store:    g.base.store,
-		topology: g.base.topology,
-		weight:   g.weight,
-		index:    g.base.index,
+		base:   g.base,
+		weight: g.weight,
 
-		shortcuts:   NewShortcutStore(100, true),
+		shortcuts:   _NewShortcutStore(100, true),
 		ch_topology: ch_topology,
 		node_levels: node_levels,
 	}
@@ -213,31 +204,10 @@ func TransformToCHPreprocGraph(g *Graph) *CHPreprocGraph {
 	return &dg
 }
 
-func TransformFromCHPreprocGraph(dg *CHPreprocGraph) *CHGraph {
-	g := CHGraph{
-		base: GraphBase{
-			store:    dg.store,
-			topology: dg.topology,
-			index:    dg.index,
-		},
-		weight: dg.weight,
-
-		ch_shortcuts: dg.shortcuts,
-		ch_topology:  *AdjacencyListToArray(&dg.ch_topology),
-		node_levels:  dg.node_levels,
-	}
-
-	return &g
-}
-
-func TransformFromCHPreprocGraph2(dg *CHPreprocGraph) *_CHData {
-	return &_CHData{
-		id_mapping: NewIDMapping(dg.NodeCount()),
-
-		_build_with_tiles: false,
-
+func TransformToCHData(dg *CHPreprocGraph) *CH {
+	return &CH{
 		shortcuts:   dg.shortcuts,
-		topology:    *AdjacencyListToArray(&dg.ch_topology),
+		topology:    *_AdjacencyListToArray(&dg.ch_topology),
 		node_levels: dg.node_levels,
 	}
 }
@@ -400,7 +370,7 @@ func _GetShortcut(from, to, via int32, explorer *CHPreprocGraphExplorer, flags F
 // preprocess ch
 //*******************************************
 
-func CalcContraction(base_graph *Graph) *_CHData {
+func CalcContraction(base_graph *Graph) *CH {
 	graph := TransformToCHPreprocGraph(base_graph)
 
 	fmt.Println("started contracting graph")
@@ -431,11 +401,11 @@ func CalcContraction(base_graph *Graph) *_CHData {
 		fmt.Println("start ordering nodes")
 		sort.Slice(nodes, func(i, j int) bool {
 			a := nodes[i]
-			c1 := graph.topology.GetDegree(a, FORWARD) + graph.topology.GetDegree(a, BACKWARD)
+			c1 := graph.base.GetNodeDegree(a, FORWARD) + graph.base.GetNodeDegree(a, BACKWARD)
 			c2 := graph.ch_topology.GetDegree(a, FORWARD) + graph.ch_topology.GetDegree(a, BACKWARD)
 			count_a := c1 + c2
 			b := nodes[j]
-			c1 = graph.topology.GetDegree(b, FORWARD) + graph.topology.GetDegree(b, BACKWARD)
+			c1 = graph.base.GetNodeDegree(b, FORWARD) + graph.base.GetNodeDegree(b, BACKWARD)
 			c2 = graph.ch_topology.GetDegree(b, FORWARD) + graph.ch_topology.GetDegree(b, BACKWARD)
 			count_b := c1 + c2
 			return count_a < count_b
@@ -505,8 +475,7 @@ func CalcContraction(base_graph *Graph) *_CHData {
 	}
 	fmt.Println("finished contracting graph")
 
-	ch_data := TransformFromCHPreprocGraph2(graph)
-	ch_data._base_weighting = base_graph._weight_name
+	ch_data := TransformToCHData(graph)
 	return ch_data
 }
 
@@ -514,7 +483,7 @@ func CalcContraction(base_graph *Graph) *_CHData {
 // preprocess ch 2
 //*******************************************
 
-func CalcContraction2(base_graph *Graph, contraction_order Array[int32]) *_CHData {
+func CalcContraction2(base_graph *Graph, contraction_order Array[int32]) *CH {
 	graph := TransformToCHPreprocGraph(base_graph)
 
 	fmt.Println("started contracting graph")
@@ -577,8 +546,7 @@ func CalcContraction2(base_graph *Graph, contraction_order Array[int32]) *_CHDat
 	}
 	fmt.Println("finished contracting graph")
 
-	ch_data := TransformFromCHPreprocGraph2(graph)
-	ch_data._base_weighting = base_graph._weight_name
+	ch_data := TransformToCHData(graph)
 	return ch_data
 }
 
@@ -592,11 +560,11 @@ func SimpleNodeOrdering(graph *CHPreprocGraph) Array[int32] {
 	fmt.Println("start ordering nodes")
 	sort.Slice(nodes, func(i, j int) bool {
 		a := nodes[i]
-		c1 := graph.topology.GetDegree(a, FORWARD) + graph.topology.GetDegree(a, BACKWARD)
+		c1 := graph.base.GetNodeDegree(a, FORWARD) + graph.base.GetNodeDegree(a, BACKWARD)
 		c2 := graph.ch_topology.GetDegree(a, FORWARD) + graph.ch_topology.GetDegree(a, BACKWARD)
 		count_a := c1 + c2
 		b := nodes[j]
-		c1 = graph.topology.GetDegree(b, FORWARD) + graph.topology.GetDegree(b, BACKWARD)
+		c1 = graph.base.GetNodeDegree(b, FORWARD) + graph.base.GetNodeDegree(b, BACKWARD)
 		c2 = graph.ch_topology.GetDegree(b, FORWARD) + graph.ch_topology.GetDegree(b, BACKWARD)
 		count_b := c1 + c2
 		return count_a < count_b
@@ -712,7 +680,7 @@ func MarkNodesOnPath(start, end int32, sp_counts Array[int32], graph IGraph, hea
 //*******************************************
 
 // Computes contraction using 2*ED + CN + EC + 5*L with hop-limits.
-func CalcContraction3(base_graph *Graph) *_CHData {
+func CalcContraction3(base_graph *Graph) *CH {
 	graph := TransformToCHPreprocGraph(base_graph)
 
 	fmt.Println("started contracting graph...")
@@ -836,8 +804,7 @@ func CalcContraction3(base_graph *Graph) *_CHData {
 	}
 	fmt.Println("finished contracting graph")
 
-	ch_data := TransformFromCHPreprocGraph2(graph)
-	ch_data._base_weighting = base_graph._weight_name
+	ch_data := TransformToCHData(graph)
 	return ch_data
 }
 
@@ -883,7 +850,7 @@ func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap Pri
 }
 
 // Computes contraction using 2*ED + CN.
-func CalcContraction4(base_graph *Graph) *_CHData {
+func CalcContraction4(base_graph *Graph) *CH {
 	graph := TransformToCHPreprocGraph(base_graph)
 
 	fmt.Println("started contracting graph...")
@@ -977,8 +944,7 @@ func CalcContraction4(base_graph *Graph) *_CHData {
 	}
 	fmt.Println("finished contracting graph")
 
-	ch_data := TransformFromCHPreprocGraph2(graph)
-	ch_data._base_weighting = base_graph._weight_name
+	ch_data := TransformToCHData(graph)
 	return ch_data
 }
 
@@ -1013,7 +979,7 @@ func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap Pr
 
 // Computes contraction using 2*ED + CN + EC + 5*L.
 // Ignores border nodes until all interior nodes are contracted.
-func CalcContraction5(base_graph *Graph, node_tiles Array[int16]) *_CHData {
+func CalcContraction5(base_graph *Graph, partition *Partition) *CH {
 	graph := TransformToCHPreprocGraph(base_graph)
 
 	fmt.Println("started contracting graph...")
@@ -1031,7 +997,7 @@ func CalcContraction5(base_graph *Graph, node_tiles Array[int16]) *_CHData {
 
 	// compute node priorities
 	fmt.Println("computing priorities...")
-	is_border := _IsBorderNode(graph, node_tiles)
+	is_border := _IsBorderNode(graph, partition)
 	border_count := 0
 	node_priorities := NewArray[int](graph.NodeCount())
 	contraction_order := NewPriorityQueue[Tuple[int32, int], int](graph.NodeCount())
@@ -1146,24 +1112,22 @@ func CalcContraction5(base_graph *Graph, node_tiles Array[int16]) *_CHData {
 	}
 	fmt.Println("finished contracting graph")
 
-	ch_data := TransformFromCHPreprocGraph2(graph)
-	ch_data._build_with_tiles = true
-	ch_data._base_weighting = base_graph._weight_name
+	ch_data := TransformToCHData(graph)
 	return ch_data
 }
 
-func _IsBorderNode(graph *CHPreprocGraph, node_tiles Array[int16]) Array[bool] {
+func _IsBorderNode(graph *CHPreprocGraph, partition *Partition) Array[bool] {
 	is_border := NewArray[bool](graph.NodeCount())
 
 	explorer := graph.GetExplorer()
 	for i := 0; i < graph.NodeCount(); i++ {
 		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if node_tiles[i] != node_tiles[ref.OtherID] {
+			if partition.GetNodeTile(int32(i)) != partition.GetNodeTile(ref.OtherID) {
 				is_border[i] = true
 			}
 		})
 		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if node_tiles[i] != node_tiles[ref.OtherID] {
+			if partition.GetNodeTile(int32(i)) != partition.GetNodeTile(ref.OtherID) {
 				is_border[i] = true
 			}
 		})
@@ -1174,7 +1138,7 @@ func _IsBorderNode(graph *CHPreprocGraph, node_tiles Array[int16]) Array[bool] {
 
 // Computes contraction using 2*ED + CN + EC + 5*L.
 // Ignores border nodes until all interior nodes are contracted.
-func CalcPartialContraction5(base_graph *Graph, node_tiles Array[int16]) *_CHData {
+func CalcPartialContraction5(base_graph *Graph, partition *Partition) *CH {
 	graph := TransformToCHPreprocGraph(base_graph)
 
 	fmt.Println("started contracting graph...")
@@ -1192,7 +1156,7 @@ func CalcPartialContraction5(base_graph *Graph, node_tiles Array[int16]) *_CHDat
 
 	// compute node priorities
 	fmt.Println("computing priorities...")
-	is_border := _IsBorderNode(graph, node_tiles)
+	is_border := _IsBorderNode(graph, partition)
 	node_priorities := NewArray[int](graph.NodeCount())
 	contraction_order := NewPriorityQueue[Tuple[int32, int], int](graph.NodeCount())
 	for i := 0; i < graph.NodeCount(); i++ {
@@ -1296,14 +1260,12 @@ func CalcPartialContraction5(base_graph *Graph, node_tiles Array[int16]) *_CHDat
 	}
 	fmt.Println("finished contracting graph")
 
-	ch_data := TransformFromCHPreprocGraph2(graph)
-	ch_data._build_with_tiles = true
-	ch_data._base_weighting = base_graph._weight_name
+	ch_data := TransformToCHData(graph)
 	return ch_data
 }
 
 // Computes contraction using 2*ED + CN + EC + 5*L without hop-limits.
-func CalcContraction6(base_graph *Graph) *_CHData {
+func CalcContraction6(base_graph *Graph) *CH {
 	graph := TransformToCHPreprocGraph(base_graph)
 	fmt.Println("started contracting graph...")
 
@@ -1416,7 +1378,246 @@ func CalcContraction6(base_graph *Graph) *_CHData {
 	}
 	fmt.Println("finished contracting graph")
 
-	ch_data := TransformFromCHPreprocGraph2(graph)
-	ch_data._base_weighting = base_graph._weight_name
+	ch_data := TransformToCHData(graph)
 	return ch_data
+}
+
+//*******************************************
+// preprocess ch-index
+//*******************************************
+
+// Computes CH down-edges used in PHAST.
+func PreparePHASTIndex(graph *Graph, ch *CH) *CHIndex {
+	temp_graph := CHGraph{
+		base:   graph.base,
+		weight: graph.weight,
+
+		ch_shortcuts: ch.shortcuts,
+		ch_topology:  ch.topology,
+		node_levels:  ch.node_levels,
+	}
+	explorer := temp_graph.GetGraphExplorer()
+
+	fwd_down_edges := NewList[Shortcut](temp_graph.NodeCount())
+	bwd_down_edges := NewList[Shortcut](temp_graph.NodeCount())
+
+	for i := 0; i < temp_graph.NodeCount(); i++ {
+		this_id := int32(i)
+		count := 0
+		explorer.ForAdjacentEdges(this_id, FORWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
+			other_id := ref.OtherID
+			fwd_down_edges.Add(Shortcut{
+				From:   this_id,
+				To:     other_id,
+				Weight: explorer.GetEdgeWeight(ref),
+			})
+			count += 1
+		})
+		for j := fwd_down_edges.Length() - count; j < fwd_down_edges.Length(); j++ {
+			ch_edge := fwd_down_edges[j]
+			Shortcut_set_payload(&ch_edge, int32(count), 0)
+			fwd_down_edges[j] = ch_edge
+		}
+
+		count = 0
+		explorer.ForAdjacentEdges(this_id, BACKWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
+			other_id := ref.OtherID
+			bwd_down_edges.Add(Shortcut{
+				From:   this_id,
+				To:     other_id,
+				Weight: explorer.GetEdgeWeight(ref),
+			})
+			count += 1
+		})
+		for j := bwd_down_edges.Length() - count; j < bwd_down_edges.Length(); j++ {
+			ch_edge := bwd_down_edges[j]
+			Shortcut_set_payload(&ch_edge, int32(count), 0)
+			bwd_down_edges[j] = ch_edge
+		}
+	}
+
+	// sort down edges by node level
+	sort.SliceStable(fwd_down_edges, func(i, j int) bool {
+		e_i := fwd_down_edges[i]
+		level_i := ch.node_levels[e_i.From]
+		e_j := fwd_down_edges[j]
+		level_j := ch.node_levels[e_j.From]
+		return level_i > level_j
+	})
+	sort.SliceStable(bwd_down_edges, func(i, j int) bool {
+		e_i := bwd_down_edges[i]
+		level_i := ch.node_levels[e_i.From]
+		e_j := bwd_down_edges[j]
+		level_j := ch.node_levels[e_j.From]
+		return level_i > level_j
+	})
+
+	return &CHIndex{
+		fwd_down_edges: Array[Shortcut](fwd_down_edges),
+		bwd_down_edges: Array[Shortcut](bwd_down_edges),
+	}
+}
+
+// Computes CH down-edges used in PHAST+GS.
+// Has to be reordered with tile-level-ordering before calling this function.
+func PrepareGSPHASTIndex(graph *Graph, ch *CH, partition *Partition) *CHIndex {
+	is_border := _IsBorderNode3(graph, partition)
+
+	temp_graph := CHGraph{
+		base:   graph.base,
+		weight: graph.weight,
+
+		ch_shortcuts: ch.shortcuts,
+		ch_topology:  ch.topology,
+		node_levels:  ch.node_levels,
+	}
+	explorer := temp_graph.GetGraphExplorer()
+	border_count := 0
+
+	// initialize down edges lists
+	fwd_down_edges := NewList[Shortcut](temp_graph.NodeCount())
+	bwd_down_edges := NewList[Shortcut](temp_graph.NodeCount())
+
+	// add overlay down-edges
+	fwd_down_edges.Add(_CreateDummyShortcut(-1))
+	bwd_down_edges.Add(_CreateDummyShortcut(-1))
+	fwd_other_edges := NewDict[int16, List[Shortcut]](100)
+	bwd_other_edges := NewDict[int16, List[Shortcut]](100)
+	for i := 0; i < temp_graph.NodeCount(); i++ {
+		this_id := int32(i)
+		this_tile := partition.GetNodeTile(this_id)
+		if !is_border[this_id] {
+			border_count = i + 1
+			break
+		}
+		explorer.ForAdjacentEdges(this_id, FORWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
+			other_id := ref.OtherID
+			other_tile := partition.GetNodeTile(other_id)
+			edge := Shortcut{
+				From:   this_id,
+				To:     other_id,
+				Weight: explorer.GetEdgeWeight(ref),
+			}
+			Shortcut_set_payload(&edge, other_tile, 0)
+			if !is_border[other_id] {
+				var edges List[Shortcut]
+				if fwd_other_edges.ContainsKey(this_tile) {
+					edges = fwd_other_edges[this_tile]
+				} else {
+					edges = NewList[Shortcut](10)
+				}
+				edges.Add(edge)
+				fwd_other_edges[this_tile] = edges
+			} else {
+				fwd_down_edges.Add(edge)
+			}
+		})
+		explorer.ForAdjacentEdges(this_id, BACKWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
+			other_id := ref.OtherID
+			other_tile := partition.GetNodeTile(other_id)
+			edge := Shortcut{
+				From:   this_id,
+				To:     other_id,
+				Weight: explorer.GetEdgeWeight(ref),
+			}
+			Shortcut_set_payload(&edge, other_tile, 0)
+			if !is_border[other_id] {
+				var edges List[Shortcut]
+				if bwd_other_edges.ContainsKey(this_tile) {
+					edges = bwd_other_edges[this_tile]
+				} else {
+					edges = NewList[Shortcut](10)
+				}
+				edges.Add(edge)
+				bwd_other_edges[this_tile] = edges
+			} else {
+				bwd_down_edges.Add(edge)
+			}
+		})
+	}
+	// add other down edges
+	curr_tile := int16(-1)
+	for i := border_count; i < temp_graph.NodeCount(); i++ {
+		this_id := int32(i)
+		this_tile := partition.GetNodeTile(this_id)
+		if this_tile != curr_tile {
+			fwd_down_edges.Add(_CreateDummyShortcut(this_tile))
+			bwd_down_edges.Add(_CreateDummyShortcut(this_tile))
+			curr_tile = this_tile
+			if fwd_other_edges.ContainsKey(this_tile) {
+				edges := fwd_other_edges[this_tile]
+				for _, edge := range edges {
+					fwd_down_edges.Add(edge)
+				}
+			}
+			if bwd_other_edges.ContainsKey(this_tile) {
+				edges := bwd_other_edges[this_tile]
+				for _, edge := range edges {
+					bwd_down_edges.Add(edge)
+				}
+			}
+		}
+		explorer.ForAdjacentEdges(this_id, FORWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
+			other_id := ref.OtherID
+			fwd_down_edges.Add(Shortcut{
+				From:   this_id,
+				To:     other_id,
+				Weight: explorer.GetEdgeWeight(ref),
+			})
+		})
+		explorer.ForAdjacentEdges(this_id, BACKWARD, ADJACENT_DOWNWARDS, func(ref EdgeRef) {
+			other_id := ref.OtherID
+			bwd_down_edges.Add(Shortcut{
+				From:   this_id,
+				To:     other_id,
+				Weight: explorer.GetEdgeWeight(ref),
+			})
+		})
+	}
+
+	// set count in dummy edges
+	fwd_id := 0
+	fwd_count := 0
+	for i := 0; i < fwd_down_edges.Length(); i++ {
+		edge := fwd_down_edges[i]
+		is_dummy := Shortcut_get_payload[bool](&edge, 2)
+		if is_dummy {
+			// set count in previous dummy
+			fwd_down_edges[fwd_id].To = int32(fwd_count)
+			// reset count
+			fwd_id = i
+			fwd_count = 0
+			continue
+		}
+		fwd_count += 1
+	}
+	fwd_down_edges[fwd_id].To = int32(fwd_count)
+	bwd_id := 0
+	bwd_count := 0
+	for i := 0; i < bwd_down_edges.Length(); i++ {
+		edge := bwd_down_edges[i]
+		is_dummy := Shortcut_get_payload[bool](&edge, 2)
+		if is_dummy {
+			// set count in previous dummy
+			bwd_down_edges[bwd_id].To = int32(bwd_count)
+			// reset count
+			bwd_id = i
+			bwd_count = 0
+			continue
+		}
+		bwd_count += 1
+	}
+	bwd_down_edges[bwd_id].To = int32(bwd_count)
+
+	return &CHIndex{
+		fwd_down_edges: Array[Shortcut](fwd_down_edges),
+		bwd_down_edges: Array[Shortcut](bwd_down_edges),
+	}
+}
+
+func _CreateDummyShortcut(to_tile int16) Shortcut {
+	dummy := Shortcut{}
+	Shortcut_set_payload(&dummy, to_tile, 0)
+	Shortcut_set_payload(&dummy, true, 2)
+	return dummy
 }

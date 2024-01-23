@@ -3,10 +3,10 @@ package main
 import (
 	"math"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/decay"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access/view"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
+	"github.com/ttpr0/go-routing/access/decay"
+	"github.com/ttpr0/go-routing/access/view"
+	"github.com/ttpr0/go-routing/geo"
+	"github.com/ttpr0/go-routing/graph"
 )
 
 func LoadOrCreate(graph_path string, osm_file string, partition_file string) graph.ITiledGraph {

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"os"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/go-routing/geo"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
@@ -13,13 +13,14 @@ import (
 //******************************************
 
 type TransitGraph struct {
-	base   GraphBase
+	base   IGraphBase
 	weight IWeighting
+	index  IGraphIndex
 
 	id_mapping       _IDMapping
 	transit_stops    Array[_TransitStop]
 	transit_edges    Array[_TransitEdge]
-	transit_topology AdjacencyArray
+	transit_topology _AdjacencyArray
 	transit_weights  Array[_TransitEdgeWeight]
 }
 
@@ -54,9 +55,7 @@ func (self *TransitGraph) GetEdgeGeom(edge int32) geo.CoordArray {
 	return self.base.GetEdgeGeom(edge)
 }
 func (self *TransitGraph) GetIndex() IGraphIndex {
-	return &BaseGraphIndex{
-		index: self.base.GetKDTree(),
-	}
+	return self.index
 }
 func (self *TransitGraph) GetBaseGraph() *Graph {
 	return &Graph{
@@ -71,10 +70,10 @@ func (self *TransitGraph) GetBaseGraph() *Graph {
 
 type TransitGraphExplorer struct {
 	graph    *TransitGraph
-	accessor AdjArrayAccessor
+	accessor _AdjArrayAccessor
 	weight   IWeighting
 
-	transit_accessor AdjArrayAccessor
+	transit_accessor _AdjArrayAccessor
 }
 
 func (self *TransitGraphExplorer) ForAdjacentEdges(node int32, typ Adjacency, arival int32, day WeekDay, callback func(EdgeRef, int)) {
@@ -202,7 +201,7 @@ func (self *TransitGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 type _TransitData struct {
 	transit_stops    Array[_TransitStop]
 	transit_edges    Array[_TransitEdge]
-	transit_topology AdjacencyArray
+	transit_topology _AdjacencyArray
 	transit_weights  Array[_TransitEdgeWeight]
 }
 
@@ -241,10 +240,10 @@ func BuildTransitGraph(base *GraphBase, weight IWeighting, data *_TransitData) *
 	for i := 0; i < base.NodeCount(); i++ {
 		mapping[i] = [2]int32{-1, -1}
 	}
-	index := base.GetKDTree()
+	index := NewBaseGraphIndex(base)
 	for i := 0; i < data.transit_stops.Length(); i++ {
 		stop := data.transit_stops[i]
-		closest, ok := index.GetClosest(stop.coord[:], 0.02)
+		closest, ok := index.index.GetClosest(stop.coord[:], 0.02)
 		if !ok {
 			continue
 		}
@@ -253,7 +252,7 @@ func BuildTransitGraph(base *GraphBase, weight IWeighting, data *_TransitData) *
 	}
 
 	return &TransitGraph{
-		base:   *base,
+		base:   base,
 		weight: weight,
 
 		id_mapping: _IDMapping{mapping: mapping},
@@ -310,11 +309,11 @@ func LoadTransitData(file string) *_TransitData {
 		}
 	}
 
-	dyn := NewAdjacencyList(transit_stops.Length())
+	dyn := _NewAdjacencyList(transit_stops.Length())
 	for id, edge := range transit_edges {
 		dyn.AddFWDEntry(edge.node_a, edge.node_b, int32(id), 130)
 	}
-	transit_topology := AdjacencyListToArray(&dyn)
+	transit_topology := _AdjacencyListToArray(&dyn)
 
 	return &_TransitData{
 		transit_stops:    transit_stops,

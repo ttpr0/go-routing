@@ -3,8 +3,8 @@ package graph
 import (
 	"errors"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/go-routing/geo"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
@@ -40,25 +40,20 @@ type ICHGraph interface {
 
 type CHGraph struct {
 	// Base Graph
-	base   GraphBase
+	base   IGraphBase
 	weight IWeighting
-
-	// ID-mapping
-	id_mapping _IDMapping
+	index  IGraphIndex
 
 	// Additional Storage
-	ch_shortcuts ShortcutStore
-	ch_topology  AdjacencyArray
+	ch_shortcuts _ShortcutStore
+	ch_topology  _AdjacencyArray
 	node_levels  Array[int16]
 
 	// contraction order build with tiles
-	_build_with_tiles bool
-	node_tiles        Optional[Array[int16]]
+	partition Optional[*Partition]
 
 	// index for PHAST
-	_contains_dummies bool
-	fwd_down_edges    Optional[Array[Shortcut]]
-	bwd_down_edges    Optional[Array[Shortcut]]
+	ch_index Optional[*CHIndex]
 }
 
 func (self *CHGraph) GetGraphExplorer() IGraphExplorer {
@@ -115,52 +110,49 @@ func (self *CHGraph) GetEdgesFromShortcut(edges *List[int32], shc_id int32, reve
 	})
 }
 func (self *CHGraph) GetDownEdges(dir Direction) (Array[Shortcut], error) {
+	if !self.ch_index.HasValue() {
+		return nil, errors.New("downedges not build for this graph")
+	}
 	if dir == FORWARD {
-		if self.fwd_down_edges.HasValue() {
-			return self.fwd_down_edges.Value, nil
-		} else {
+		down_edges := self.ch_index.Value.fwd_down_edges
+		if down_edges.Length() == 0 {
 			return nil, errors.New("forward downedges not build for this graph")
 		}
+		return down_edges, nil
 	} else {
-		if self.bwd_down_edges.HasValue() {
-			return self.bwd_down_edges.Value, nil
-		} else {
+		down_edges := self.ch_index.Value.bwd_down_edges
+		if down_edges.Length() == 0 {
 			return nil, errors.New("backward downedges not build for this graph")
 		}
+		return down_edges, nil
 	}
 }
 func (self *CHGraph) HasDownEdges(dir Direction) bool {
+	if !self.ch_index.HasValue() {
+		return false
+	}
 	if dir == FORWARD {
-		return self.fwd_down_edges.HasValue()
+		return self.ch_index.Value.fwd_down_edges.Length() > 0
 	} else {
-		return self.bwd_down_edges.HasValue()
+		return self.ch_index.Value.bwd_down_edges.Length() > 0
 	}
 }
 func (self *CHGraph) GetNodeTile(node int32) int16 {
-	if self.node_tiles.HasValue() {
-		return self.node_tiles.Value[node]
+	if self.partition.HasValue() {
+		return self.partition.Value.GetNodeTile(node)
 	} else {
 		return -1
 	}
 }
 func (self *CHGraph) TileCount() int {
-	if self.node_tiles.HasValue() {
-		max := int16(0)
-		for i := 0; i < len(self.node_tiles.Value); i++ {
-			tile := self.node_tiles.Value[i]
-			if tile > max {
-				max = tile
-			}
-		}
-		return int(max + 1)
+	if self.partition.HasValue() {
+		return int(self.partition.Value.TileCount())
 	} else {
 		return -1
 	}
 }
 func (self *CHGraph) GetIndex() IGraphIndex {
-	return &BaseGraphIndex{
-		index: self.base.GetKDTree(),
-	}
+	return self.index
 }
 
 //*******************************************
@@ -169,8 +161,8 @@ func (self *CHGraph) GetIndex() IGraphIndex {
 
 type CHGraphExplorer struct {
 	graph       *CHGraph
-	accessor    AdjArrayAccessor
-	sh_accessor AdjArrayAccessor
+	accessor    _AdjArrayAccessor
+	sh_accessor _AdjArrayAccessor
 	weight      IWeighting
 }
 
@@ -312,4 +304,22 @@ func (self *CHGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 		}
 		return -1
 	}
+}
+
+//*******************************************
+// graph index
+//******************************************
+
+type MappedGraphIndex struct {
+	id_mapping _IDMapping
+	index      IGraphIndex
+}
+
+func (self *MappedGraphIndex) GetClosestNode(point geo.Coord) (int32, bool) {
+	node, ok := self.index.GetClosestNode(point)
+	if !ok {
+		return node, ok
+	}
+	mapped_node := self.id_mapping.GetTarget(node)
+	return mapped_node, true
 }

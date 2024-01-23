@@ -3,8 +3,8 @@ package graph
 import (
 	"errors"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/go-routing/geo"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
@@ -38,15 +38,16 @@ type ITiledGraph interface {
 
 type TiledGraph struct {
 	// Base Graph
-	base   GraphBase
+	base   IGraphBase
 	weight IWeighting
+	index  IGraphIndex
 
 	// Tiles Storage
-	skip_shortcuts ShortcutStore
-	skip_topology  AdjacencyArray
-	node_tiles     Array[int16]
+	partition      *Partition
+	skip_shortcuts _ShortcutStore
+	skip_topology  _AdjacencyArray
 	edge_types     Array[byte]
-	cell_index     Optional[_CellIndex] // Storage for indexing sp within cells
+	cell_index     Optional[*CellIndex] // Storage for indexing sp within cells
 }
 
 func (self *TiledGraph) GetGraphExplorer() IGraphExplorer {
@@ -58,7 +59,7 @@ func (self *TiledGraph) GetGraphExplorer() IGraphExplorer {
 	}
 }
 func (self *TiledGraph) GetNodeTile(node int32) int16 {
-	return self.node_tiles[node]
+	return self.partition.GetNodeTile(node)
 }
 func (self *TiledGraph) NodeCount() int {
 	return self.base.NodeCount()
@@ -67,14 +68,7 @@ func (self *TiledGraph) EdgeCount() int {
 	return self.base.EdgeCount()
 }
 func (self *TiledGraph) TileCount() int16 {
-	max := int16(0)
-	for i := 0; i < len(self.node_tiles); i++ {
-		tile := self.node_tiles[i]
-		if tile > max {
-			max = tile
-		}
-	}
-	return max - 1
+	return self.partition.TileCount()
 }
 func (self *TiledGraph) IsNode(node int32) bool {
 	return self.base.NodeCount() < int(node)
@@ -113,9 +107,7 @@ func (self *TiledGraph) HasCellIndex() bool {
 	return self.cell_index.HasValue()
 }
 func (self *TiledGraph) GetIndex() IGraphIndex {
-	return &BaseGraphIndex{
-		index: self.base.GetKDTree(),
-	}
+	return self.index
 }
 
 //*******************************************
@@ -124,8 +116,8 @@ func (self *TiledGraph) GetIndex() IGraphIndex {
 
 type TiledGraphExplorer struct {
 	graph         *TiledGraph
-	accessor      AdjArrayAccessor
-	skip_accessor AdjArrayAccessor
+	accessor      _AdjArrayAccessor
+	skip_accessor _AdjArrayAccessor
 	weight        IWeighting
 }
 

@@ -1,88 +1,60 @@
 package graph
 
 import (
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
 // build graphs
 //*******************************************
 
-func BuildBaseGraph(base *GraphBase, weight IWeighting) *Graph {
+func BuildBaseGraph(base IGraphBase, weight IWeighting) *Graph {
 	return &Graph{
-		base:   *base,
+		base:   base,
 		weight: weight,
 	}
 }
 
-func BuildCHGraph(base *GraphBase, weight IWeighting, ch_data ISpeedUpData) *CHGraph {
-	data := ch_data.(*_CHData)
-
+func BuildCHGraph(base IGraphBase, weight IWeighting, ch_data *CH, ch_index Optional[*CHIndex]) *CHGraph {
 	return &CHGraph{
-		base:   *base,
+		base:   base,
 		weight: weight,
 
-		id_mapping: data.id_mapping,
+		ch_shortcuts: ch_data.shortcuts,
+		ch_topology:  ch_data.topology,
+		node_levels:  ch_data.node_levels,
 
-		_build_with_tiles: data._build_with_tiles,
+		partition: None[*Partition](),
 
-		ch_shortcuts: data.shortcuts,
-		ch_topology:  data.topology,
-		node_levels:  data.node_levels,
+		ch_index: ch_index,
 	}
 }
 
-func BuildCHGraph2(base *GraphBase, weight IWeighting, ch_data ISpeedUpData) *CHGraph2 {
-	data := ch_data.(*_CHData)
-
-	return &CHGraph2{
-		base:   *base,
+func BuildPartitionedCHGraph(base IGraphBase, weight IWeighting, ch_data *CH, partition Optional[*Partition], ch_index Optional[*CHIndex]) *CHGraph {
+	return &CHGraph{
+		base:   base,
 		weight: weight,
 
-		id_mapping: data.id_mapping,
+		ch_shortcuts: ch_data.shortcuts,
+		ch_topology:  ch_data.topology,
+		node_levels:  ch_data.node_levels,
 
-		_build_with_tiles: data._build_with_tiles,
+		partition: partition,
 
-		ch_shortcuts: data.shortcuts,
-		ch_topology:  data.topology,
-		node_levels:  data.node_levels,
-
-		node_tiles: data.node_tiles,
-
-		fwd_down_edges: data.fwd_down_edges,
-		bwd_down_edges: data.bwd_down_edges,
+		ch_index: ch_index,
 	}
 }
 
-func BuildTiledGraph(base *GraphBase, weight IWeighting, tiled_data ISpeedUpData) *TiledGraph {
-	data := tiled_data.(*_TiledData)
-
+func BuildTiledGraph(base IGraphBase, weight IWeighting, partition *Partition, overlay *Overlay, cell_index Optional[*CellIndex]) *TiledGraph {
 	return &TiledGraph{
-		base:   *base,
+		base:   base,
 		weight: weight,
 
-		skip_shortcuts: data.skip_shortcuts,
-		skip_topology:  data.skip_topology,
-		node_tiles:     data.node_tiles,
-		edge_types:     data.edge_types,
-		cell_index:     data.cell_index,
-	}
-}
-
-func BuildTiledGraph2(base *GraphBase, weight IWeighting, tiled_data ISpeedUpData) *TiledGraph2 {
-	data := tiled_data.(*_TiledData)
-
-	return &TiledGraph2{
-		base:   *base,
-		weight: weight,
-
-		id_mapping: data.id_mapping,
-
-		skip_shortcuts: data.skip_shortcuts,
-		skip_topology:  data.skip_topology,
-		node_tiles:     data.node_tiles,
-		edge_types:     data.edge_types,
-		cell_index:     data.cell_index,
+		partition:      partition,
+		skip_shortcuts: overlay.skip_shortcuts,
+		skip_topology:  overlay.skip_topology,
+		edge_types:     overlay.edge_types,
+		cell_index:     cell_index,
 	}
 }
 
@@ -90,25 +62,20 @@ func BuildTiledGraph2(base *GraphBase, weight IWeighting, tiled_data ISpeedUpDat
 // build graph components
 //*******************************************
 
-func _BuildTopology(store GraphStore) AdjacencyArray {
-	nodes := store.nodes
-	edges := store.edges
-
-	dyn := NewAdjacencyList(nodes.Length())
+func _BuildTopology(nodes Array[Node], edges Array[Edge]) _AdjacencyArray {
+	dyn := _NewAdjacencyList(nodes.Length())
 	for id, edge := range edges {
 		dyn.AddFWDEntry(edge.NodeA, edge.NodeB, int32(id), 0)
 		dyn.AddBWDEntry(edge.NodeA, edge.NodeB, int32(id), 0)
 	}
 
-	return *AdjacencyListToArray(&dyn)
+	return *_AdjacencyListToArray(&dyn)
 }
 
-func _BuildKDTreeIndex(store GraphStore) KDTree[int32] {
-	node_geoms := store.node_geoms
-
+func _BuildKDTreeIndex(base IGraphBase) KDTree[int32] {
 	tree := NewKDTree[int32](2)
-	for i := 0; i < len(node_geoms); i++ {
-		geom := node_geoms[i]
+	for i := 0; i < base.NodeCount(); i++ {
+		geom := base.GetNodeGeom(int32(i))
 		tree.Insert(geom[:], int32(i))
 	}
 	return tree

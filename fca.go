@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/access"
+	"github.com/ttpr0/go-routing/access"
 )
 
 type FCARequest struct {

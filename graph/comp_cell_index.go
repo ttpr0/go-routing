@@ -4,55 +4,51 @@ import (
 	"errors"
 	"os"
 
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
 // tiled-graph cell-index
 //*******************************************
 
-func _NewCellIndex() _CellIndex {
-	return _CellIndex{
+func _NewCellIndex() CellIndex {
+	return CellIndex{
 		fwd_index_edges: NewDict[int16, Array[Shortcut]](100),
 		bwd_index_edges: NewDict[int16, Array[Shortcut]](100),
 	}
 }
 
-type _CellIndex struct {
+type CellIndex struct {
 	fwd_index_edges Dict[int16, Array[Shortcut]]
 	bwd_index_edges Dict[int16, Array[Shortcut]]
 }
 
-func (self *_CellIndex) GetFWDIndexEdges(tile int16) Array[Shortcut] {
+func (self *CellIndex) GetFWDIndexEdges(tile int16) Array[Shortcut] {
 	return self.fwd_index_edges[tile]
 }
-func (self *_CellIndex) GetBWDIndexEdges(tile int16) Array[Shortcut] {
+func (self *CellIndex) GetBWDIndexEdges(tile int16) Array[Shortcut] {
 	return self.bwd_index_edges[tile]
 }
-func (self *_CellIndex) SetFWDIndexEdges(tile int16, edges Array[Shortcut]) {
+func (self *CellIndex) SetFWDIndexEdges(tile int16, edges Array[Shortcut]) {
 	self.fwd_index_edges[tile] = edges
 }
-func (self *_CellIndex) SetBWDIndexEdges(tile int16, edges Array[Shortcut]) {
+func (self *CellIndex) SetBWDIndexEdges(tile int16, edges Array[Shortcut]) {
 	self.bwd_index_edges[tile] = edges
 }
 
-func (self *_CellIndex) _ReorderNodes(mapping Array[int32]) {
+func (self *CellIndex) _ReorderNodes(mapping Array[int32]) {
 	panic("not implemented")
 }
-
-//*******************************************
-// tiled-graph cell-index io
-//*******************************************
-
-func _StoreCellIndex(index _CellIndex, filename string) {
+func (self *CellIndex) _Store(path string) {
+	filename := path + "-tileranges"
 	writer := NewBufferWriter()
 
-	fwd_tilecount := index.fwd_index_edges.Length()
+	fwd_tilecount := self.fwd_index_edges.Length()
 	Write[int32](writer, int32(fwd_tilecount))
-	bwd_tilecount := index.bwd_index_edges.Length()
+	bwd_tilecount := self.bwd_index_edges.Length()
 	Write[int32](writer, int32(bwd_tilecount))
 
-	for tile, edges := range index.fwd_index_edges {
+	for tile, edges := range self.fwd_index_edges {
 		Write[int16](writer, tile)
 		Write[int32](writer, int32(edges.Length()))
 		for _, edge := range edges {
@@ -62,7 +58,7 @@ func _StoreCellIndex(index _CellIndex, filename string) {
 			// Write[[4]byte](writer, edge._payload)
 		}
 	}
-	for tile, edges := range index.bwd_index_edges {
+	for tile, edges := range self.bwd_index_edges {
 		Write[int16](writer, tile)
 		Write[int32](writer, int32(edges.Length()))
 		for _, edge := range edges {
@@ -77,8 +73,11 @@ func _StoreCellIndex(index _CellIndex, filename string) {
 	defer rangesfile.Close()
 	rangesfile.Write(writer.Bytes())
 }
-
-func _LoadCellIndex(file string) _CellIndex {
+func (self *CellIndex) _New() *CellIndex {
+	return &CellIndex{}
+}
+func (self *CellIndex) _Load(path string) {
+	file := path + "-tileranges"
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -95,7 +94,7 @@ func _LoadCellIndex(file string) _CellIndex {
 		tile := Read[int16](reader)
 		count := Read[int32](reader)
 		edges := NewArray[Shortcut](int(count))
-		for j := 0; i < int(count); j++ {
+		for j := 0; j < int(count); j++ {
 			edge := Shortcut{}
 			edge.From = Read[int32](reader)
 			edge.To = Read[int32](reader)
@@ -110,7 +109,7 @@ func _LoadCellIndex(file string) _CellIndex {
 		tile := Read[int16](reader)
 		count := Read[int32](reader)
 		edges := NewArray[Shortcut](int(count))
-		for j := 0; i < int(count); j++ {
+		for j := 0; j < int(count); j++ {
 			edge := Shortcut{}
 			edge.From = Read[int32](reader)
 			edge.To = Read[int32](reader)
@@ -121,8 +120,11 @@ func _LoadCellIndex(file string) _CellIndex {
 		bwd_index_edges[tile] = edges
 	}
 
-	return _CellIndex{
+	*self = CellIndex{
 		fwd_index_edges: fwd_index_edges,
 		bwd_index_edges: bwd_index_edges,
 	}
+}
+func (self *CellIndex) _Remove(path string) {
+	os.Remove(path + "-tileranges")
 }

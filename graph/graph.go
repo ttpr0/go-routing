@@ -1,8 +1,7 @@
 package graph
 
 import (
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/go-routing/geo"
 )
 
 //*******************************************
@@ -34,18 +33,14 @@ type IGraphExplorer interface {
 	GetOtherNode(edge EdgeRef, node int32) int32
 }
 
-type IGraphIndex interface {
-	GetClosestNode(point geo.Coord) (int32, bool)
-}
-
 //*******************************************
 // base-graph
 //******************************************
 
 type Graph struct {
-	base         GraphBase
-	weight       IWeighting
-	_weight_name string
+	base   IGraphBase
+	weight IWeighting
+	index  IGraphIndex
 }
 
 func (self *Graph) GetGraphExplorer() IGraphExplorer {
@@ -77,9 +72,7 @@ func (self *Graph) GetEdgeGeom(edge int32) geo.CoordArray {
 	return self.base.GetEdgeGeom(edge)
 }
 func (self *Graph) GetIndex() IGraphIndex {
-	return &BaseGraphIndex{
-		index: self.base.GetKDTree(),
-	}
+	return self.index
 }
 
 //*******************************************
@@ -88,7 +81,7 @@ func (self *Graph) GetIndex() IGraphIndex {
 
 type BaseGraphExplorer struct {
 	graph    *Graph
-	accessor AdjArrayAccessor
+	accessor _AdjArrayAccessor
 	weight   IWeighting
 }
 
@@ -123,16 +116,4 @@ func (self *BaseGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 		return e.NodeA
 	}
 	return -1
-}
-
-//*******************************************
-// graph index
-//******************************************
-
-type BaseGraphIndex struct {
-	index KDTree[int32]
-}
-
-func (self *BaseGraphIndex) GetClosestNode(point geo.Coord) (int32, bool) {
-	return self.index.GetClosest(point[:], 0.005)
 }

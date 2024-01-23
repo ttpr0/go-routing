@@ -5,9 +5,9 @@ import (
 	"math"
 	"sort"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/geo"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/go-routing/geo"
+	"github.com/ttpr0/go-routing/graph"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 func SortNodes(g graph.IGraph, coord_func func(geo.Coord) float32) Array[int32] {

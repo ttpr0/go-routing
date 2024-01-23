@@ -6,16 +6,12 @@ import (
 	"errors"
 	"os"
 
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
 // adjacency interfaces
 //*******************************************
-
-type IAdjacency interface {
-	GetAccessor() IAdjacencyAccessor
-}
 
 type IAdjacencyAccessor interface {
 	SetBaseNode(node int32, dir Direction)
@@ -51,14 +47,14 @@ type _EdgeEntry struct {
 // adjacency array implementation
 //*******************************************
 
-type AdjacencyArray struct {
+type _AdjacencyArray struct {
 	node_entries     Array[_NodeEntry]
 	fwd_edge_entries Array[_EdgeEntry]
 	bwd_edge_entries Array[_EdgeEntry]
 }
 
 // return the node degree for given direction
-func (self *AdjacencyArray) GetDegree(index int32, dir Direction) int16 {
+func (self *_AdjacencyArray) GetDegree(index int32, dir Direction) int16 {
 	ref := self.node_entries[index]
 	if dir == FORWARD {
 		return ref.FWDEdgeCount
@@ -67,14 +63,14 @@ func (self *AdjacencyArray) GetDegree(index int32, dir Direction) int16 {
 	}
 }
 
-func (self *AdjacencyArray) GetAccessor() AdjArrayAccessor {
-	return AdjArrayAccessor{
+func (self *_AdjacencyArray) GetAccessor() _AdjArrayAccessor {
+	return _AdjArrayAccessor{
 		topology: self,
 	}
 }
 
-type AdjArrayAccessor struct {
-	topology      *AdjacencyArray
+type _AdjArrayAccessor struct {
+	topology      *_AdjacencyArray
 	state         int32
 	end           int32
 	edge_refs     Array[_EdgeEntry]
@@ -83,7 +79,7 @@ type AdjArrayAccessor struct {
 	curr_type     byte
 }
 
-func (self *AdjArrayAccessor) SetBaseNode(node int32, dir Direction) {
+func (self *_AdjArrayAccessor) SetBaseNode(node int32, dir Direction) {
 	ref := self.topology.node_entries[node]
 	if dir == FORWARD {
 		start, count := ref.FWDEdgeStart, int32(ref.FWDEdgeCount)
@@ -97,7 +93,7 @@ func (self *AdjArrayAccessor) SetBaseNode(node int32, dir Direction) {
 		self.edge_refs = self.topology.bwd_edge_entries
 	}
 }
-func (self *AdjArrayAccessor) Next() bool {
+func (self *_AdjArrayAccessor) Next() bool {
 	if self.state == self.end {
 		return false
 	}
@@ -108,13 +104,13 @@ func (self *AdjArrayAccessor) Next() bool {
 	self.state += 1
 	return true
 }
-func (self *AdjArrayAccessor) GetEdgeID() int32 {
+func (self *_AdjArrayAccessor) GetEdgeID() int32 {
 	return self.curr_edge_id
 }
-func (self *AdjArrayAccessor) GetOtherID() int32 {
+func (self *_AdjArrayAccessor) GetOtherID() int32 {
 	return self.curr_other_id
 }
-func (self *AdjArrayAccessor) GetType() byte {
+func (self *_AdjArrayAccessor) GetType() byte {
 	return self.curr_type
 }
 
@@ -122,11 +118,11 @@ func (self *AdjArrayAccessor) GetType() byte {
 // adjacency list implementation
 //*******************************************
 
-type AdjacencyList struct {
+type _AdjacencyList struct {
 	node_entries Array[_DynamicNodeEntry]
 }
 
-func NewAdjacencyList(node_count int) AdjacencyList {
+func _NewAdjacencyList(node_count int) _AdjacencyList {
 	topology := NewArray[_DynamicNodeEntry](node_count)
 
 	for i := 0; i < node_count; i++ {
@@ -136,13 +132,13 @@ func NewAdjacencyList(node_count int) AdjacencyList {
 		}
 	}
 
-	return AdjacencyList{
+	return _AdjacencyList{
 		node_entries: topology,
 	}
 }
 
 // return the node degree for given direction
-func (self *AdjacencyList) GetDegree(index int32, dir Direction) int16 {
+func (self *_AdjacencyList) GetDegree(index int32, dir Direction) int16 {
 	ref := self.node_entries[index]
 	if dir == FORWARD {
 		return int16(ref.FWDEdges.Length())
@@ -150,7 +146,7 @@ func (self *AdjacencyList) GetDegree(index int32, dir Direction) int16 {
 		return int16(ref.BWDEdges.Length())
 	}
 }
-func (self *AdjacencyList) AddNodeEntry() {
+func (self *_AdjacencyList) AddNodeEntry() {
 	nodes := List[_DynamicNodeEntry](self.node_entries)
 	nodes.Add(_DynamicNodeEntry{
 		FWDEdges: NewList[_EdgeEntry](4),
@@ -158,7 +154,7 @@ func (self *AdjacencyList) AddNodeEntry() {
 	})
 	self.node_entries = Array[_DynamicNodeEntry](nodes)
 }
-func (self *AdjacencyList) AddEdgeEntries(node_a, node_b, edge_id int32, edge_typ byte) {
+func (self *_AdjacencyList) AddEdgeEntries(node_a, node_b, edge_id int32, edge_typ byte) {
 	fwd_edges := self.node_entries[node_a].FWDEdges
 	fwd_edges.Add(_EdgeEntry{
 		EdgeID:  edge_id,
@@ -178,7 +174,7 @@ func (self *AdjacencyList) AddEdgeEntries(node_a, node_b, edge_id int32, edge_ty
 // adds forward entry to adjacency
 //
 // refers to edge between node_a and node_b, entry will be added at node_a
-func (self *AdjacencyList) AddFWDEntry(node_a, node_b, edge_id int32, edge_typ byte) {
+func (self *_AdjacencyList) AddFWDEntry(node_a, node_b, edge_id int32, edge_typ byte) {
 	fwd_edges := self.node_entries[node_a].FWDEdges
 	fwd_edges.Add(_EdgeEntry{
 		EdgeID:  edge_id,
@@ -191,7 +187,7 @@ func (self *AdjacencyList) AddFWDEntry(node_a, node_b, edge_id int32, edge_typ b
 // adds backward entry to adjacency
 //
 // refers to edge between node_a and node_b, entry will be added at node_b
-func (self *AdjacencyList) AddBWDEntry(node_a, node_b, edge_id int32, edge_typ byte) {
+func (self *_AdjacencyList) AddBWDEntry(node_a, node_b, edge_id int32, edge_typ byte) {
 	bwd_edges := self.node_entries[node_b].BWDEdges
 	bwd_edges.Add(_EdgeEntry{
 		EdgeID:  edge_id,
@@ -200,14 +196,14 @@ func (self *AdjacencyList) AddBWDEntry(node_a, node_b, edge_id int32, edge_typ b
 	})
 	self.node_entries[node_b].BWDEdges = bwd_edges
 }
-func (self *AdjacencyList) GetAccessor() AdjListAccessor {
-	return AdjListAccessor{
+func (self *_AdjacencyList) GetAccessor() _AdjListAccessor {
+	return _AdjListAccessor{
 		topology: self,
 	}
 }
 
-type AdjListAccessor struct {
-	topology      *AdjacencyList
+type _AdjListAccessor struct {
+	topology      *_AdjacencyList
 	state         int32
 	end           int32
 	edge_refs     List[_EdgeEntry]
@@ -216,7 +212,7 @@ type AdjListAccessor struct {
 	curr_type     byte
 }
 
-func (self *AdjListAccessor) SetBaseNode(node int32, dir Direction) {
+func (self *_AdjListAccessor) SetBaseNode(node int32, dir Direction) {
 	ref := self.topology.node_entries[node]
 	if dir == FORWARD {
 		self.state = 0
@@ -228,7 +224,7 @@ func (self *AdjListAccessor) SetBaseNode(node int32, dir Direction) {
 		self.edge_refs = ref.BWDEdges
 	}
 }
-func (self *AdjListAccessor) Next() bool {
+func (self *_AdjListAccessor) Next() bool {
 	if self.state == self.end {
 		return false
 	}
@@ -239,13 +235,13 @@ func (self *AdjListAccessor) Next() bool {
 	self.state += 1
 	return true
 }
-func (self *AdjListAccessor) GetEdgeID() int32 {
+func (self *_AdjListAccessor) GetEdgeID() int32 {
 	return self.curr_edge_id
 }
-func (self *AdjListAccessor) GetOtherID() int32 {
+func (self *_AdjListAccessor) GetOtherID() int32 {
 	return self.curr_other_id
 }
-func (self *AdjListAccessor) Type() byte {
+func (self *_AdjListAccessor) Type() byte {
 	return self.curr_type
 }
 
@@ -255,7 +251,7 @@ func (self *AdjListAccessor) Type() byte {
 
 // reorders nodes in topologystore,
 // mapping: old id -> new id
-func (self *AdjacencyArray) _ReorderNodes(mapping Array[int32]) {
+func (self *_AdjacencyArray) _ReorderNodes(mapping Array[int32]) {
 	node_refs := NewArray[_NodeEntry](self.node_entries.Length())
 	for i, id := range mapping {
 		node_refs[id] = self.node_entries[i]
@@ -299,9 +295,11 @@ func (self *AdjacencyArray) _ReorderNodes(mapping Array[int32]) {
 	self.bwd_edge_entries = Array[_EdgeEntry](bwd_edge_refs)
 }
 
-func _StoreAdjacency(store *AdjacencyArray, typed bool, filename string) {
+func _StoreAdjacency(store *_AdjacencyArray, typed bool, filename string) {
 	topologybuffer := bytes.Buffer{}
 
+	node_count := store.node_entries.Length()
+	binary.Write(&topologybuffer, binary.LittleEndian, int32(node_count))
 	fwd_edgerefcount := store.fwd_edge_entries.Length()
 	bwd_edgerefcount := store.bwd_edge_entries.Length()
 	binary.Write(&topologybuffer, binary.LittleEndian, int32(fwd_edgerefcount))
@@ -336,7 +334,7 @@ func _StoreAdjacency(store *AdjacencyArray, typed bool, filename string) {
 	topologyfile.Write(topologybuffer.Bytes())
 }
 
-func _LoadAdjacency(file string, typed bool, nodecount int) *AdjacencyArray {
+func _LoadAdjacency(file string, typed bool) *_AdjacencyArray {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -344,14 +342,16 @@ func _LoadAdjacency(file string, typed bool, nodecount int) *AdjacencyArray {
 
 	topologydata, _ := os.ReadFile(file)
 	topologyreader := bytes.NewReader(topologydata)
+	var node_count int32
+	binary.Read(topologyreader, binary.LittleEndian, &node_count)
 	var fwd_edgerefcount int32
 	binary.Read(topologyreader, binary.LittleEndian, &fwd_edgerefcount)
 	var bwd_edgerefcount int32
 	binary.Read(topologyreader, binary.LittleEndian, &bwd_edgerefcount)
-	node_refs := NewList[_NodeEntry](int(nodecount))
+	node_refs := NewList[_NodeEntry](int(node_count))
 	fwd_edge_refs := NewList[_EdgeEntry](int(fwd_edgerefcount))
 	bwd_edge_refs := NewList[_EdgeEntry](int(bwd_edgerefcount))
-	for i := 0; i < int(nodecount); i++ {
+	for i := 0; i < int(node_count); i++ {
 		var s1 int32
 		binary.Read(topologyreader, binary.LittleEndian, &s1)
 		var c1 int16
@@ -402,14 +402,14 @@ func _LoadAdjacency(file string, typed bool, nodecount int) *AdjacencyArray {
 		})
 	}
 
-	return &AdjacencyArray{
+	return &_AdjacencyArray{
 		node_entries:     Array[_NodeEntry](node_refs),
 		fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs),
 		bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs),
 	}
 }
 
-func AdjacencyListToArray(dyn *AdjacencyList) *AdjacencyArray {
+func _AdjacencyListToArray(dyn *_AdjacencyList) *_AdjacencyArray {
 	node_refs := NewList[_NodeEntry](dyn.node_entries.Length())
 	fwd_edge_refs := NewList[_EdgeEntry](dyn.node_entries.Length())
 	bwd_edge_refs := NewList[_EdgeEntry](dyn.node_entries.Length())
@@ -442,7 +442,7 @@ func AdjacencyListToArray(dyn *AdjacencyList) *AdjacencyArray {
 		bwd_start += bwd_count
 	}
 
-	return &AdjacencyArray{
+	return &_AdjacencyArray{
 		node_entries:     Array[_NodeEntry](node_refs),
 		fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs),
 		bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs),

@@ -7,9 +7,9 @@ import (
 	"os/exec"
 	"sync"
 
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/algorithm"
-	"github.com/ttpr0/simple-routing-visualizer/src/go-routing/graph"
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	"github.com/ttpr0/go-routing/algorithm"
+	"github.com/ttpr0/go-routing/graph"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 func prepare() {
@@ -22,16 +22,13 @@ func prepare() {
 	// Parse graph
 	//*******************************************
 	base := graph.ParseGraph(DATA_DIR + "/" + GRAPH_NAME + ".pbf")
-	dir := graph.NewGraphDir(GRAPH_DIR)
-	dir.AddGraphBase(GRAPH_NAME+"_pre", base)
-	dir.StoreGraphBase(GRAPH_NAME + "_pre")
-	dir.UnloadGraphBase(GRAPH_NAME + "_pre")
+	graph.Store(&base, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
 
 	//*******************************************
 	// Remove unconnected components
 	//*******************************************
 	// compute closely connected components
-	weight := graph.BuildEqualWeighting(base)
+	weight := graph.BuildEqualWeighting(&base)
 	g := graph.BuildBaseGraph(&base, weight)
 	groups := algorithm.ConnectedComponents(g)
 	// get largest group
@@ -45,13 +42,11 @@ func prepare() {
 	}
 	fmt.Println("remove", remove.Length(), "nodes")
 	// remove nodes from graph
-	graph.RemoveBaseNodes(&base, remove)
-	dir.AddGraphBase(GRAPH_NAME, base)
-	dir.StoreGraphBase(GRAPH_NAME)
+	graph.RemoveNodes(&base, remove)
+	graph.Store(&base, GRAPH_DIR+"/"+GRAPH_NAME)
 
-	weight = graph.BuildDefaultWeighting(base)
-	dir.AddWeighting("fastest", weight)
-	dir.StoreWeighting("fastest")
+	weight = graph.BuildDefaultWeighting(&base)
+	graph.Store(weight, GRAPH_DIR+"/"+GRAPH_NAME+"-fastest")
 
 	g = graph.BuildBaseGraph(&base, weight)
 
@@ -88,7 +83,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			create_grasp_graph(dir, GRAPH_NAME, GRAPH_NAME+"_grasp_"+size, "./tmp_"+size+".txt")
+			create_grasp_graph(&base, weight, GRAPH_NAME, GRAPH_NAME+"_grasp_"+size, "./tmp_"+size+".txt")
 			fmt.Println("	done:", size)
 			wg.Done()
 		}()
@@ -103,7 +98,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			create_isophast_graph(dir, GRAPH_NAME, GRAPH_NAME+"_isophast_"+size, "./tmp_"+size+".txt")
+			create_isophast_graph(&base, weight, GRAPH_NAME, GRAPH_NAME+"_isophast_"+size, "./tmp_"+size+".txt")
 			fmt.Println("	done:", size)
 			wg.Done()
 		}()
@@ -114,7 +109,7 @@ func prepare() {
 	// Create CH-Graph
 	//*******************************************
 	fmt.Println("start creating ch-graph")
-	create_ch_graph(dir, GRAPH_NAME, GRAPH_NAME+"_ch")
+	create_ch_graph(&base, weight, GRAPH_NAME, GRAPH_NAME+"_ch")
 	fmt.Println("	done")
 
 	//*******************************************
@@ -125,7 +120,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			create_tiled_ch_graph(dir, GRAPH_NAME, GRAPH_NAME+"_ch_tiled_"+size, "./tmp_"+size+".txt")
+			create_tiled_ch_graph(&base, weight, GRAPH_NAME, GRAPH_NAME+"_ch_tiled_"+size, "./tmp_"+size+".txt")
 			fmt.Println("	done:", size)
 			wg.Done()
 		}()
@@ -133,57 +128,47 @@ func prepare() {
 	wg.Wait()
 }
 
-func create_grasp_graph(dir graph.GraphDir, graph_name, out_name, tiles_name string) {
-	g := graph.BuildBaseGraph(dir.GetGraphBase(graph_name), dir.GetWeighting("fastest"))
+func create_grasp_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name, tiles_name string) {
+	g := graph.BuildBaseGraph(base, weight)
 	tiles := graph.ReadNodeTiles(tiles_name)
+	partition := graph.NewPartition(tiles)
 
-	td := graph.PreprocessTiledGraph3(g, tiles)
+	td := graph.PrepareOverlay(g, partition)
 
-	order := graph.ComputeTileOrdering(g, tiles)
-	mapping := graph.NodeOrderToNodeMapping(order)
-	graph.ReorderSpeedUpNodes(td, mapping, graph.ONLY_TARGET_NODES)
+	mapping := graph.ComputeTileOrdering(g, partition)
+	graph.ReorderNodes(td, mapping)
 
-	graph.PrepareGRASPCellIndex2(g, td)
-
-	dir.AddSpeedUp(out_name, td)
-	dir.StoreSpeedUp(out_name)
-	dir.UnloadSpeedUp(out_name)
+	graph.PrepareGRASPCellIndex(g, partition)
+	// TODO
 }
 
-func create_isophast_graph(dir graph.GraphDir, graph_name, out_name, tiles_name string) {
-	g := graph.BuildBaseGraph(dir.GetGraphBase(graph_name), dir.GetWeighting("fastest"))
+func create_isophast_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name, tiles_name string) {
+	g := graph.BuildBaseGraph(base, weight)
 	tiles := graph.ReadNodeTiles(tiles_name)
+	partition := graph.NewPartition(tiles)
 
-	td := graph.PreprocessTiledGraph5(g, tiles)
-
-	dir.AddSpeedUp(out_name, td)
-	dir.StoreSpeedUp(out_name)
-	dir.UnloadSpeedUp(out_name)
+	graph.PrepareIsoPHAST(g, partition)
+	// TODO
 }
 
-func create_ch_graph(dir graph.GraphDir, graph_name, out_name string) {
-	g := graph.BuildBaseGraph(dir.GetGraphBase(graph_name), dir.GetWeighting("fastest"))
+func create_ch_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name string) {
+	g := graph.BuildBaseGraph(base, weight)
 
 	cd := graph.CalcContraction6(g)
 
-	graph.PreparePHASTIndex2(g, cd)
-
-	dir.AddSpeedUp(out_name, cd)
-	dir.StoreSpeedUp(out_name)
-	dir.UnloadSpeedUp(out_name)
+	graph.PreparePHASTIndex(g, cd)
+	// TODO
 }
 
-func create_tiled_ch_graph(dir graph.GraphDir, graph_name, out_name, tiles_name string) {
-	g := graph.BuildBaseGraph(dir.GetGraphBase(graph_name), dir.GetWeighting("fastest"))
+func create_tiled_ch_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name, tiles_name string) {
+	g := graph.BuildBaseGraph(base, weight)
 	tiles := graph.ReadNodeTiles(tiles_name)
+	partition := graph.NewPartition(tiles)
 
-	cd := graph.CalcContraction5(g, tiles)
+	cd := graph.CalcContraction5(g, partition)
 
-	graph.PrepareGSPHASTIndex2(g, cd)
-
-	dir.AddSpeedUp(out_name, cd)
-	dir.StoreSpeedUp(out_name)
-	dir.UnloadSpeedUp(out_name)
+	graph.PrepareGSPHASTIndex(g, cd, partition)
+	// TODO
 }
 
 func GetMostCommon[T comparable](arr Array[T]) T {

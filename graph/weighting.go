@@ -6,7 +6,7 @@ import (
 	"errors"
 	"os"
 
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
@@ -31,18 +31,6 @@ const (
 	TURN_COST_WEIGHT WeightType = 1
 	TRAFFIC_WEIGHT   WeightType = 2
 )
-
-type IWeightHandler interface {
-	Load(dir string, name string) IWeighting
-	Store(dir string, name string, weight IWeighting)
-	Remove(dir string, name string)
-	_ReorderNodes(weight IWeighting, mapping Array[int32]) // Reorder nodes of base-graph
-}
-
-var WEIGHTING_HANDLERS = Dict[WeightType, IWeightHandler]{
-	DEFAULT_WEIGHT:   _DefaultWeightingHandler{},
-	TURN_COST_WEIGHT: _TCWeightingHandler{},
-}
 
 //*******************************************
 // default weighting without turn costs
@@ -72,42 +60,18 @@ func (self *DefaultWeighting) IsTimeDependant() bool {
 	return false
 }
 
-type _DefaultWeightingHandler struct{}
-
-func (self _DefaultWeightingHandler) Load(dir string, name string) IWeighting {
-	return _LoadDefaultWeighting(dir + name + "-weight")
+func (self *DefaultWeighting) _New() *DefaultWeighting {
+	return &DefaultWeighting{}
 }
-func (self _DefaultWeightingHandler) Store(dir string, name string, weight IWeighting) {
-	_StoreDefaultWeighting(weight.(*DefaultWeighting), dir+name+"-weight")
-}
-func (self _DefaultWeightingHandler) Remove(dir string, name string) {
-	os.Remove(dir + name + "-weight")
-}
-func (self _DefaultWeightingHandler) _ReorderNodes(weight IWeighting, mapping Array[int32]) {
-}
+func (self *DefaultWeighting) _Load(path string) {
+	filename := path + "-weight"
 
-func _StoreDefaultWeighting(weight *DefaultWeighting, filename string) {
-	weightbuffer := bytes.Buffer{}
-
-	edgecount := len(weight.edge_weights)
-	binary.Write(&weightbuffer, binary.LittleEndian, int32(edgecount))
-	for i := 0; i < edgecount; i++ {
-		edge_weight := weight.GetEdgeWeight(int32(i))
-		binary.Write(&weightbuffer, binary.LittleEndian, uint8(edge_weight))
-	}
-
-	weightfile, _ := os.Create(filename)
-	defer weightfile.Close()
-	weightfile.Write(weightbuffer.Bytes())
-}
-
-func _LoadDefaultWeighting(file string) *DefaultWeighting {
-	_, err := os.Stat(file)
+	_, err := os.Stat(filename)
 	if errors.Is(err, os.ErrNotExist) {
-		panic("file not found: " + file)
+		panic("file not found: " + filename)
 	}
 
-	nodedata, _ := os.ReadFile(file)
+	nodedata, _ := os.ReadFile(filename)
 	nodereader := bytes.NewReader(nodedata)
 
 	var edgecount int32
@@ -120,21 +84,40 @@ func _LoadDefaultWeighting(file string) *DefaultWeighting {
 		weights[i] = int32(w)
 	}
 
-	return &DefaultWeighting{
+	*self = DefaultWeighting{
 		edge_weights: weights,
 	}
 }
+func (self *DefaultWeighting) _Store(path string) {
+	filename := path + "-weight"
+	weightbuffer := bytes.Buffer{}
 
-func BuildDefaultWeighting(base GraphBase) IWeighting {
-	edges := base.store.edges
+	edgecount := len(self.edge_weights)
+	binary.Write(&weightbuffer, binary.LittleEndian, int32(edgecount))
+	for i := 0; i < edgecount; i++ {
+		edge_weight := self.GetEdgeWeight(int32(i))
+		binary.Write(&weightbuffer, binary.LittleEndian, uint8(edge_weight))
+	}
 
-	weights := NewArray[int32](edges.Length())
-	for id, edge := range edges {
+	weightfile, _ := os.Create(filename)
+	defer weightfile.Close()
+	weightfile.Write(weightbuffer.Bytes())
+}
+func (self *DefaultWeighting) _Remove(path string) {
+	os.Remove(path + "-weight")
+}
+func (self *DefaultWeighting) _ReorderNodes(mapping Array[int32]) {
+}
+
+func BuildDefaultWeighting(base IGraphBase) *DefaultWeighting {
+	weights := NewArray[int32](base.EdgeCount())
+	for i := 0; i < base.EdgeCount(); i++ {
+		edge := base.GetEdge(int32(i))
 		w := edge.Length * 3.6 / float32(edge.Maxspeed)
 		if w < 1 {
 			w = 1
 		}
-		weights[id] = int32(w)
+		weights[i] = int32(w)
 	}
 
 	return &DefaultWeighting{
@@ -142,7 +125,7 @@ func BuildDefaultWeighting(base GraphBase) IWeighting {
 	}
 }
 
-func BuildEqualWeighting(base GraphBase) IWeighting {
+func BuildEqualWeighting(base IGraphBase) *DefaultWeighting {
 	count := base.EdgeCount()
 
 	weights := NewArray[int32](count)
@@ -155,16 +138,15 @@ func BuildEqualWeighting(base GraphBase) IWeighting {
 	}
 }
 
-func BuildPedestrianWeighting(base GraphBase) IWeighting {
-	edges := base.store.edges
-
-	weights := NewArray[int32](edges.Length())
-	for id, edge := range edges {
+func BuildPedestrianWeighting(base IGraphBase) *DefaultWeighting {
+	weights := NewArray[int32](base.EdgeCount())
+	for i := 0; i < base.EdgeCount(); i++ {
+		edge := base.GetEdge(int32(i))
 		w := edge.Length * 3.6 / 3
 		if w < 1 {
 			w = 1
 		}
-		weights[id] = int32(w)
+		weights[i] = int32(w)
 	}
 
 	return &DefaultWeighting{
@@ -208,22 +190,83 @@ func (self *TCWeighting) IsTimeDependant() bool {
 	return false
 }
 
-type _TCWeightingHandler struct{}
+func (self *TCWeighting) _New() *TCWeighting {
+	return &TCWeighting{}
+}
+func (self *TCWeighting) _Load(path string) {
+	file := path + "-weight"
+	_, err := os.Stat(file)
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file)
+	}
 
-func (self _TCWeightingHandler) Load(dir string, name string) IWeighting {
-	return _LoadTCWeighting(dir + name + "-weight")
+	data, _ := os.ReadFile(file)
+	reader := NewBufferReader(data)
+
+	edgecount := Read[int32](reader)
+	nodecount := Read[int32](reader)
+
+	edge_weights := NewArray[int32](int(edgecount))
+	edge_indices := NewArray[Tuple[byte, byte]](int(edgecount))
+	for i := 0; i < int(edgecount); i++ {
+		edge_weight := Read[uint8](reader)
+		edge_weights[i] = int32(edge_weight)
+		ei_a := Read[uint8](reader)
+		ei_b := Read[uint8](reader)
+		edge_indices[i] = MakeTuple(ei_a, ei_b)
+	}
+	turn_refs := NewArray[Triple[int, byte, byte]](int(nodecount))
+	for i := 0; i < int(nodecount); i++ {
+		ref_a := Read[int32](reader)
+		ref_b := Read[uint8](reader)
+		ref_c := Read[uint8](reader)
+		turn_refs[i] = MakeTriple(int(ref_a), ref_b, ref_c)
+	}
+	turn_weights := ReadArray[byte](reader)
+
+	*self = TCWeighting{
+		edge_weights: List[int32](edge_weights),
+		edge_indices: List[Tuple[byte, byte]](edge_indices),
+		turn_refs:    List[Triple[int, byte, byte]](turn_refs),
+		turn_weights: turn_weights,
+	}
 }
-func (self _TCWeightingHandler) Store(dir string, name string, weight IWeighting) {
-	_StoreTCWeighting(weight.(*TCWeighting), dir+name+"-weight")
+func (self *TCWeighting) _Store(path string) {
+	filename := path + "-weight"
+	writer := NewBufferWriter()
+
+	edgecount := len(self.edge_weights)
+	Write(writer, int32(edgecount))
+	nodecount := len(self.turn_refs)
+	Write(writer, int32(nodecount))
+
+	for i := 0; i < edgecount; i++ {
+		edge_weight := self.GetEdgeWeight(int32(i))
+		Write(writer, uint8(edge_weight))
+		edge_indices := self.edge_indices[i]
+		Write(writer, uint8(edge_indices.A))
+		Write(writer, uint8(edge_indices.B))
+	}
+	for i := 0; i < nodecount; i++ {
+		tc_ref := self.turn_refs[i]
+		Write(writer, int32(tc_ref.A))
+		Write(writer, uint8(tc_ref.B))
+		Write(writer, uint8(tc_ref.C))
+	}
+	WriteArray(writer, self.turn_weights)
+
+	weightfile, _ := os.Create(filename)
+	defer weightfile.Close()
+	weightfile.Write(writer.Bytes())
 }
-func (self _TCWeightingHandler) Remove(dir string, name string) {
-	os.Remove(dir + name + "-weight")
+func (self *TCWeighting) _Remove(path string) {
+	os.Remove(path + "-weight")
 }
-func (self _TCWeightingHandler) _ReorderNodes(weight IWeighting, mapping Array[int32]) {
+func (self *TCWeighting) _ReorderNodes(mapping Array[int32]) {
 	panic("not implemented")
 }
 
-func BuildTCWeighting(base GraphBase) IWeighting {
+func BuildTCWeighting(base IGraphBase) IWeighting {
 	edge_weights := NewArray[int32](int(base.EdgeCount()))
 	edge_indices := NewArray[Tuple[byte, byte]](int(base.EdgeCount()))
 	turn_cost_ref := NewArray[Triple[int, byte, byte]](int(base.NodeCount()))
@@ -261,72 +304,6 @@ func BuildTCWeighting(base GraphBase) IWeighting {
 		edge_indices: List[Tuple[byte, byte]](edge_indices),
 		turn_refs:    List[Triple[int, byte, byte]](turn_cost_ref),
 		turn_weights: turn_cost_map,
-	}
-}
-
-func _StoreTCWeighting(weight *TCWeighting, filename string) {
-	writer := NewBufferWriter()
-
-	edgecount := len(weight.edge_weights)
-	Write(writer, int32(edgecount))
-	nodecount := len(weight.turn_refs)
-	Write(writer, int32(nodecount))
-
-	for i := 0; i < edgecount; i++ {
-		edge_weight := weight.GetEdgeWeight(int32(i))
-		Write(writer, uint8(edge_weight))
-		edge_indices := weight.edge_indices[i]
-		Write(writer, uint8(edge_indices.A))
-		Write(writer, uint8(edge_indices.B))
-	}
-	for i := 0; i < nodecount; i++ {
-		tc_ref := weight.turn_refs[i]
-		Write(writer, int32(tc_ref.A))
-		Write(writer, uint8(tc_ref.B))
-		Write(writer, uint8(tc_ref.C))
-	}
-	WriteArray(writer, weight.turn_weights)
-
-	weightfile, _ := os.Create(filename)
-	defer weightfile.Close()
-	weightfile.Write(writer.Bytes())
-}
-
-func _LoadTCWeighting(file string) *TCWeighting {
-	_, err := os.Stat(file)
-	if errors.Is(err, os.ErrNotExist) {
-		panic("file not found: " + file)
-	}
-
-	data, _ := os.ReadFile(file)
-	reader := NewBufferReader(data)
-
-	edgecount := Read[int32](reader)
-	nodecount := Read[int32](reader)
-
-	edge_weights := NewArray[int32](int(edgecount))
-	edge_indices := NewArray[Tuple[byte, byte]](int(edgecount))
-	for i := 0; i < int(edgecount); i++ {
-		edge_weight := Read[uint8](reader)
-		edge_weights[i] = int32(edge_weight)
-		ei_a := Read[uint8](reader)
-		ei_b := Read[uint8](reader)
-		edge_indices[i] = MakeTuple(ei_a, ei_b)
-	}
-	turn_refs := NewArray[Triple[int, byte, byte]](int(nodecount))
-	for i := 0; i < int(nodecount); i++ {
-		ref_a := Read[int32](reader)
-		ref_b := Read[uint8](reader)
-		ref_c := Read[uint8](reader)
-		turn_refs[i] = MakeTriple(int(ref_a), ref_b, ref_c)
-	}
-	turn_weights := ReadArray[byte](reader)
-
-	return &TCWeighting{
-		edge_weights: List[int32](edge_weights),
-		edge_indices: List[Tuple[byte, byte]](edge_indices),
-		turn_refs:    List[Triple[int, byte, byte]](turn_refs),
-		turn_weights: turn_weights,
 	}
 }
 

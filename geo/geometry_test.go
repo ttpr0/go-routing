@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	. "github.com/ttpr0/simple-routing-visualizer/src/go-routing/util"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 func TestMarshalGeometry(t *testing.T) {
