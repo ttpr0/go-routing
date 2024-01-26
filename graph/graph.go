@@ -2,6 +2,7 @@ package graph
 
 import (
 	"github.com/ttpr0/go-routing/geo"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
@@ -17,7 +18,6 @@ type IGraph interface {
 	GetNode(node int32) Node
 	GetEdge(edge int32) Edge
 	GetNodeGeom(node int32) geo.Coord
-	GetEdgeGeom(edge int32) geo.CoordArray
 }
 
 // not thread safe, use only one instance per thread
@@ -40,7 +40,7 @@ type IGraphExplorer interface {
 type Graph struct {
 	base   IGraphBase
 	weight IWeighting
-	index  IGraphIndex
+	index  Optional[IGraphIndex]
 }
 
 func (self *Graph) GetGraphExplorer() IGraphExplorer {
@@ -48,6 +48,14 @@ func (self *Graph) GetGraphExplorer() IGraphExplorer {
 		graph:    self,
 		accessor: self.base.GetAccessor(),
 		weight:   self.weight,
+	}
+}
+func (self *Graph) GetIndex() IGraphIndex {
+	if self.index.HasValue() {
+		return self.index.Value
+	} else {
+		self.index.Value = BuildGraphIndex(self.base)
+		return self.index.Value
 	}
 }
 func (self *Graph) NodeCount() int {
@@ -66,13 +74,7 @@ func (self *Graph) GetEdge(edge int32) Edge {
 	return self.base.GetEdge(edge)
 }
 func (self *Graph) GetNodeGeom(node int32) geo.Coord {
-	return self.base.GetNodeGeom(node)
-}
-func (self *Graph) GetEdgeGeom(edge int32) geo.CoordArray {
-	return self.base.GetEdgeGeom(edge)
-}
-func (self *Graph) GetIndex() IGraphIndex {
-	return self.index
+	return self.base.GetNode(node).Loc
 }
 
 //*******************************************
@@ -81,7 +83,7 @@ func (self *Graph) GetIndex() IGraphIndex {
 
 type BaseGraphExplorer struct {
 	graph    *Graph
-	accessor _AdjArrayAccessor
+	accessor IAdjacencyAccessor
 	weight   IWeighting
 }
 

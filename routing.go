@@ -8,7 +8,7 @@ import (
 
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/routing"
-	"github.com/ttpr0/go-routing/util"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 type RoutingRequest struct {
@@ -112,13 +112,13 @@ func HandleRoutingRequest(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("shortest path found")
 	path := alg.GetShortestPath()
 	fmt.Println("start building response")
-	resp := NewRoutingResponse(path.GetGeometry(), true, int(req.Key))
+	resp := NewRoutingResponse(path.GetGeometry(ATTR), true, int(req.Key))
 	fmt.Println("reponse build")
 	data, _ = json.Marshal(resp)
 	w.Write(data)
 }
 
-var algs_dict util.Dict[int, routing.IShortestPath] = util.NewDict[int, routing.IShortestPath](10)
+var algs_dict Dict[int, routing.IShortestPath] = NewDict[int, routing.IShortestPath](10)
 
 func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
 	// read body
@@ -179,12 +179,14 @@ func HandleRoutingStepRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	edges := util.NewList[geo.CoordArray](10)
-	finished := !alg.Steps(req.Stepcount, &edges)
+	edges := NewList[geo.CoordArray](10)
+	finished := !alg.Steps(req.Stepcount, func(edge int32) {
+		edges.Add(ATTR.GetEdgeGeom(edge))
+	})
 	var resp RoutingResponse
 	if finished {
 		path := alg.GetShortestPath()
-		resp = NewRoutingResponse(path.GetGeometry(), true, req.Key)
+		resp = NewRoutingResponse(path.GetGeometry(ATTR), true, req.Key)
 	} else {
 		resp = NewRoutingResponse(edges, finished, req.Key)
 	}

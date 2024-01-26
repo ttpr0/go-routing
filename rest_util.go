@@ -33,26 +33,26 @@ func WriteResponse[T any](w http.ResponseWriter, resp T, status int) {
 	w.Write(data)
 }
 
-type Result2[T any] struct {
+type Result[T any] struct {
 	result T
 	status int
 }
 
-func OK[T any](value T) Result2[T] {
-	return Result2[T]{
+func OK[T any](value T) Result[T] {
+	return Result[T]{
 		result: value,
 		status: http.StatusOK,
 	}
 }
 
-func BadRequest[T any](value T) Result2[T] {
-	return Result2[T]{
+func BadRequest[T any](value T) Result[T] {
+	return Result[T]{
 		result: value,
 		status: http.StatusBadRequest,
 	}
 }
 
-func MapPost[F any, T any](app *http.ServeMux, path string, handler func(F) Result2[T]) {
+func MapPost[F any, T any](app *http.ServeMux, path string, handler func(F) Result[T]) {
 	app.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		body := ReadRequestBody[F](r)
 		res := handler(body)
@@ -60,7 +60,7 @@ func MapPost[F any, T any](app *http.ServeMux, path string, handler func(F) Resu
 	})
 }
 
-func MapGet[F any, T any](app *http.ServeMux, path string, handler func(F) Result2[T]) {
+func MapGet[F any, T any](app *http.ServeMux, path string, handler func(F) Result[T]) {
 	var val F
 	typ := reflect.TypeOf(val)
 	num_field := typ.NumField()

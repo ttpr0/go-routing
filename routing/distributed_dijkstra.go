@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"sync"
 
-	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
 )
@@ -633,7 +632,7 @@ func (self *DistributedDijkstra) CalcShortestPath() bool {
 	return true
 }
 
-func (self *DistributedDijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
+func (self *DistributedDijkstra) Steps(count int, handler func(int32)) bool {
 	if self.edge_queue == nil {
 		key, queue := self.manager.RunRoutingDraw(self.start_id, self.end_id)
 		self.key = key
@@ -645,7 +644,7 @@ func (self *DistributedDijkstra) Steps(count int, visitededges *List[geo.CoordAr
 		if !ok {
 			return false
 		}
-		visitededges.Add(self.manager.graph.GetEdgeGeom(edge_id))
+		handler(edge_id)
 	}
 	return true
 }

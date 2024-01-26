@@ -155,7 +155,7 @@ func (self *BidirectAStar) CalcShortestPath() bool {
 	return true
 }
 
-func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
+func (self *BidirectAStar) Steps(count int, handler func(int32)) bool {
 	explorer := self.graph.GetGraphExplorer()
 
 	lambda_route := geo.HaversineDistance(geo.Coord(self.end_point), geo.Coord(self.start_point))
@@ -183,7 +183,7 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 			if other_flag.visited1 {
 				return
 			}
-			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			handler(edge_id)
 			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
 			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
 			lambda := (other_flag.lambda1-other_flag.lambda2)/2 + lambda_route/2
@@ -234,7 +234,7 @@ func (self *BidirectAStar) Steps(count int, visitededges *List[geo.CoordArray]) 
 			if other_flag.visited2 {
 				return
 			}
-			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			handler(edge_id)
 			other_flag.lambda1 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
 			other_flag.lambda2 = geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.start_point)) * 3.6 / 130
 			lambda := (other_flag.lambda2-other_flag.lambda1)/2 + lambda_route/2

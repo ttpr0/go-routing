@@ -1,4 +1,4 @@
-package graph
+package parser
 
 import (
 	"context"
@@ -9,30 +9,32 @@ import (
 
 	"github.com/paulmach/osm"
 	"github.com/paulmach/osm/osmpbf"
+	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/geo"
+	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
 )
 
-func ParseGraph(pbf_file string) GraphBase {
+func ParseGraph(pbf_file string) (*graph.GraphBase, *attr.GraphAttributes) {
 	nodes := NewList[OSMNode](10000)
 	edges := NewList[OSMEdge](10000)
 	index_mapping := NewDict[int64, int](10000)
 	_ParseOsm(pbf_file, &nodes, &edges, &index_mapping)
 	print("edges: ", edges.Length(), ", nodes: ", nodes.Length())
 	_CalcEdgeWeights(&edges)
-	base, _ := _CreateGraphBase(&nodes, &edges)
-	return base
+	base, attr := _CreateGraphBase(&nodes, &edges)
+	return base, attr
 }
 
-func ParseGraphFromOSM(pbf_file string) GraphBase {
+func ParseGraphFromOSM(pbf_file string) (*graph.GraphBase, *attr.GraphAttributes) {
 	nodes := NewList[OSMNode](10000)
 	edges := NewList[OSMEdge](10000)
 	index_mapping := NewDict[int64, int](10000)
 	_ParseOsm(pbf_file, &nodes, &edges, &index_mapping)
 	print("edges: ", edges.Length(), ", nodes: ", nodes.Length())
 	_CalcEdgeWeights(&edges)
-	base := _CreateGraphStore(&nodes, &edges)
-	return base
+	base, attr := _CreateGraphBase(&nodes, &edges)
+	return base, attr
 }
 
 func _ParseOsm(filename string, nodes *List[OSMNode], edges *List[OSMEdge], index_mapping *Dict[int64, int]) {
@@ -66,156 +68,58 @@ func _ParseOsm(filename string, nodes *List[OSMNode], edges *List[OSMEdge], inde
 	}
 }
 
-func _CreateGraphBase(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) (GraphBase, DefaultWeighting) {
-	nodes := NewList[Node](osmnodes.Length())
-	node_refs := NewList[_NodeEntry](osmnodes.Length())
-	edges := NewList[Edge](osmedges.Length() * 2)
-	fwd_edge_refs := NewList[_EdgeEntry](osmedges.Length() * 2)
-	bwd_edge_refs := NewList[_EdgeEntry](osmedges.Length() * 2)
-	edge_weights := NewList[int32](osmedges.Length() * 2)
+func _CreateGraphBase(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) (*graph.GraphBase, *attr.GraphAttributes) {
+	nodes := NewList[graph.Node](osmnodes.Length())
+	edges := NewList[graph.Edge](osmedges.Length() * 2)
+	node_attrs := NewList[attr.NodeAttribs](osmnodes.Length())
+	edge_attrs := NewList[attr.EdgeAttribs](osmedges.Length() * 2)
 	node_geoms := NewList[geo.Coord](osmnodes.Length())
 	edge_geoms := NewList[geo.CoordArray](osmedges.Length() * 2)
 
 	edge_index_mapping := NewDict[int, int](osmedges.Length())
 	for i, osmedge := range *osmedges {
-		edge := Edge{
-			NodeA:    int32(osmedge.NodeA),
-			NodeB:    int32(osmedge.NodeB),
-			Type:     osmedge.Type,
-			Maxspeed: byte(osmedge.Templimit),
-			Length:   osmedge.Length,
+		edge := graph.Edge{
+			NodeA: int32(osmedge.NodeA),
+			NodeB: int32(osmedge.NodeB),
 		}
-		edge_weight := int32(osmedge.Weight)
-		edges.Add(edge)
-		edge_weights.Add(edge_weight)
-		edge_geoms.Add(geo.CoordArray(osmedge.Nodes))
-		edge_index_mapping[i] = edges.Length() - 1
-		if !osmedge.Oneway {
-			edge = Edge{
-				NodeA:    int32(osmedge.NodeB),
-				NodeB:    int32(osmedge.NodeA),
-				Type:     osmedge.Type,
-				Maxspeed: byte(osmedge.Templimit),
-				Length:   osmedge.Length,
-			}
-			edge_weight := int32(osmedge.Weight)
-			edges.Add(edge)
-			edge_weights.Add(edge_weight)
-			edge_geoms.Add(geo.CoordArray(osmedge.Nodes))
-		}
-	}
-
-	for id, osmnode := range *osmnodes {
-		node := Node{}
-		node_ref := _NodeEntry{}
-		node_ref.FWDEdgeStart = int32(fwd_edge_refs.Length())
-		node_ref.BWDEdgeStart = int32(bwd_edge_refs.Length())
-		for _, edgeid := range osmnode.Edges {
-			index := edge_index_mapping[int(edgeid)]
-			edge := edges[index]
-			if edge.NodeA == int32(id) {
-				edgeref := _EdgeEntry{
-					EdgeID:  int32(index),
-					OtherID: edge.NodeB,
-				}
-				fwd_edge_refs.Add(edgeref)
-				if index < edges.Length()-1 {
-					edge = edges[index+1]
-					if edge.NodeB == int32(id) {
-						edgeref := _EdgeEntry{
-							EdgeID:  int32(index + 1),
-							OtherID: edge.NodeA,
-						}
-						bwd_edge_refs.Add(edgeref)
-					}
-				}
-			} else if edge.NodeB == int32(id) {
-				edgeref := _EdgeEntry{
-					EdgeID:  int32(index),
-					OtherID: edge.NodeA,
-				}
-				bwd_edge_refs.Add(edgeref)
-				if index < edges.Length()-1 {
-					edge = edges[index+1]
-					if edge.NodeA == int32(id) {
-						edgeref := _EdgeEntry{
-							EdgeID:  int32(index + 1),
-							OtherID: edge.NodeB,
-						}
-						fwd_edge_refs.Add(edgeref)
-					}
-				}
-			}
-		}
-		node_ref.FWDEdgeCount = int16(fwd_edge_refs.Length() - int(node_ref.FWDEdgeStart))
-		node_ref.BWDEdgeCount = int16(bwd_edge_refs.Length() - int(node_ref.BWDEdgeStart))
-		nodes.Add(node)
-		node_refs.Add(node_ref)
-		node_geoms.Add(osmnode.Point)
-	}
-
-	topology := _AdjacencyArray{
-		node_entries:     Array[_NodeEntry](node_refs),
-		fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs),
-		bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs),
-	}
-	weighting := DefaultWeighting{edge_weights: edge_weights}
-
-	base := GraphBase{
-		nodes:      Array[Node](nodes),
-		edges:      Array[Edge](edges),
-		node_geoms: node_geoms,
-		edge_geoms: edge_geoms,
-		topology:   topology,
-	}
-	return base, weighting
-}
-
-func _CreateGraphStore(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) GraphBase {
-	nodes := NewList[Node](osmnodes.Length())
-	edges := NewList[Edge](osmedges.Length() * 2)
-	node_geoms := NewList[geo.Coord](osmnodes.Length())
-	edge_geoms := NewList[geo.CoordArray](osmedges.Length() * 2)
-
-	edge_index_mapping := NewDict[int, int](osmedges.Length())
-	for i, osmedge := range *osmedges {
-		edge := Edge{
-			NodeA:    int32(osmedge.NodeA),
-			NodeB:    int32(osmedge.NodeB),
+		edge_attr := attr.EdgeAttribs{
 			Type:     osmedge.Type,
 			Maxspeed: byte(osmedge.Templimit),
 			Length:   osmedge.Length,
 		}
 		edges.Add(edge)
+		edge_attrs.Add(edge_attr)
 		edge_geoms.Add(geo.CoordArray(osmedge.Nodes))
 		edge_index_mapping[i] = edges.Length() - 1
 		if !osmedge.Oneway {
-			edge = Edge{
-				NodeA:    int32(osmedge.NodeB),
-				NodeB:    int32(osmedge.NodeA),
+			edge = graph.Edge{
+				NodeA: int32(osmedge.NodeB),
+				NodeB: int32(osmedge.NodeA),
+			}
+			edge_attr = attr.EdgeAttribs{
 				Type:     osmedge.Type,
 				Maxspeed: byte(osmedge.Templimit),
 				Length:   osmedge.Length,
 			}
 			edges.Add(edge)
+			edge_attrs.Add(edge_attr)
 			edge_geoms.Add(geo.CoordArray(osmedge.Nodes))
 		}
 	}
 
 	for _, osmnode := range *osmnodes {
-		node := Node{}
+		node := graph.Node{
+			Loc: osmnode.Point,
+		}
+		node_attr := attr.NodeAttribs{}
 		nodes.Add(node)
+		node_attrs.Add(node_attr)
 		node_geoms.Add(osmnode.Point)
 	}
 
-	base := GraphBase{
-		nodes:      Array[Node](nodes),
-		edges:      Array[Edge](edges),
-		node_geoms: node_geoms,
-		edge_geoms: edge_geoms,
-	}
-	base.topology = _BuildTopology(base.nodes, base.edges)
-	return base
+	base := graph.BuildGraphBase(Array[graph.Node](nodes), Array[graph.Edge](edges))
+	attr := attr.New(Array[attr.NodeAttribs](node_attrs), Array[attr.EdgeAttribs](edge_attrs), Array[geo.Coord](node_geoms), Array[geo.CoordArray](edge_geoms))
+	return base, attr
 }
 
 //*******************************************
@@ -359,8 +263,8 @@ func _WayHandler(scanner *osmpbf.Scanner, edges *List[OSMEdge], osm_nodes *Dict[
 // utility methods
 //*******************************************
 
-func _IsOneway(oneway string, str_type RoadType) bool {
-	if str_type == MOTORWAY || str_type == TRUNK || str_type == MOTORWAY_LINK || str_type == TRUNK_LINK {
+func _IsOneway(oneway string, str_type attr.RoadType) bool {
+	if str_type == attr.MOTORWAY || str_type == attr.TRUNK || str_type == attr.MOTORWAY_LINK || str_type == attr.TRUNK_LINK {
 		return true
 	} else if oneway == "yes" {
 		return true
@@ -368,58 +272,58 @@ func _IsOneway(oneway string, str_type RoadType) bool {
 	return false
 }
 
-func _GetType(typ string) RoadType {
+func _GetType(typ string) attr.RoadType {
 	switch typ {
 	case "motorway":
-		return MOTORWAY
+		return attr.MOTORWAY
 	case "motorway_link":
-		return MOTORWAY_LINK
+		return attr.MOTORWAY_LINK
 	case "trunk":
-		return TRUNK
+		return attr.TRUNK
 	case "trunk_link":
-		return TRUNK_LINK
+		return attr.TRUNK_LINK
 	case "primary":
-		return PRIMARY
+		return attr.PRIMARY
 	case "primary_link":
-		return PRIMARY_LINK
+		return attr.PRIMARY_LINK
 	case "secondary":
-		return SECONDARY
+		return attr.SECONDARY
 	case "secondary_link":
-		return SECONDARY_LINK
+		return attr.SECONDARY_LINK
 	case "tertiary":
-		return TERTIARY
+		return attr.TERTIARY
 	case "tertiary_link":
-		return TERTIARY_LINK
+		return attr.TERTIARY_LINK
 	case "residential":
-		return RESIDENTIAL
+		return attr.RESIDENTIAL
 	case "living_street":
-		return LIVING_STREET
+		return attr.LIVING_STREET
 	case "unclassified":
-		return UNCLASSIFIED
+		return attr.UNCLASSIFIED
 	case "road":
-		return ROAD
+		return attr.ROAD
 	case "track":
-		return TRACK
+		return attr.TRACK
 	}
 	return 0
 }
 
-func _GetTemplimit(templimit string, streettype RoadType) int32 {
+func _GetTemplimit(templimit string, streettype attr.RoadType) int32 {
 	var w int32
 	if templimit == "" {
-		if streettype == MOTORWAY || streettype == TRUNK {
+		if streettype == attr.MOTORWAY || streettype == attr.TRUNK {
 			w = 130
-		} else if streettype == MOTORWAY_LINK || streettype == TRUNK_LINK {
+		} else if streettype == attr.MOTORWAY_LINK || streettype == attr.TRUNK_LINK {
 			w = 50
-		} else if streettype == PRIMARY || streettype == SECONDARY {
+		} else if streettype == attr.PRIMARY || streettype == attr.SECONDARY {
 			w = 90
-		} else if streettype == TERTIARY {
+		} else if streettype == attr.TERTIARY {
 			w = 70
-		} else if streettype == PRIMARY_LINK || streettype == SECONDARY_LINK || streettype == TERTIARY_LINK {
+		} else if streettype == attr.PRIMARY_LINK || streettype == attr.SECONDARY_LINK || streettype == attr.TERTIARY_LINK {
 			w = 30
-		} else if streettype == RESIDENTIAL {
+		} else if streettype == attr.RESIDENTIAL {
 			w = 40
-		} else if streettype == LIVING_STREET {
+		} else if streettype == attr.LIVING_STREET {
 			w = 10
 		} else {
 			w = 25
@@ -454,7 +358,7 @@ func _CalcEdgeWeights(edges *List[OSMEdge]) {
 	}
 }
 
-func _GetORSTravelSpeed(streettype RoadType, maxspeed string, tracktype string, surface string) int32 {
+func _GetORSTravelSpeed(streettype attr.RoadType, maxspeed string, tracktype string, surface string) int32 {
 	var speed int32
 
 	// check if maxspeed is set
@@ -477,31 +381,31 @@ func _GetORSTravelSpeed(streettype RoadType, maxspeed string, tracktype string, 
 	// set defaults
 	if maxspeed == "" {
 		switch streettype {
-		case MOTORWAY:
+		case attr.MOTORWAY:
 			speed = 100
-		case TRUNK:
+		case attr.TRUNK:
 			speed = 85
-		case MOTORWAY_LINK, TRUNK_LINK:
+		case attr.MOTORWAY_LINK, attr.TRUNK_LINK:
 			speed = 60
-		case PRIMARY:
+		case attr.PRIMARY:
 			speed = 65
-		case SECONDARY:
+		case attr.SECONDARY:
 			speed = 60
-		case TERTIARY:
+		case attr.TERTIARY:
 			speed = 50
-		case PRIMARY_LINK, SECONDARY_LINK:
+		case attr.PRIMARY_LINK, attr.SECONDARY_LINK:
 			speed = 50
-		case TERTIARY_LINK:
+		case attr.TERTIARY_LINK:
 			speed = 40
-		case UNCLASSIFIED:
+		case attr.UNCLASSIFIED:
 			speed = 30
-		case RESIDENTIAL:
+		case attr.RESIDENTIAL:
 			speed = 30
-		case LIVING_STREET:
+		case attr.LIVING_STREET:
 			speed = 10
-		case ROAD:
+		case attr.ROAD:
 			speed = 20
-		case TRACK:
+		case attr.TRACK:
 			if tracktype == "" {
 				speed = 15
 			} else {

@@ -82,7 +82,7 @@ func (self *AStar) CalcShortestPath() bool {
 	}
 }
 
-func (self *AStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
+func (self *AStar) Steps(count int, handler func(int32)) bool {
 	explorer := self.graph.GetGraphExplorer()
 	for c := 0; c < count; c++ {
 		curr_id, ok := self.heap.Dequeue()
@@ -109,7 +109,7 @@ func (self *AStar) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 			if other_flag.visited {
 				return
 			}
-			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			handler(edge_id)
 			lambda := geo.HaversineDistance(geo.Coord(self.graph.GetNodeGeom(other_id)), geo.Coord(self.end_point)) * 3.6 / 130
 			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {

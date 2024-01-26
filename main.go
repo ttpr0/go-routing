@@ -10,13 +10,16 @@ import (
 
 	"github.com/ttpr0/go-routing/algorithm"
 	"github.com/ttpr0/go-routing/algorithm/partitioning"
+	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/graph"
+	"github.com/ttpr0/go-routing/parser"
 	. "github.com/ttpr0/go-routing/util"
 )
 
 // var GRAPH graph.ICHGraph
 // var GRAPH2 graph.ICHGraph
 var GRAPH graph.IGraph
+var ATTR *attr.GraphAttributes
 var GRAPH3 *graph.TransitGraph
 
 // var GRAPH graph.IGraph
@@ -31,10 +34,12 @@ func main() {
 	fmt.Println("hello world")
 
 	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
+	attributes := attr.Load("./graphs/niedersachsen/attr")
 	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	GRAPH = graph.BuildBaseGraph(base, weight)
+	GRAPH = graph.BuildGraph(base, weight)
+	ATTR = attributes
 
-	pedestrian_weight := graph.BuildPedestrianWeighting(base)
+	pedestrian_weight := BuildPedestrianWeighting(base, attributes)
 	transit_data := graph.LoadTransitData("./graphs/test/transit_graph")
 	fmt.Println("start buidling transit-graph")
 	GRAPH3 = graph.BuildTransitGraph(base, pedestrian_weight, transit_data)
@@ -57,10 +62,10 @@ func main() {
 
 	app := http.DefaultServeMux
 
-	MapGet(app, "/v1/test", func(v Dummy) Result2[string] {
+	MapGet(app, "/v1/test", func(v Dummy) Result[string] {
 		return OK("hello world" + v.Val)
 	})
-	MapGet(app, "/test", func(none) Result2[int] {
+	MapGet(app, "/test", func(none) Result[int] {
 		return OK(1)
 	})
 
@@ -69,9 +74,9 @@ func main() {
 
 // parse OSM to graph and remove unconnected components
 func main2() {
-	base := graph.ParseGraph("./data/saarland.pbf")
-	weight := graph.BuildDefaultWeighting(&base)
-	g := graph.BuildBaseGraph(&base, weight)
+	base, attributes := parser.ParseGraph("./data/saarland.pbf")
+	weight := BuildDefaultWeighting(base, attributes)
+	g := graph.BuildGraph(base, weight)
 
 	// compute closely connected components
 	groups := algorithm.ConnectedComponents(g)
@@ -79,20 +84,48 @@ func main2() {
 	// get largest group
 	max_group := GetMostCommon(groups)
 
-	// get nodes to be removed
-	remove := NewList[int32](100)
+	// get nodes and edges to be removed
+	e := g.GetGraphExplorer()
+	nodes_remove := NewArray[bool](g.NodeCount())
+	edges_remove := NewArray[bool](g.EdgeCount())
 	for i := 0; i < g.NodeCount(); i++ {
-		if groups[i] != max_group {
-			remove.Add(int32(i))
+		if groups[i] == max_group {
+			continue
+		}
+		// mark nodes not part of largest group
+		nodes_remove[i] = true
+		// mark all in- and out-going edges of those nodes
+		e.ForAdjacentEdges(int32(i), graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
+			edges_remove[ref.EdgeID] = true
+		})
+		e.ForAdjacentEdges(int32(i), graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
+			edges_remove[ref.EdgeID] = true
+		})
+	}
+
+	// get remove lists
+	remove_nodes := NewList[int32](100)
+	remove_edges := NewList[int32](100)
+	for i := 0; i < g.NodeCount(); i++ {
+		if nodes_remove[i] {
+			remove_nodes.Add(int32(i))
 		}
 	}
-	fmt.Println("remove", remove.Length(), "nodes")
+	for i := 0; i < g.EdgeCount(); i++ {
+		if edges_remove[i] {
+			remove_edges.Add(int32(i))
+		}
+	}
+	fmt.Println("remove", remove_nodes.Length(), "nodes")
 
 	// remove nodes from graph
-	graph.RemoveNodes(&base, remove)
+	graph.RemoveNodes(base, remove_nodes)
+	attributes.RemoveNodes(remove_nodes)
+	attributes.RemoveEdges(remove_edges)
 
-	graph.Store(&base, "./graphs/niedersachsen/base")
-	weight = graph.BuildDefaultWeighting(&base)
+	graph.Store(base, "./graphs/niedersachsen/base")
+	attr.Store(attributes, "./graphs/niedersachsen/attr")
+	weight = BuildDefaultWeighting(base, attributes)
 	graph.Store(weight, "./graphs/niedersachsen/default")
 }
 
@@ -100,7 +133,7 @@ func main2() {
 func main3() {
 	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
 	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 
 	partition := graph.Load[*graph.Partition]("./graphs/niedersachsen/partition")
 
@@ -115,7 +148,7 @@ func main3() {
 func main4() {
 	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
 	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 
 	ch := graph.CalcContraction6(g)
 	// ci := graph.PreparePHASTIndex(g, cd)
@@ -130,7 +163,7 @@ func main4() {
 func main5() {
 	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
 	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 
 	partition := graph.Load[*graph.Partition]("./graphs/niedersachsen/partition")
 
@@ -147,7 +180,7 @@ func main5() {
 func main6() {
 	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
 	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 
 	partition := graph.Load[*graph.Partition]("./graphs/niedersachsen/partition")
 
@@ -160,7 +193,7 @@ func main6() {
 func main7() {
 	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
 	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 
 	ch_data := graph.Load[*graph.CH]("./graphs/niedersachsen/ch")
 	ch_index := graph.PreparePHASTIndex(g, ch_data)
@@ -321,7 +354,7 @@ func main11() {
 func main12() {
 	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
 	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 
 	tiles := partitioning.InertialFlow(g)
 

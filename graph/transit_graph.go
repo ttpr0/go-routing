@@ -49,10 +49,7 @@ func (self *TransitGraph) GetEdge(edge int32) Edge {
 	return self.base.GetEdge(edge)
 }
 func (self *TransitGraph) GetNodeGeom(node int32) geo.Coord {
-	return self.base.GetNodeGeom(node)
-}
-func (self *TransitGraph) GetEdgeGeom(edge int32) geo.CoordArray {
-	return self.base.GetEdgeGeom(edge)
+	return self.base.GetNode(node).Loc
 }
 func (self *TransitGraph) GetIndex() IGraphIndex {
 	return self.index
@@ -70,7 +67,7 @@ func (self *TransitGraph) GetBaseGraph() *Graph {
 
 type TransitGraphExplorer struct {
 	graph    *TransitGraph
-	accessor _AdjArrayAccessor
+	accessor IAdjacencyAccessor
 	weight   IWeighting
 
 	transit_accessor _AdjArrayAccessor
@@ -234,13 +231,13 @@ const (
 // build transit graph
 //*******************************************
 
-func BuildTransitGraph(base *GraphBase, weight IWeighting, data *_TransitData) *TransitGraph {
+func BuildTransitGraph(base IGraphBase, weight IWeighting, data *_TransitData) *TransitGraph {
 	// map transit nodes to graph nodes
 	mapping := NewArray[[2]int32](base.NodeCount())
 	for i := 0; i < base.NodeCount(); i++ {
 		mapping[i] = [2]int32{-1, -1}
 	}
-	index := NewBaseGraphIndex(base)
+	index := BuildGraphIndex(base).(*BaseGraphIndex)
 	for i := 0; i < data.transit_stops.Length(); i++ {
 		stop := data.transit_stops[i]
 		closest, ok := index.index.GetClosest(stop.coord[:], 0.02)

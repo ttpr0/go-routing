@@ -3,7 +3,6 @@ package routing
 import (
 	"fmt"
 
-	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
 )
@@ -80,7 +79,7 @@ func (self *TransitDijkstra) CalcShortestPath() bool {
 	}
 }
 
-func (self *TransitDijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
+func (self *TransitDijkstra) Steps(count int, handler func(int32)) bool {
 	return false
 }
 

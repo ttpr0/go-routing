@@ -80,7 +80,7 @@ func (self *CHPreprocGraph) AddShortcut(node_a, node_b int32, edges [2]Tuple[int
 
 type CHPreprocGraphExplorer struct {
 	graph       *CHPreprocGraph
-	accessor    _AdjArrayAccessor
+	accessor    IAdjacencyAccessor
 	sh_accessor _AdjListAccessor
 }
 

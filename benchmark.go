@@ -123,7 +123,7 @@ func run_benchmark() {
 	// write_results("./results.csv", results, headers)
 }
 
-type Result struct {
+type BenchResult struct {
 	value int
 	times []int
 }
@@ -182,7 +182,7 @@ func select_random(locations Array[geo.Coord], weights Array[int32], count int) 
 	return new_locs, new_weights
 }
 
-func write_results(filename string, results Array[Result], headers []string) {
+func write_results(filename string, results Array[BenchResult], headers []string) {
 	file, err := os.Create(filename)
 	if err != nil {
 		fmt.Println("failed to create csv file")

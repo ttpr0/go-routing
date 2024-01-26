@@ -21,13 +21,12 @@ type ICHGraph interface {
 	GetNode(node int32) Node
 	GetEdge(edge int32) Edge
 	GetNodeGeom(node int32) geo.Coord
-	GetEdgeGeom(edge int32) geo.CoordArray
 
 	// CH Specific
 	GetNodeLevel(node int32) int16
 	ShortcutCount() int
 	GetShortcut(shortcut int32) Shortcut
-	GetEdgesFromShortcut(edges *List[int32], shortcut_id int32, reversed bool)
+	GetEdgesFromShortcut(shortcut_id int32, reversed bool, handler func(int32))
 	HasDownEdges(dir Direction) bool
 	GetDownEdges(dir Direction) (Array[Shortcut], error)
 	GetNodeTile(node int32) int16
@@ -42,7 +41,7 @@ type CHGraph struct {
 	// Base Graph
 	base   IGraphBase
 	weight IWeighting
-	index  IGraphIndex
+	index  Optional[IGraphIndex]
 
 	// Additional Storage
 	ch_shortcuts _ShortcutStore
@@ -62,6 +61,14 @@ func (self *CHGraph) GetGraphExplorer() IGraphExplorer {
 		accessor:    self.base.GetAccessor(),
 		sh_accessor: self.ch_topology.GetAccessor(),
 		weight:      self.weight,
+	}
+}
+func (self *CHGraph) GetIndex() IGraphIndex {
+	if self.index.HasValue() {
+		return self.index.Value
+	} else {
+		self.index.Value = BuildGraphIndex(self.base)
+		return self.index.Value
 	}
 }
 
@@ -94,20 +101,15 @@ func (self *CHGraph) GetEdge(edge int32) Edge {
 }
 
 func (self *CHGraph) GetNodeGeom(node int32) geo.Coord {
-	return self.base.GetNodeGeom(node)
-}
-func (self *CHGraph) GetEdgeGeom(edge int32) geo.CoordArray {
-	return self.base.GetEdgeGeom(edge)
+	return self.base.GetNode(node).Loc
 }
 
 func (self *CHGraph) GetShortcut(shortcut int32) Shortcut {
 	return self.ch_shortcuts.GetShortcut(shortcut)
 }
 
-func (self *CHGraph) GetEdgesFromShortcut(edges *List[int32], shc_id int32, reversed bool) {
-	self.ch_shortcuts.GetEdgesFromShortcut(shc_id, false, func(edge int32) {
-		edges.Add(edge)
-	})
+func (self *CHGraph) GetEdgesFromShortcut(shc_id int32, reversed bool, handler func(int32)) {
+	self.ch_shortcuts.GetEdgesFromShortcut(shc_id, false, handler)
 }
 func (self *CHGraph) GetDownEdges(dir Direction) (Array[Shortcut], error) {
 	if !self.ch_index.HasValue() {
@@ -151,9 +153,6 @@ func (self *CHGraph) TileCount() int {
 		return -1
 	}
 }
-func (self *CHGraph) GetIndex() IGraphIndex {
-	return self.index
-}
 
 //*******************************************
 // ch-graph explorer
@@ -161,7 +160,7 @@ func (self *CHGraph) GetIndex() IGraphIndex {
 
 type CHGraphExplorer struct {
 	graph       *CHGraph
-	accessor    _AdjArrayAccessor
+	accessor    IAdjacencyAccessor
 	sh_accessor _AdjArrayAccessor
 	weight      IWeighting
 }
@@ -304,22 +303,4 @@ func (self *CHGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 		}
 		return -1
 	}
-}
-
-//*******************************************
-// graph index
-//******************************************
-
-type MappedGraphIndex struct {
-	id_mapping _IDMapping
-	index      IGraphIndex
-}
-
-func (self *MappedGraphIndex) GetClosestNode(point geo.Coord) (int32, bool) {
-	node, ok := self.index.GetClosestNode(point)
-	if !ok {
-		return node, ok
-	}
-	mapped_node := self.id_mapping.GetTarget(node)
-	return mapped_node, true
 }

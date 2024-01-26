@@ -40,8 +40,17 @@ type DefaultWeighting struct {
 	edge_weights []int32
 }
 
+func NewDefaultWeighting(base IGraphBase) *DefaultWeighting {
+	return &DefaultWeighting{
+		edge_weights: make([]int32, base.EdgeCount()),
+	}
+}
+
 func (self *DefaultWeighting) GetEdgeWeight(edge int32) int32 {
 	return self.edge_weights[edge]
+}
+func (self *DefaultWeighting) SetEdgeWeight(edge int32, weight int32) {
+	self.edge_weights[edge] = weight
 }
 func (self *DefaultWeighting) GetTurnCost(from, via, to int32) int32 {
 	return 0
@@ -109,49 +118,68 @@ func (self *DefaultWeighting) _Remove(path string) {
 func (self *DefaultWeighting) _ReorderNodes(mapping Array[int32]) {
 }
 
-func BuildDefaultWeighting(base IGraphBase) *DefaultWeighting {
-	weights := NewArray[int32](base.EdgeCount())
-	for i := 0; i < base.EdgeCount(); i++ {
-		edge := base.GetEdge(int32(i))
-		w := edge.Length * 3.6 / float32(edge.Maxspeed)
-		if w < 1 {
-			w = 1
-		}
-		weights[i] = int32(w)
-	}
+//*******************************************
+// equal weighting
+//*******************************************
 
-	return &DefaultWeighting{
-		edge_weights: weights,
+type EqualWeighting struct{}
+
+func NewEqualWeighting() *EqualWeighting {
+	return &EqualWeighting{}
+}
+
+func (self *EqualWeighting) GetEdgeWeight(edge int32) int32 {
+	return 1
+}
+func (self *EqualWeighting) GetTurnCost(from, via, to int32) int32 {
+	return 0
+}
+
+func (self *EqualWeighting) Type() WeightType {
+	return DEFAULT_WEIGHT
+}
+func (self *EqualWeighting) HasTurnCosts() bool {
+	return false
+}
+func (self *EqualWeighting) IsDynamic() bool {
+	return false
+}
+func (self *EqualWeighting) IsTimeDependant() bool {
+	return false
+}
+
+//*******************************************
+// dynamic weighting
+//*******************************************
+
+type DynamicWeighting struct {
+	weight_func func(int32) int32
+}
+
+func NewDynamicWeighting(f func(int32) int32) *DynamicWeighting {
+	return &DynamicWeighting{
+		weight_func: f,
 	}
 }
 
-func BuildEqualWeighting(base IGraphBase) *DefaultWeighting {
-	count := base.EdgeCount()
-
-	weights := NewArray[int32](count)
-	for i := 0; i < count; i++ {
-		weights[i] = 1
-	}
-
-	return &DefaultWeighting{
-		edge_weights: weights,
-	}
+func (self *DynamicWeighting) GetEdgeWeight(edge int32) int32 {
+	return self.weight_func(edge)
+}
+func (self *DynamicWeighting) GetTurnCost(from, via, to int32) int32 {
+	return 0
 }
 
-func BuildPedestrianWeighting(base IGraphBase) *DefaultWeighting {
-	weights := NewArray[int32](base.EdgeCount())
-	for i := 0; i < base.EdgeCount(); i++ {
-		edge := base.GetEdge(int32(i))
-		w := edge.Length * 3.6 / 3
-		if w < 1 {
-			w = 1
-		}
-		weights[i] = int32(w)
-	}
-
-	return &DefaultWeighting{
-		edge_weights: weights,
-	}
+func (self *DynamicWeighting) Type() WeightType {
+	return DEFAULT_WEIGHT
+}
+func (self *DynamicWeighting) HasTurnCosts() bool {
+	return false
+}
+func (self *DynamicWeighting) IsDynamic() bool {
+	return true
+}
+func (self *DynamicWeighting) IsTimeDependant() bool {
+	return false
 }
 
 //*******************************************
@@ -165,8 +193,48 @@ type TCWeighting struct {
 	turn_weights []byte
 }
 
+func NewTCWeighting(base IGraphBase) *TCWeighting {
+	edge_weights := NewArray[int32](int(base.EdgeCount()))
+	edge_indices := NewArray[Tuple[byte, byte]](int(base.EdgeCount()))
+	turn_cost_ref := NewArray[Triple[int, byte, byte]](int(base.NodeCount()))
+
+	size := 0
+	accessor := base.GetAccessor()
+	for i := 0; i < int(base.NodeCount()); i++ {
+		fwd_index := 0
+		accessor.SetBaseNode(int32(i), FORWARD)
+		for accessor.Next() {
+			edge_id := accessor.GetEdgeID()
+			edge_indices[int(edge_id)].A = byte(fwd_index)
+			fwd_index += 1
+		}
+		bwd_index := 0
+		accessor.SetBaseNode(int32(i), BACKWARD)
+		for accessor.Next() {
+			edge_id := accessor.GetEdgeID()
+			edge_indices[int(edge_id)].B = byte(bwd_index)
+			bwd_index += 1
+		}
+		turn_cost_ref[i].B = byte(bwd_index)
+		turn_cost_ref[i].C = byte(fwd_index)
+		turn_cost_ref[i].A = size
+		size += bwd_index * fwd_index
+	}
+	turn_cost_map := NewArray[byte](size)
+
+	return &TCWeighting{
+		edge_weights: List[int32](edge_weights),
+		edge_indices: List[Tuple[byte, byte]](edge_indices),
+		turn_refs:    List[Triple[int, byte, byte]](turn_cost_ref),
+		turn_weights: turn_cost_map,
+	}
+}
+
 func (self *TCWeighting) GetEdgeWeight(edge int32) int32 {
 	return self.edge_weights[edge]
+}
+func (self *TCWeighting) SetEdgeWeight(edge int32, weight int32) {
+	self.edge_weights[edge] = weight
 }
 func (self *TCWeighting) GetTurnCost(from, via, to int32) int32 {
 	bwd_index := self.edge_indices[from].B
@@ -175,6 +243,14 @@ func (self *TCWeighting) GetTurnCost(from, via, to int32) int32 {
 	cols := tc_ref.C
 	loc := tc_ref.A
 	return int32(self.turn_weights[loc+int(cols*bwd_index)+int(fwd_index)])
+}
+func (self *TCWeighting) SetTurnCost(from, via, to int32, weight int32) {
+	bwd_index := self.edge_indices[from].B
+	fwd_index := self.edge_indices[to].A
+	tc_ref := self.turn_refs[via]
+	cols := tc_ref.C
+	loc := tc_ref.A
+	self.turn_weights[loc+int(cols*bwd_index)+int(fwd_index)] = byte(weight)
 }
 
 func (self *TCWeighting) Type() WeightType {
@@ -264,47 +340,6 @@ func (self *TCWeighting) _Remove(path string) {
 }
 func (self *TCWeighting) _ReorderNodes(mapping Array[int32]) {
 	panic("not implemented")
-}
-
-func BuildTCWeighting(base IGraphBase) IWeighting {
-	edge_weights := NewArray[int32](int(base.EdgeCount()))
-	edge_indices := NewArray[Tuple[byte, byte]](int(base.EdgeCount()))
-	turn_cost_ref := NewArray[Triple[int, byte, byte]](int(base.NodeCount()))
-
-	for i := 0; i < int(base.EdgeCount()); i++ {
-		edge := base.GetEdge(int32(i))
-		edge_weights[i] = int32(edge.Length / float32(edge.Maxspeed))
-	}
-	size := 0
-	accessor := base.GetAccessor()
-	for i := 0; i < int(base.NodeCount()); i++ {
-		fwd_index := 0
-		accessor.SetBaseNode(int32(i), FORWARD)
-		for accessor.Next() {
-			edge_id := accessor.GetEdgeID()
-			edge_indices[int(edge_id)].A = byte(fwd_index)
-			fwd_index += 1
-		}
-		bwd_index := 0
-		accessor.SetBaseNode(int32(i), BACKWARD)
-		for accessor.Next() {
-			edge_id := accessor.GetEdgeID()
-			edge_indices[int(edge_id)].B = byte(bwd_index)
-			bwd_index += 1
-		}
-		turn_cost_ref[i].B = byte(bwd_index)
-		turn_cost_ref[i].C = byte(fwd_index)
-		turn_cost_ref[i].A = size
-		size += bwd_index * fwd_index
-	}
-	turn_cost_map := NewArray[byte](size)
-
-	return &TCWeighting{
-		edge_weights: List[int32](edge_weights),
-		edge_indices: List[Tuple[byte, byte]](edge_indices),
-		turn_refs:    List[Triple[int, byte, byte]](turn_cost_ref),
-		turn_weights: turn_cost_map,
-	}
 }
 
 //*******************************************

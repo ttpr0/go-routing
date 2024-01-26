@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
@@ -13,11 +14,11 @@ type Path struct {
 	changed bool
 }
 
-func (self *Path) GetGeometry() []geo.CoordArray {
+func (self *Path) GetGeometry(attributes *attr.GraphAttributes) []geo.CoordArray {
 	if self.lines == nil || self.changed {
 		self.lines = make([]geo.CoordArray, 0, 10)
 		for _, edge_id := range self.path {
-			self.lines = append(self.lines, self.graph.GetEdgeGeom(edge_id))
+			self.lines = append(self.lines, attributes.GetEdgeGeom(edge_id))
 		}
 	}
 	return self.lines

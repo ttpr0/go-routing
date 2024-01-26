@@ -3,7 +3,6 @@ package routing
 import (
 	"fmt"
 
-	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
 )
@@ -152,7 +151,7 @@ func (self *BidirectDijkstra) CalcShortestPath() bool {
 	return true
 }
 
-func (self *BidirectDijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
+func (self *BidirectDijkstra) Steps(count int, handler func(int32)) bool {
 	explorer := self.graph.GetGraphExplorer()
 
 	is_finished := false
@@ -175,7 +174,7 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *List[geo.CoordArray
 			if other_flag.visited1 {
 				return
 			}
-			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			handler(edge_id)
 			new_length := curr_flag.path_length1 + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.visited2 {
 				shortest := new_length + other_flag.path_length2
@@ -219,7 +218,7 @@ func (self *BidirectDijkstra) Steps(count int, visitededges *List[geo.CoordArray
 			if other_flag.visited2 {
 				return
 			}
-			visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+			handler(edge_id)
 			new_length := curr_flag.path_length2 + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.visited1 {
 				shortest := new_length + other_flag.path_length1

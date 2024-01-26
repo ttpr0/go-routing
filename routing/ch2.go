@@ -3,7 +3,6 @@ package routing
 import (
 	"fmt"
 
-	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
 )
@@ -134,15 +133,7 @@ func (self *CH2) CalcShortestPath() bool {
 	return true
 }
 
-func (self *CH2) Steps(count int, visitededges *List[geo.CoordArray]) bool {
-	edges := NewList[int32](100)
-	defer func() {
-		fmt.Println("running")
-		for _, edge := range edges {
-			visitededges.Add(self.graph.GetEdgeGeom(edge))
-		}
-	}()
-
+func (self *CH2) Steps(count int, handler func(int32)) bool {
 	explorer := self.graph.GetGraphExplorer()
 	for c := 0; c < count; c++ {
 		if self.startheap.Len() == 0 && self.endheap.Len() == 0 {
@@ -184,9 +175,9 @@ func (self *CH2) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				weight := explorer.GetEdgeWeight(ref)
 
 				if ref.IsShortcut() {
-					self.graph.GetEdgesFromShortcut(&edges, edge_id, false)
+					self.graph.GetEdgesFromShortcut(edge_id, false, handler)
 				} else {
-					edges.Add(edge_id)
+					handler(edge_id)
 				}
 
 				new_length := curr_flag.path_length1 + float64(weight)
@@ -230,9 +221,9 @@ func (self *CH2) Steps(count int, visitededges *List[geo.CoordArray]) bool {
 				}
 				weight := explorer.GetEdgeWeight(ref)
 				if ref.IsShortcut() {
-					self.graph.GetEdgesFromShortcut(&edges, edge_id, false)
+					self.graph.GetEdgesFromShortcut(edge_id, false, handler)
 				} else {
-					edges.Add(edge_id)
+					handler(edge_id)
 				}
 				new_length := curr_flag.path_length2 + float64(weight)
 				if new_length < other_flag.path_length2 {
@@ -261,7 +252,9 @@ func (self *CH2) GetShortestPath() Path {
 		}
 		curr_flag := self.flags[curr_id]
 		if curr_flag.is_shortcut1 {
-			self.graph.GetEdgesFromShortcut(&path, curr_flag.prev_edge1, true)
+			self.graph.GetEdgesFromShortcut(curr_flag.prev_edge1, true, func(edge int32) {
+				path.Add(edge)
+			})
 			curr_id = explorer.GetOtherNode(graph.CreateCHShortcutRef(curr_flag.prev_edge1), curr_id)
 		} else {
 			path.Add(curr_flag.prev_edge1)
@@ -278,7 +271,9 @@ func (self *CH2) GetShortestPath() Path {
 		}
 		curr_flag := self.flags[curr_id]
 		if curr_flag.is_shortcut2 {
-			self.graph.GetEdgesFromShortcut(&path, curr_flag.prev_edge2, false)
+			self.graph.GetEdgesFromShortcut(curr_flag.prev_edge2, false, func(edge int32) {
+				path.Add(edge)
+			})
 			curr_id = explorer.GetOtherNode(graph.CreateCHShortcutRef(curr_flag.prev_edge2), curr_id)
 		} else {
 			path.Add(curr_flag.prev_edge2)

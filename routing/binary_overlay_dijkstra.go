@@ -3,7 +3,6 @@ package routing
 import (
 	"fmt"
 
-	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
 )
@@ -99,7 +98,7 @@ func (self *BODijkstra) CalcShortestPath() bool {
 	}
 }
 
-func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) bool {
+func (self *BODijkstra) Steps(count int, handler func(int32)) bool {
 	explorer := self.graph.GetGraphExplorer()
 
 	for c := 0; c < count; c++ {
@@ -133,7 +132,7 @@ func (self *BODijkstra) Steps(count int, visitededges *List[geo.CoordArray]) boo
 			}
 			if ref.IsShortcut() {
 			} else {
-				visitededges.Add(self.graph.GetEdgeGeom(edge_id))
+				handler(edge_id)
 			}
 			new_length := curr_flag.path_length + float64(explorer.GetEdgeWeight(ref))
 			if other_flag.path_length > new_length {

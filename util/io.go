@@ -1,4 +1,4 @@
-package graph
+package util
 
 import (
 	"bytes"
@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
-
-	. "github.com/ttpr0/go-routing/util"
 )
 
 func NewBufferReader(data []byte) BufferReader {

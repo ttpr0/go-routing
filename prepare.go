@@ -8,7 +8,9 @@ import (
 	"sync"
 
 	"github.com/ttpr0/go-routing/algorithm"
+	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/graph"
+	"github.com/ttpr0/go-routing/parser"
 	. "github.com/ttpr0/go-routing/util"
 )
 
@@ -21,15 +23,16 @@ func prepare() {
 	//*******************************************
 	// Parse graph
 	//*******************************************
-	base := graph.ParseGraph(DATA_DIR + "/" + GRAPH_NAME + ".pbf")
-	graph.Store(&base, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
+	base, attributes := parser.ParseGraph(DATA_DIR + "/" + GRAPH_NAME + ".pbf")
+	graph.Store(base, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
+	attr.Store(attributes, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
 
 	//*******************************************
 	// Remove unconnected components
 	//*******************************************
 	// compute closely connected components
-	weight := graph.BuildEqualWeighting(&base)
-	g := graph.BuildBaseGraph(&base, weight)
+	eq_weight := graph.NewEqualWeighting()
+	g := graph.BuildGraph(base, eq_weight)
 	groups := algorithm.ConnectedComponents(g)
 	// get largest group
 	max_group := GetMostCommon(groups)
@@ -42,13 +45,13 @@ func prepare() {
 	}
 	fmt.Println("remove", remove.Length(), "nodes")
 	// remove nodes from graph
-	graph.RemoveNodes(&base, remove)
-	graph.Store(&base, GRAPH_DIR+"/"+GRAPH_NAME)
+	graph.RemoveNodes(base, remove)
+	graph.Store(base, GRAPH_DIR+"/"+GRAPH_NAME)
 
-	weight = graph.BuildDefaultWeighting(&base)
+	weight := BuildDefaultWeighting(base, attributes)
 	graph.Store(weight, GRAPH_DIR+"/"+GRAPH_NAME+"-fastest")
 
-	g = graph.BuildBaseGraph(&base, weight)
+	g = graph.BuildGraph(base, weight)
 
 	//*******************************************
 	// Partition with KaHIP
@@ -83,7 +86,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			create_grasp_graph(&base, weight, GRAPH_NAME, GRAPH_NAME+"_grasp_"+size, "./tmp_"+size+".txt")
+			create_grasp_graph(base, weight, GRAPH_NAME, GRAPH_NAME+"_grasp_"+size, "./tmp_"+size+".txt")
 			fmt.Println("	done:", size)
 			wg.Done()
 		}()
@@ -98,7 +101,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			create_isophast_graph(&base, weight, GRAPH_NAME, GRAPH_NAME+"_isophast_"+size, "./tmp_"+size+".txt")
+			create_isophast_graph(base, weight, GRAPH_NAME, GRAPH_NAME+"_isophast_"+size, "./tmp_"+size+".txt")
 			fmt.Println("	done:", size)
 			wg.Done()
 		}()
@@ -109,7 +112,7 @@ func prepare() {
 	// Create CH-Graph
 	//*******************************************
 	fmt.Println("start creating ch-graph")
-	create_ch_graph(&base, weight, GRAPH_NAME, GRAPH_NAME+"_ch")
+	create_ch_graph(base, weight, GRAPH_NAME, GRAPH_NAME+"_ch")
 	fmt.Println("	done")
 
 	//*******************************************
@@ -120,7 +123,7 @@ func prepare() {
 		size := fmt.Sprint(s)
 		wg.Add(1)
 		go func() {
-			create_tiled_ch_graph(&base, weight, GRAPH_NAME, GRAPH_NAME+"_ch_tiled_"+size, "./tmp_"+size+".txt")
+			create_tiled_ch_graph(base, weight, GRAPH_NAME, GRAPH_NAME+"_ch_tiled_"+size, "./tmp_"+size+".txt")
 			fmt.Println("	done:", size)
 			wg.Done()
 		}()
@@ -129,7 +132,7 @@ func prepare() {
 }
 
 func create_grasp_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name, tiles_name string) {
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 	tiles := graph.ReadNodeTiles(tiles_name)
 	partition := graph.NewPartition(tiles)
 
@@ -143,7 +146,7 @@ func create_grasp_graph(base graph.IGraphBase, weight graph.IWeighting, graph_na
 }
 
 func create_isophast_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name, tiles_name string) {
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 	tiles := graph.ReadNodeTiles(tiles_name)
 	partition := graph.NewPartition(tiles)
 
@@ -152,7 +155,7 @@ func create_isophast_graph(base graph.IGraphBase, weight graph.IWeighting, graph
 }
 
 func create_ch_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name string) {
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 
 	cd := graph.CalcContraction6(g)
 
@@ -161,7 +164,7 @@ func create_ch_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name,
 }
 
 func create_tiled_ch_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name, tiles_name string) {
-	g := graph.BuildBaseGraph(base, weight)
+	g := graph.BuildGraph(base, weight)
 	tiles := graph.ReadNodeTiles(tiles_name)
 	partition := graph.NewPartition(tiles)
 

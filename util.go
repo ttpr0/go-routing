@@ -1,10 +1,9 @@
 package main
 
 import (
-	"math"
-
 	"github.com/ttpr0/go-routing/access/decay"
 	"github.com/ttpr0/go-routing/access/view"
+	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 )
@@ -35,24 +34,6 @@ func LoadOrCreate(graph_path string, osm_file string, partition_file string) gra
 	// 	return graph.LoadTiledGraph(graph_path)
 	// }
 	return nil
-}
-
-func GetClosestNode2(point geo.Coord, graph graph.IGraph) int32 {
-	distance := -1.0
-	id := 0
-	newdistance := 0.0
-	for i := 0; i < int(graph.NodeCount()); i++ {
-		p := graph.GetNodeGeom(int32(i))
-		newdistance = math.Sqrt(math.Pow(float64(point[1])-float64(p[1]), 2) + math.Pow(float64(point[0])-float64(p[0]), 2))
-		if distance == -1 {
-			distance = newdistance
-			id = i
-		} else if newdistance < distance {
-			distance = newdistance
-			id = i
-		}
-	}
-	return int32(id)
 }
 
 func GetClosestNode(point geo.Coord, graph graph.IGraph) int32 {
@@ -113,4 +94,43 @@ func GetDistanceDecay(param DecayRequestParams) decay.IDistanceDecay {
 	default:
 		return nil
 	}
+}
+
+func BuildDefaultWeighting(base graph.IGraphBase, attributes *attr.GraphAttributes) *graph.DefaultWeighting {
+	weights := graph.NewDefaultWeighting(base)
+	for i := 0; i < base.EdgeCount(); i++ {
+		attr := attributes.GetEdgeAttribs(int32(i))
+		w := attr.Length * 3.6 / float32(attr.Maxspeed)
+		if w < 1 {
+			w = 1
+		}
+		weights.SetEdgeWeight(int32(i), int32(w))
+	}
+
+	return weights
+}
+
+func BuildPedestrianWeighting(base graph.IGraphBase, attributes *attr.GraphAttributes) *graph.DefaultWeighting {
+	weights := graph.NewDefaultWeighting(base)
+	for i := 0; i < base.EdgeCount(); i++ {
+		attr := attributes.GetEdgeAttribs(int32(i))
+		w := attr.Length * 3.6 / 3
+		if w < 1 {
+			w = 1
+		}
+		weights.SetEdgeWeight(int32(i), int32(w))
+	}
+
+	return weights
+}
+
+func BuildTCWeighting(base graph.IGraphBase, attributes *attr.GraphAttributes) *graph.TCWeighting {
+	weight := graph.NewTCWeighting(base)
+
+	for i := 0; i < int(base.EdgeCount()); i++ {
+		attr := attributes.GetEdgeAttribs(int32(i))
+		weight.SetEdgeWeight(int32(i), int32(attr.Length/float32(attr.Maxspeed)))
+	}
+
+	return weight
 }

@@ -8,7 +8,16 @@ import (
 // build graphs
 //*******************************************
 
-func BuildBaseGraph(base IGraphBase, weight IWeighting) *Graph {
+func BuildGraphBase(nodes Array[Node], edges Array[Edge]) *GraphBase {
+	topology := _BuildTopology(nodes, edges)
+	return &GraphBase{
+		nodes:    nodes,
+		edges:    edges,
+		topology: topology,
+	}
+}
+
+func BuildGraph(base IGraphBase, weight IWeighting) *Graph {
 	return &Graph{
 		base:   base,
 		weight: weight,
@@ -58,6 +67,13 @@ func BuildTiledGraph(base IGraphBase, weight IWeighting, partition *Partition, o
 	}
 }
 
+func BuildGraphIndex(base IGraphBase) IGraphIndex {
+	index := _BuildKDTreeIndex(base)
+	return &BaseGraphIndex{
+		index: index,
+	}
+}
+
 //*******************************************
 // build graph components
 //*******************************************
@@ -75,7 +91,8 @@ func _BuildTopology(nodes Array[Node], edges Array[Edge]) _AdjacencyArray {
 func _BuildKDTreeIndex(base IGraphBase) KDTree[int32] {
 	tree := NewKDTree[int32](2)
 	for i := 0; i < base.NodeCount(); i++ {
-		geom := base.GetNodeGeom(int32(i))
+		node := base.GetNode(int32(i))
+		geom := node.Loc
 		tree.Insert(geom[:], int32(i))
 	}
 	return tree

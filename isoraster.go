@@ -8,7 +8,7 @@ import (
 
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/routing"
-	"github.com/ttpr0/go-routing/util"
+	. "github.com/ttpr0/go-routing/util"
 )
 
 type IsoRasterRequest struct {
@@ -22,7 +22,7 @@ type IsoRasterResponse struct {
 	Features []GeoJSONFeature `json:"features"`
 }
 
-func NewIsoRasterResponse(nodes []*util.QuadNode[int], rasterizer IRasterizer) IsoRasterResponse {
+func NewIsoRasterResponse(nodes []*QuadNode[int], rasterizer IRasterizer) IsoRasterResponse {
 	resp := IsoRasterResponse{}
 	resp.Type = "FeatureCollection"
 
@@ -57,7 +57,7 @@ func HandleIsoRasterRequest(w http.ResponseWriter, r *http.Request) {
 
 	start := geo.Coord{req.Locations[0][0], req.Locations[0][1]}
 	consumer := &SPTConsumer{
-		points: util.NewQuadTree(func(val1, val2 int) int {
+		points: NewQuadTree(func(val1, val2 int) int {
 			if val1 < val2 {
 				return val1
 			} else {
@@ -79,7 +79,7 @@ func HandleIsoRasterRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 type SPTConsumer struct {
-	points     *util.QuadTree[int]
+	points     *QuadTree[int]
 	rasterizer IRasterizer
 }
 

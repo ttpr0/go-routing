@@ -1,6 +1,7 @@
 package graph
 
 import (
+	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/geo"
 	. "github.com/ttpr0/go-routing/util"
 )
@@ -84,7 +85,7 @@ func (self *DictGraph) AddNode(id int32, node Node, point geo.Coord) {
 	self.fwd_edgerefs[id] = NewList[EdgeRef](2)
 	self.bwd_edgerefs[id] = NewList[EdgeRef](2)
 }
-func (self *DictGraph) AddEdge(edge Edge, points geo.CoordArray) {
+func (self *DictGraph) AddEdge(edge Edge, att attr.EdgeAttribs, points geo.CoordArray) {
 	if !self.nodes.ContainsKey(edge.NodeA) {
 		self.AddNode(edge.NodeA, Node{}, points[0])
 	}
@@ -95,7 +96,7 @@ func (self *DictGraph) AddEdge(edge Edge, points geo.CoordArray) {
 	self.max_edge_id = id + 1
 	self.edges[id] = edge
 	self.edge_geoms[id] = points
-	self.weight.weights[id] = int32(edge.Length / float32(edge.Maxspeed))
+	self.weight.weights[id] = int32(att.Length / float32(att.Maxspeed))
 	fwd_edge_refs := self.fwd_edgerefs[edge.NodeA]
 	fwd_edge_refs.Add(EdgeRef{EdgeID: id, OtherID: edge.NodeB, _Type: 0})
 	self.fwd_edgerefs[edge.NodeA] = fwd_edge_refs

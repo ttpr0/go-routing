@@ -21,13 +21,12 @@ type ITiledGraph interface {
 	GetNode(node int32) Node
 	GetEdge(edge int32) Edge
 	GetNodeGeom(node int32) geo.Coord
-	GetEdgeGeom(edge int32) geo.CoordArray
 
 	// Additional
 	GetNodeTile(node int32) int16
 	TileCount() int16
 	GetShortcut(shc int32) Shortcut
-	GetEdgesFromShortcut(edges *List[int32], shortcut_id int32)
+	GetEdgesFromShortcut(shortcut_id int32, reversed bool, handler func(int32))
 	HasCellIndex() bool
 	GetIndexEdges(tile int16, dir Direction) (Array[Shortcut], error)
 }
@@ -40,7 +39,7 @@ type TiledGraph struct {
 	// Base Graph
 	base   IGraphBase
 	weight IWeighting
-	index  IGraphIndex
+	index  Optional[IGraphIndex]
 
 	// Tiles Storage
 	partition      *Partition
@@ -56,6 +55,14 @@ func (self *TiledGraph) GetGraphExplorer() IGraphExplorer {
 		accessor:      self.base.GetAccessor(),
 		skip_accessor: self.skip_topology.GetAccessor(),
 		weight:        self.weight,
+	}
+}
+func (self *TiledGraph) GetIndex() IGraphIndex {
+	if self.index.HasValue() {
+		return self.index.Value
+	} else {
+		self.index.Value = BuildGraphIndex(self.base)
+		return self.index.Value
 	}
 }
 func (self *TiledGraph) GetNodeTile(node int32) int16 {
@@ -79,19 +86,11 @@ func (self *TiledGraph) GetNode(node int32) Node {
 func (self *TiledGraph) GetEdge(edge int32) Edge {
 	return self.base.GetEdge(edge)
 }
-func (self *TiledGraph) GetNodeGeom(node int32) geo.Coord {
-	return self.base.GetNodeGeom(node)
-}
-func (self *TiledGraph) GetEdgeGeom(edge int32) geo.CoordArray {
-	return self.base.GetEdgeGeom(edge)
-}
 func (self *TiledGraph) GetShortcut(shc int32) Shortcut {
 	return self.skip_shortcuts.GetShortcut(shc)
 }
-func (self *TiledGraph) GetEdgesFromShortcut(edges *List[int32], shc_id int32) {
-	self.skip_shortcuts.GetEdgesFromShortcut(shc_id, false, func(edge int32) {
-		edges.Add(edge)
-	})
+func (self *TiledGraph) GetEdgesFromShortcut(shc_id int32, reversed bool, handler func(int32)) {
+	self.skip_shortcuts.GetEdgesFromShortcut(shc_id, reversed, handler)
 }
 func (self *TiledGraph) GetIndexEdges(tile int16, dir Direction) (Array[Shortcut], error) {
 	if !self.cell_index.HasValue() {
@@ -106,9 +105,6 @@ func (self *TiledGraph) GetIndexEdges(tile int16, dir Direction) (Array[Shortcut
 func (self *TiledGraph) HasCellIndex() bool {
 	return self.cell_index.HasValue()
 }
-func (self *TiledGraph) GetIndex() IGraphIndex {
-	return self.index
-}
 
 //*******************************************
 // tiled-graph explorer
@@ -116,7 +112,7 @@ func (self *TiledGraph) GetIndex() IGraphIndex {
 
 type TiledGraphExplorer struct {
 	graph         *TiledGraph
-	accessor      _AdjArrayAccessor
+	accessor      IAdjacencyAccessor
 	skip_accessor _AdjArrayAccessor
 	weight        IWeighting
 }
