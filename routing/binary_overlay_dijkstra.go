@@ -131,6 +131,7 @@ func (self *BODijkstra) Steps(count int, handler func(int32)) bool {
 				return
 			}
 			if ref.IsShortcut() {
+				self.graph.GetEdgesFromShortcut(edge_id, false, handler)
 			} else {
 				handler(edge_id)
 			}
@@ -177,7 +178,9 @@ func (self *BODijkstra) GetShortestPath() Path {
 		curr_flag := self.flags[curr_id]
 		edge = curr_flag.prev_edge
 		if curr_flag.is_shortcut {
-			// self.graph.GetEdgesFromShortcut(&path, edge)
+			self.graph.GetEdgesFromShortcut(edge, false, func(e int32) {
+				path.Add(e)
+			})
 			curr_id = explorer.GetOtherNode(graph.CreateCHShortcutRef(edge), curr_id)
 		} else {
 			path.Add(edge)

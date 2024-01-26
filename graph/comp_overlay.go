@@ -24,7 +24,7 @@ func (self *Overlay) _New() *Overlay {
 	return &Overlay{}
 }
 func (self *Overlay) _Load(path string) {
-	skip_shortcuts := _LoadShortcuts(path + "skip_shortcuts")
+	skip_shortcuts := _LoadShortcuts(path + "-skip_shortcuts")
 	skip_topology := _LoadAdjacency(path+"-skip_topology", true)
 	edge_types := ReadArrayFromFile[byte](path + "-tiles_types")
 

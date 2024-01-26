@@ -125,7 +125,7 @@ func Store(attr *GraphAttributes, path string) {
 	_StoreGraphGeom(attr.node_geoms, attr.edge_geoms, path+"-geom")
 }
 
-func Load2(path string) *GraphAttributes {
+func Load(path string) *GraphAttributes {
 	_, err := os.Stat(path + "-attrib")
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + path + "-attrib")
@@ -164,7 +164,7 @@ func Load2(path string) *GraphAttributes {
 	}
 }
 
-func Load(path string) *GraphAttributes {
+func LoadMin(path string) *GraphAttributes {
 	_, err := os.Stat(path + "-attrib")
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + path + "-attrib")

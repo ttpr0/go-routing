@@ -91,6 +91,9 @@ func _BuildTopology(nodes Array[Node], edges Array[Edge]) _AdjacencyArray {
 func _BuildKDTreeIndex(base IGraphBase) KDTree[int32] {
 	tree := NewKDTree[int32](2)
 	for i := 0; i < base.NodeCount(); i++ {
+		if !base.IsNode(int32(i)) {
+			continue
+		}
 		node := base.GetNode(int32(i))
 		geom := node.Loc
 		tree.Insert(geom[:], int32(i))

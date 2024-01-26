@@ -86,6 +86,9 @@ func (self *TiledGraph) GetNode(node int32) Node {
 func (self *TiledGraph) GetEdge(edge int32) Edge {
 	return self.base.GetEdge(edge)
 }
+func (self *TiledGraph) GetNodeGeom(node int32) geo.Coord {
+	return self.GetNode(node).Loc
+}
 func (self *TiledGraph) GetShortcut(shc int32) Shortcut {
 	return self.skip_shortcuts.GetShortcut(shc)
 }

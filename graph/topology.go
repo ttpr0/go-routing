@@ -241,7 +241,7 @@ func (self *_AdjListAccessor) GetEdgeID() int32 {
 func (self *_AdjListAccessor) GetOtherID() int32 {
 	return self.curr_other_id
 }
-func (self *_AdjListAccessor) Type() byte {
+func (self *_AdjListAccessor) GetType() byte {
 	return self.curr_type
 }
 
