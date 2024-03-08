@@ -1,51 +1,22 @@
-package graph
+package preproc
 
 import (
 	"sort"
 
+	"github.com/ttpr0/go-routing/comps"
+	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
 )
-
-//*******************************************
-// modification methods
-//*******************************************
-
-type IReorderable interface {
-	_ReorderNodes(mapping Array[int32])
-}
-
-// reorders nodes in graph using mapping
-// mapping: old id -> new id
-func ReorderNodes(comp IReorderable, mapping Array[int32]) {
-	comp._ReorderNodes(mapping)
-}
-
-type IModifyable interface {
-	_RemoveNodes(nodes List[int32])
-	_RemoveEdges(edges List[int32])
-}
-
-// removes nodes from nodes-list by id keeping order in tact
-//
-// also removes all edges (or shortcuts) adjacent to removed nodes
-func RemoveNodes(comp IModifyable, nodes List[int32]) {
-	comp._RemoveNodes(nodes)
-}
-
-// removes edges from edges-list by id keeping order in tact
-func RemoveEdges(comp IModifyable, edges List[int32]) {
-	comp._RemoveEdges(edges)
-}
 
 //*******************************************
 // compute orderings
 //*******************************************
 
 // Orders nodes by CH-level.
-func ComputeLevelOrdering(g IGraph, ch *CH) Array[int32] {
+func ComputeLevelOrdering(g graph.IGraph, ch *comps.CH) Array[int32] {
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), ch.node_levels[i]))
+		indices.Add(MakeTuple(int32(i), ch.GetNodeLevel(int32(i))))
 	}
 	sort.SliceStable(indices, func(i, j int) bool {
 		return indices[i].B > indices[j].B
@@ -60,11 +31,11 @@ func ComputeLevelOrdering(g IGraph, ch *CH) Array[int32] {
 // Orders nodes by tiles and levels.
 // Border nodes are pushed to front of all nodes.
 // Within their tiles nodes are ordered by level.
-func ComputeTileLevelOrdering(g IGraph, partition *Partition, ch *CH) Array[int32] {
+func ComputeTileLevelOrdering(g graph.IGraph, partition *comps.Partition, ch *comps.CH) Array[int32] {
 	// sort by level
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
-		indices.Add(MakeTuple(int32(i), ch.node_levels[i]))
+		indices.Add(MakeTuple(int32(i), ch.GetNodeLevel(int32(i))))
 	}
 	sort.SliceStable(indices, func(i, j int) bool {
 		return indices[i].B > indices[j].B
@@ -92,7 +63,7 @@ func ComputeTileLevelOrdering(g IGraph, partition *Partition, ch *CH) Array[int3
 
 // Orders nodes by tiles.
 // Border nodes are pushed to front of all nodes.
-func ComputeTileOrdering(g IGraph, partition *Partition) Array[int32] {
+func ComputeTileOrdering(g graph.IGraph, partition *comps.Partition) Array[int32] {
 	is_border := _IsBorderNode3(g, partition)
 	indices := NewList[Tuple[int32, int16]](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {

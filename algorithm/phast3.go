@@ -2,6 +2,7 @@ package algorithm
 
 import (
 	"github.com/ttpr0/go-routing/graph"
+	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
 )
 
@@ -54,7 +55,7 @@ func CalcPHAST3(g graph.ICHGraph, start int32, max_range int32) Array[int32] {
 		edge := down_edges[i]
 		curr_len := dist[edge.From]
 		if curr_len > max_range {
-			count := graph.Shortcut_get_payload[int32](&edge, 0)
+			count := structs.Shortcut_get_payload[int32](&edge, 0)
 			i += count
 			continue
 		}

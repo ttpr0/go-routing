@@ -1,0 +1,58 @@
+package preproc
+
+import (
+	"github.com/ttpr0/go-routing/algorithm"
+	"github.com/ttpr0/go-routing/comps"
+	"github.com/ttpr0/go-routing/graph"
+	"github.com/ttpr0/go-routing/structs"
+	. "github.com/ttpr0/go-routing/util"
+)
+
+//*******************************************
+// prepare transit-data
+//*******************************************
+
+func PrepareTransit(g graph.IGraph, stops Array[structs.Node], connections Array[structs.Connection], max_transfer_range int32) *comps.Transit {
+	mapping := NewArray[[2]int32](g.NodeCount())
+	for i := 0; i < g.NodeCount(); i++ {
+		mapping[i] = [2]int32{-1, -1}
+	}
+	for i := 0; i < stops.Length(); i++ {
+		stop := stops[i]
+		closest, ok := g.GetClosestNode(stop.Loc)
+		if !ok {
+			continue
+		}
+		mapping[closest][0] = int32(i)
+		mapping[i][1] = closest
+	}
+	id_mapping := structs.NewIDMapping(mapping)
+	shortcuts := structs.NewShortcutStore(100, false)
+	node_flags := NewFlags[algorithm.DistFlag](int32(g.NodeCount()), algorithm.DistFlag{100000000})
+	edge_flags := NewFlags[algorithm.DistFlag](int32(g.EdgeCount()), algorithm.DistFlag{100000000})
+	for i := 0; i < stops.Length(); i++ {
+		s_node := id_mapping.GetSource(int32(i))
+		if s_node == -1 {
+			continue
+		}
+		starts := [1]Tuple[int32, int32]{MakeTuple(s_node, int32(0))}
+		algorithm.CalcRangeDijkstraTC(g, starts[:], node_flags, edge_flags, max_transfer_range)
+		for j := 0; j < stops.Length(); j++ {
+			if i == j {
+				continue
+			}
+			t_node := id_mapping.GetSource(int32(j))
+			if t_node == -1 {
+				continue
+			}
+			dist := node_flags.Get(t_node).GetDist()
+			if dist > max_transfer_range {
+				continue
+			}
+			// TODO: edges from shortcuts
+			shortcuts.AddShortcut(structs.Shortcut{From: int32(i), To: int32(j), Weight: dist}, []int32{})
+		}
+	}
+
+	return comps.NewTransit(id_mapping, stops, connections, shortcuts)
+}

@@ -24,11 +24,10 @@ func HandleMatrixRequest(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Run Matrix Request")
 
-	index := GRAPH.GetIndex()
 	source_nodes := NewArray[int32](req.Sources.Length())
 	for i := 0; i < req.Sources.Length(); i++ {
 		loc := req.Sources[i]
-		id, ok := index.GetClosestNode(loc)
+		id, ok := GRAPH.GetClosestNode(loc)
 		if ok {
 			source_nodes[i] = id
 		} else {
@@ -38,7 +37,7 @@ func HandleMatrixRequest(w http.ResponseWriter, r *http.Request) {
 	destination_nodes := NewArray[int32](req.Destinations.Length())
 	for i := 0; i < req.Destinations.Length(); i++ {
 		loc := req.Destinations[i]
-		id, ok := index.GetClosestNode(loc)
+		id, ok := GRAPH.GetClosestNode(loc)
 		if ok {
 			destination_nodes[i] = id
 		} else {

@@ -1,21 +1,27 @@
-package graph
+package structs
 
 import (
 	. "github.com/ttpr0/go-routing/util"
 )
 
-func NewIDMapping(size int) _IDMapping {
+func NewIDMapping(mapping Array[[2]int32]) IDMapping {
+	return IDMapping{
+		mapping: mapping,
+	}
+}
+
+func NewIdendityMapping(size int) IDMapping {
 	mapping := NewArray[[2]int32](size)
 	for i := 0; i < size; i++ {
 		mapping[i] = [2]int32{int32(i), int32(i)}
 	}
-	return _IDMapping{
+	return IDMapping{
 		mapping: mapping,
 	}
 }
 
 // Maps indices from a source to a target and reversed.
-type _IDMapping struct {
+type IDMapping struct {
 	// Contains two mappings:
 	//
 	// -> first value maps source s to target t: mapping[s][0] = t
@@ -24,17 +30,17 @@ type _IDMapping struct {
 	mapping Array[[2]int32]
 }
 
-func (self *_IDMapping) GetTarget(source int32) int32 {
+func (self *IDMapping) GetTarget(source int32) int32 {
 	return self.mapping[source][0]
 }
 
-func (self *_IDMapping) GetSource(target int32) int32 {
+func (self *IDMapping) GetSource(target int32) int32 {
 	return self.mapping[target][1]
 }
 
 // reorders sources,
 // mapping: old id -> new id
-func (self *_IDMapping) ReorderSources(mapping Array[int32]) {
+func (self *IDMapping) ReorderSources(mapping Array[int32]) {
 	if self.mapping.Length() != mapping.Length() {
 		panic("invalid mapping")
 	}
@@ -58,7 +64,7 @@ func (self *_IDMapping) ReorderSources(mapping Array[int32]) {
 
 // reorders targets,
 // mapping: old id -> new id
-func (self *_IDMapping) ReorderTargets(mapping Array[int32]) {
+func (self *IDMapping) ReorderTargets(mapping Array[int32]) {
 	if self.mapping.Length() != mapping.Length() {
 		panic("invalid mapping")
 	}
@@ -80,12 +86,12 @@ func (self *_IDMapping) ReorderTargets(mapping Array[int32]) {
 	}
 }
 
-func _StoreIDMapping(store _IDMapping, file string) {
+func StoreIDMapping(store IDMapping, file string) {
 	WriteArrayToFile[[2]int32](store.mapping, file)
 }
-func _LoadIDMapping(file string) _IDMapping {
+func LoadIDMapping(file string) IDMapping {
 	store := ReadArrayFromFile[[2]int32](file)
-	return _IDMapping{
+	return IDMapping{
 		mapping: store,
 	}
 }

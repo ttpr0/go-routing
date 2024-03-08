@@ -18,13 +18,12 @@ type TransitDijkstra struct {
 	start_id  int32
 	end_id    int32
 	departure int32
-	day       graph.WeekDay
 	graph     *graph.TransitGraph
 	flags     []flag_td
 }
 
 func NewTransitDijkstra(g *graph.TransitGraph, start, end int32) *TransitDijkstra {
-	d := TransitDijkstra{graph: g, start_id: start, end_id: end, departure: 36000, day: graph.THUESDAY}
+	d := TransitDijkstra{graph: g, start_id: start, end_id: end, departure: 36000}
 
 	flags := make([]flag_td, g.NodeCount())
 	for i := 0; i < len(flags); i++ {
@@ -42,6 +41,7 @@ func NewTransitDijkstra(g *graph.TransitGraph, start, end int32) *TransitDijkstr
 
 func (self *TransitDijkstra) CalcShortestPath() bool {
 	explorer := self.graph.GetGraphExplorer()
+	transit_explorer := self.graph.GetTransitExplorer()
 
 	for {
 		curr_id, ok := self.heap.Dequeue()
@@ -58,16 +58,37 @@ func (self *TransitDijkstra) CalcShortestPath() bool {
 		}
 		curr_flag.visited = true
 		arival := self.departure + int32(curr_flag.path_length)
-		explorer.ForAdjacentEdges(curr_id, graph.ADJACENT_ALL, arival, self.day, func(ref graph.EdgeRef, index int) {
-			// edge_id := ref.EdgeID
+		if self.graph.IsStop(curr_id) {
+			transit_explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
+				if ref.IsShortcut() {
+					return
+				}
+				other_id := ref.OtherID
+				other_flag := self.flags[other_id]
+				if other_flag.visited {
+					return
+				}
+				conn_weight := transit_explorer.GetConnectionWeight(ref, arival)
+				if !conn_weight.HasValue() {
+					return
+				}
+				new_length := float64(conn_weight.Value.Arrival - self.departure)
+				if other_flag.path_length > new_length {
+					other_flag.ref = ref
+					other_flag.path_length = new_length
+					self.heap.Enqueue(other_id, new_length)
+				}
+				self.flags[other_id] = other_flag
+			})
+		}
+		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
 			other_id := ref.OtherID
 			other_flag := self.flags[other_id]
 			if other_flag.visited {
 				return
 			}
-			turn_cost := float64(explorer.GetTurnCost(curr_flag.ref, arival, curr_id, ref, index))
-			edge_weight := float64(explorer.GetEdgeWeight(ref, index))
-			new_length := curr_flag.path_length + turn_cost + edge_weight
+			edge_weight := float64(explorer.GetEdgeWeight(ref))
+			new_length := curr_flag.path_length + edge_weight
 			if other_flag.path_length > new_length {
 				other_flag.ref = ref
 				other_flag.path_length = new_length
@@ -103,5 +124,5 @@ func (self *TransitDijkstra) GetShortestPath() Path {
 		path[i], path[j] = path[j], path[i]
 	}
 	fmt.Println("length:", length)
-	return NewPath(self.graph.GetBaseGraph(), path)
+	return NewPath(self.graph, path)
 }

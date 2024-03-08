@@ -2,6 +2,7 @@ package algorithm
 
 import (
 	"github.com/ttpr0/go-routing/graph"
+	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
 )
 
@@ -64,13 +65,13 @@ func CalcPHAST4(g graph.ICHGraph, start int32, max_range int32) Array[int32] {
 		}
 		if dist[edge.To] > new_len {
 			dist[edge.To] = new_len
-			to_tile := graph.Shortcut_get_payload[int16](&edge, 0)
+			to_tile := structs.Shortcut_get_payload[int16](&edge, 0)
 			active_tiles[to_tile] = true
 		}
 	}
 	for i := int(overlay_end); i < down_edges.Length(); i++ {
 		curr_dummy := down_edges[i]
-		curr_tile := graph.Shortcut_get_payload[int16](&curr_dummy, 0)
+		curr_tile := structs.Shortcut_get_payload[int16](&curr_dummy, 0)
 		curr_count := curr_dummy.To
 		if active_tiles[curr_tile] {
 			tile_start := i + 1
@@ -152,7 +153,7 @@ func CalcPHAST5(g graph.ICHGraph, start int32, max_range int32) Array[int32] {
 		}
 		if dist[edge.To] > new_len {
 			dist[edge.To] = new_len
-			to_tile := graph.Shortcut_get_payload[int16](&edge, 0)
+			to_tile := structs.Shortcut_get_payload[int16](&edge, 0)
 			active_tiles[to_tile] = true
 		}
 	}
@@ -160,8 +161,8 @@ func CalcPHAST5(g graph.ICHGraph, start int32, max_range int32) Array[int32] {
 	tiles_end := int(down_edges.Length())
 	for i := tiles_start; i < tiles_end; i++ {
 		edge := down_edges[i]
-		is_dummy := graph.Shortcut_get_payload[bool](&edge, 2)
-		to_tile := graph.Shortcut_get_payload[int16](&edge, 0)
+		is_dummy := structs.Shortcut_get_payload[bool](&edge, 2)
+		to_tile := structs.Shortcut_get_payload[int16](&edge, 0)
 		if is_dummy {
 			curr_tile := to_tile
 			if !active_tiles[curr_tile] {

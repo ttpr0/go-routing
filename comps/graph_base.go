@@ -1,4 +1,4 @@
-package graph
+package comps
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 
+	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
 )
 
@@ -16,12 +17,12 @@ import (
 type IGraphBase interface {
 	NodeCount() int
 	EdgeCount() int
-	GetNode(node int32) Node
+	GetNode(node int32) structs.Node
 	IsNode(node int32) bool
-	GetEdge(edge int32) Edge
+	GetEdge(edge int32) structs.Edge
 	IsEdge(edge int32) bool
-	GetAccessor() IAdjacencyAccessor
-	GetNodeDegree(node int32, dir Direction) int16
+	GetAccessor() structs.IAdjAccessor
+	GetNodeDegree(node int32, forward bool) int16
 }
 
 //*******************************************
@@ -31,9 +32,18 @@ type IGraphBase interface {
 var _ IGraphBase = &GraphBase{}
 
 type GraphBase struct {
-	nodes    Array[Node]
-	edges    Array[Edge]
-	topology _AdjacencyArray
+	nodes    Array[structs.Node]
+	edges    Array[structs.Edge]
+	topology structs.AdjacencyArray
+}
+
+func NewGraphBase(nodes Array[structs.Node], edges Array[structs.Edge]) *GraphBase {
+	topology := _BuildTopology(nodes, edges)
+	return &GraphBase{
+		nodes:    nodes,
+		edges:    edges,
+		topology: topology,
+	}
 }
 
 func (self *GraphBase) NodeCount() int {
@@ -49,7 +59,7 @@ func (self *GraphBase) IsNode(node int32) bool {
 		return false
 	}
 }
-func (self *GraphBase) GetNode(node int32) Node {
+func (self *GraphBase) GetNode(node int32) structs.Node {
 	return self.nodes[node]
 }
 func (self *GraphBase) IsEdge(edge int32) bool {
@@ -59,15 +69,15 @@ func (self *GraphBase) IsEdge(edge int32) bool {
 		return false
 	}
 }
-func (self *GraphBase) GetEdge(edge int32) Edge {
+func (self *GraphBase) GetEdge(edge int32) structs.Edge {
 	return self.edges[edge]
 }
-func (self *GraphBase) GetAccessor() IAdjacencyAccessor {
+func (self *GraphBase) GetAccessor() structs.IAdjAccessor {
 	accessor := self.topology.GetAccessor()
 	return &accessor
 }
-func (self *GraphBase) GetNodeDegree(node int32, dir Direction) int16 {
-	return self.topology.GetDegree(node, dir)
+func (self *GraphBase) GetNodeDegree(node int32, forward bool) int16 {
+	return self.topology.GetDegree(node, forward)
 }
 
 //*******************************************
@@ -76,7 +86,7 @@ func (self *GraphBase) GetNodeDegree(node int32, dir Direction) int16 {
 
 func (self *GraphBase) _ReorderNodes(mapping Array[int32]) {
 	// nodes
-	new_nodes := NewArray[Node](self.NodeCount())
+	new_nodes := NewArray[structs.Node](self.NodeCount())
 	for i, id := range mapping {
 		new_nodes[id] = self.nodes[i]
 	}
@@ -91,7 +101,7 @@ func (self *GraphBase) _ReorderNodes(mapping Array[int32]) {
 	}
 
 	// others
-	self.topology._ReorderNodes(mapping)
+	self.topology.ReorderNodes(mapping)
 }
 func (self *GraphBase) _RemoveNodes(nodes List[int32]) {
 	remove := NewArray[bool](self.NodeCount())
@@ -99,7 +109,7 @@ func (self *GraphBase) _RemoveNodes(nodes List[int32]) {
 		remove[n] = true
 	}
 
-	new_nodes := NewList[Node](100)
+	new_nodes := NewList[structs.Node](100)
 	mapping := NewArray[int32](self.NodeCount())
 	id := int32(0)
 	for i := 0; i < self.NodeCount(); i++ {
@@ -111,20 +121,20 @@ func (self *GraphBase) _RemoveNodes(nodes List[int32]) {
 		mapping[i] = id
 		id += 1
 	}
-	new_edges := NewList[Edge](100)
+	new_edges := NewList[structs.Edge](100)
 	for i := 0; i < self.EdgeCount(); i++ {
 		edge := self.GetEdge(int32(i))
 		if remove[edge.NodeA] || remove[edge.NodeB] {
 			continue
 		}
-		new_edges.Add(Edge{
+		new_edges.Add(structs.Edge{
 			NodeA: mapping[edge.NodeA],
 			NodeB: mapping[edge.NodeB],
 		})
 	}
 
-	self.nodes = Array[Node](new_nodes)
-	self.edges = Array[Edge](new_edges)
+	self.nodes = Array[structs.Node](new_nodes)
+	self.edges = Array[structs.Edge](new_edges)
 	self.topology = _BuildTopology(self.nodes, self.edges)
 }
 func (self *GraphBase) _RemoveEdges(edges List[int32]) {
@@ -138,7 +148,7 @@ func (self *GraphBase) _RemoveEdges(edges List[int32]) {
 func (self *GraphBase) _Store(path string) {
 	_StoreGraphNodes(self.nodes, path+"-nodes")
 	_StoreGraphEdges(self.edges, path+"-edges")
-	_StoreAdjacency(&self.topology, false, path+"-graph")
+	structs.StoreAdjacency(&self.topology, false, path+"-graph")
 }
 
 func (self *GraphBase) _New() *GraphBase {
@@ -147,7 +157,7 @@ func (self *GraphBase) _New() *GraphBase {
 func (self *GraphBase) _Load2(path string) {
 	nodes := _LoadGraphNodes(path + "-nodes")
 	edges := _LoadGraphEdges(path + "-edges")
-	topology := _LoadAdjacency(path+"-graph", false)
+	topology := structs.LoadAdjacency(path+"-graph", false)
 
 	*self = GraphBase{
 		nodes:    nodes,
@@ -159,7 +169,7 @@ func (self *GraphBase) _Load2(path string) {
 func (self *GraphBase) _Load(path string) {
 	nodes := _LoadGraphNodes(path + "-nodes")
 	edges := _LoadGraphEdges(path + "-edges")
-	topology := _LoadAdjacency(path+"-graph", false)
+	topology := structs.LoadAdjacency(path+"-graph", false)
 
 	*self = GraphBase{
 		nodes:    nodes,
@@ -172,7 +182,7 @@ func (self *GraphBase) _Load(path string) {
 // load and store components
 //*******************************************
 
-func _StoreGraphNodes(nodes Array[Node], filename string) {
+func _StoreGraphNodes(nodes Array[structs.Node], filename string) {
 	nodesbuffer := bytes.Buffer{}
 
 	nodecount := nodes.Length()
@@ -188,7 +198,7 @@ func _StoreGraphNodes(nodes Array[Node], filename string) {
 	nodesfile.Write(nodesbuffer.Bytes())
 }
 
-func _LoadGraphNodes(file string) Array[Node] {
+func _LoadGraphNodes(file string) Array[structs.Node] {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -198,19 +208,19 @@ func _LoadGraphNodes(file string) Array[Node] {
 	nodereader := bytes.NewReader(nodedata)
 	var nodecount int32
 	binary.Read(nodereader, binary.LittleEndian, &nodecount)
-	nodes := NewList[Node](int(nodecount))
+	nodes := NewList[structs.Node](int(nodecount))
 	for i := 0; i < int(nodecount); i++ {
 		var c [2]float32
 		binary.Read(nodereader, binary.LittleEndian, &c)
-		nodes.Add(Node{
+		nodes.Add(structs.Node{
 			Loc: c,
 		})
 	}
 
-	return Array[Node](nodes)
+	return Array[structs.Node](nodes)
 }
 
-func _StoreGraphEdges(edges Array[Edge], filename string) {
+func _StoreGraphEdges(edges Array[structs.Edge], filename string) {
 	edgesbuffer := bytes.Buffer{}
 
 	edgecount := edges.Length()
@@ -227,7 +237,7 @@ func _StoreGraphEdges(edges Array[Edge], filename string) {
 	edgesfile.Write(edgesbuffer.Bytes())
 }
 
-func _LoadGraphEdges(file string) Array[Edge] {
+func _LoadGraphEdges(file string) Array[structs.Edge] {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -237,17 +247,17 @@ func _LoadGraphEdges(file string) Array[Edge] {
 	edgereader := bytes.NewReader(edgedata)
 	var edgecount int32
 	binary.Read(edgereader, binary.LittleEndian, &edgecount)
-	edges := NewList[Edge](int(edgecount))
+	edges := NewList[structs.Edge](int(edgecount))
 	for i := 0; i < int(edgecount); i++ {
 		var a int32
 		binary.Read(edgereader, binary.LittleEndian, &a)
 		var b int32
 		binary.Read(edgereader, binary.LittleEndian, &b)
-		edges.Add(Edge{
+		edges.Add(structs.Edge{
 			NodeA: a,
 			NodeB: b,
 		})
 	}
 
-	return Array[Edge](edges)
+	return Array[structs.Edge](edges)
 }

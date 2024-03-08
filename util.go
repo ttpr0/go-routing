@@ -1,9 +1,8 @@
 package main
 
 import (
-	"github.com/ttpr0/go-routing/access/decay"
-	"github.com/ttpr0/go-routing/access/view"
 	"github.com/ttpr0/go-routing/attr"
+	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 )
@@ -37,8 +36,7 @@ func LoadOrCreate(graph_path string, osm_file string, partition_file string) gra
 }
 
 func GetClosestNode(point geo.Coord, graph graph.IGraph) int32 {
-	index := graph.GetIndex()
-	id, _ := index.GetClosestNode(point)
+	id, _ := graph.GetClosestNode(point)
 	return id
 }
 
@@ -56,48 +54,8 @@ func NewGeoJSONFeature() GeoJSONFeature {
 	return line
 }
 
-func GetDemandView(param DemandRequestParams) view.IPointView {
-	var demand_view view.IPointView
-	if param.Locations != nil && param.Weights != nil {
-		demand_view = view.NewPointView(param.Locations, param.Weights)
-	} else if param.Locations != nil {
-		demand_view = view.NewPointView(param.Locations, nil)
-	}
-	return demand_view
-}
-
-func GetSupplyView(param SupplyRequestParams) view.IPointView {
-	var supply_view view.IPointView
-	if param.Locations != nil && param.Weights != nil {
-		supply_view = view.NewPointView(param.Locations, param.Weights)
-	} else if param.Locations != nil {
-		supply_view = view.NewPointView(param.Locations, nil)
-	}
-	return supply_view
-}
-
-func GetDistanceDecay(param DecayRequestParams) decay.IDistanceDecay {
-	switch param.Type {
-	case "hybrid":
-		if param.Ranges == nil || param.RangeFactors == nil {
-			return nil
-		}
-		if len(param.Ranges) == 0 || len(param.RangeFactors) != len(param.Ranges) {
-			return nil
-		}
-		return decay.NewHybridDecay(param.Ranges, param.RangeFactors)
-	case "linear":
-		if param.MaxRange <= 0 {
-			return nil
-		}
-		return decay.NewLinearDecay(param.MaxRange)
-	default:
-		return nil
-	}
-}
-
-func BuildDefaultWeighting(base graph.IGraphBase, attributes *attr.GraphAttributes) *graph.DefaultWeighting {
-	weights := graph.NewDefaultWeighting(base)
+func BuildDefaultWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
+	weights := comps.NewDefaultWeighting(base)
 	for i := 0; i < base.EdgeCount(); i++ {
 		attr := attributes.GetEdgeAttribs(int32(i))
 		w := attr.Length * 3.6 / float32(attr.Maxspeed)
@@ -110,8 +68,8 @@ func BuildDefaultWeighting(base graph.IGraphBase, attributes *attr.GraphAttribut
 	return weights
 }
 
-func BuildPedestrianWeighting(base graph.IGraphBase, attributes *attr.GraphAttributes) *graph.DefaultWeighting {
-	weights := graph.NewDefaultWeighting(base)
+func BuildPedestrianWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
+	weights := comps.NewDefaultWeighting(base)
 	for i := 0; i < base.EdgeCount(); i++ {
 		attr := attributes.GetEdgeAttribs(int32(i))
 		w := attr.Length * 3.6 / 3
@@ -124,8 +82,8 @@ func BuildPedestrianWeighting(base graph.IGraphBase, attributes *attr.GraphAttri
 	return weights
 }
 
-func BuildTCWeighting(base graph.IGraphBase, attributes *attr.GraphAttributes) *graph.TCWeighting {
-	weight := graph.NewTCWeighting(base)
+func BuildTCWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.TCWeighting {
+	weight := comps.NewTCWeighting(base)
 
 	for i := 0; i < int(base.EdgeCount()); i++ {
 		attr := attributes.GetEdgeAttribs(int32(i))

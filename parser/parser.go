@@ -10,12 +10,13 @@ import (
 	"github.com/paulmach/osm"
 	"github.com/paulmach/osm/osmpbf"
 	"github.com/ttpr0/go-routing/attr"
+	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/geo"
-	"github.com/ttpr0/go-routing/graph"
+	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
 )
 
-func ParseGraph(pbf_file string) (*graph.GraphBase, *attr.GraphAttributes) {
+func ParseGraph(pbf_file string) (*comps.GraphBase, *attr.GraphAttributes) {
 	nodes := NewList[OSMNode](10000)
 	edges := NewList[OSMEdge](10000)
 	index_mapping := NewDict[int64, int](10000)
@@ -26,7 +27,7 @@ func ParseGraph(pbf_file string) (*graph.GraphBase, *attr.GraphAttributes) {
 	return base, attr
 }
 
-func ParseGraphFromOSM(pbf_file string) (*graph.GraphBase, *attr.GraphAttributes) {
+func ParseGraphFromOSM(pbf_file string) (*comps.GraphBase, *attr.GraphAttributes) {
 	nodes := NewList[OSMNode](10000)
 	edges := NewList[OSMEdge](10000)
 	index_mapping := NewDict[int64, int](10000)
@@ -68,9 +69,9 @@ func _ParseOsm(filename string, nodes *List[OSMNode], edges *List[OSMEdge], inde
 	}
 }
 
-func _CreateGraphBase(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) (*graph.GraphBase, *attr.GraphAttributes) {
-	nodes := NewList[graph.Node](osmnodes.Length())
-	edges := NewList[graph.Edge](osmedges.Length() * 2)
+func _CreateGraphBase(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) (*comps.GraphBase, *attr.GraphAttributes) {
+	nodes := NewList[structs.Node](osmnodes.Length())
+	edges := NewList[structs.Edge](osmedges.Length() * 2)
 	node_attrs := NewList[attr.NodeAttribs](osmnodes.Length())
 	edge_attrs := NewList[attr.EdgeAttribs](osmedges.Length() * 2)
 	node_geoms := NewList[geo.Coord](osmnodes.Length())
@@ -78,7 +79,7 @@ func _CreateGraphBase(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) (*graph.
 
 	edge_index_mapping := NewDict[int, int](osmedges.Length())
 	for i, osmedge := range *osmedges {
-		edge := graph.Edge{
+		edge := structs.Edge{
 			NodeA: int32(osmedge.NodeA),
 			NodeB: int32(osmedge.NodeB),
 		}
@@ -92,7 +93,7 @@ func _CreateGraphBase(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) (*graph.
 		edge_geoms.Add(geo.CoordArray(osmedge.Nodes))
 		edge_index_mapping[i] = edges.Length() - 1
 		if !osmedge.Oneway {
-			edge = graph.Edge{
+			edge = structs.Edge{
 				NodeA: int32(osmedge.NodeB),
 				NodeB: int32(osmedge.NodeA),
 			}
@@ -108,7 +109,7 @@ func _CreateGraphBase(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) (*graph.
 	}
 
 	for _, osmnode := range *osmnodes {
-		node := graph.Node{
+		node := structs.Node{
 			Loc: osmnode.Point,
 		}
 		node_attr := attr.NodeAttribs{}
@@ -117,7 +118,7 @@ func _CreateGraphBase(osmnodes *List[OSMNode], osmedges *List[OSMEdge]) (*graph.
 		node_geoms.Add(osmnode.Point)
 	}
 
-	base := graph.BuildGraphBase(Array[graph.Node](nodes), Array[graph.Edge](edges))
+	base := comps.NewGraphBase(Array[structs.Node](nodes), Array[structs.Edge](edges))
 	attr := attr.New(Array[attr.NodeAttribs](node_attrs), Array[attr.EdgeAttribs](edge_attrs), Array[geo.Coord](node_geoms), Array[geo.CoordArray](edge_geoms))
 	return base, attr
 }

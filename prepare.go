@@ -9,8 +9,10 @@ import (
 
 	"github.com/ttpr0/go-routing/algorithm"
 	"github.com/ttpr0/go-routing/attr"
+	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/graph"
 	"github.com/ttpr0/go-routing/parser"
+	"github.com/ttpr0/go-routing/preproc"
 	. "github.com/ttpr0/go-routing/util"
 )
 
@@ -24,14 +26,14 @@ func prepare() {
 	// Parse graph
 	//*******************************************
 	base, attributes := parser.ParseGraph(DATA_DIR + "/" + GRAPH_NAME + ".pbf")
-	graph.Store(base, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
+	comps.Store(base, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
 	attr.Store(attributes, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
 
 	//*******************************************
 	// Remove unconnected components
 	//*******************************************
 	// compute closely connected components
-	eq_weight := graph.NewEqualWeighting()
+	eq_weight := comps.NewEqualWeighting()
 	g := graph.BuildGraph(base, eq_weight)
 	groups := algorithm.ConnectedComponents(g)
 	// get largest group
@@ -45,11 +47,11 @@ func prepare() {
 	}
 	fmt.Println("remove", remove.Length(), "nodes")
 	// remove nodes from graph
-	graph.RemoveNodes(base, remove)
-	graph.Store(base, GRAPH_DIR+"/"+GRAPH_NAME)
+	comps.RemoveNodes(base, remove)
+	comps.Store(base, GRAPH_DIR+"/"+GRAPH_NAME)
 
 	weight := BuildDefaultWeighting(base, attributes)
-	graph.Store(weight, GRAPH_DIR+"/"+GRAPH_NAME+"-fastest")
+	comps.Store(weight, GRAPH_DIR+"/"+GRAPH_NAME+"-fastest")
 
 	g = graph.BuildGraph(base, weight)
 
@@ -131,46 +133,42 @@ func prepare() {
 	wg.Wait()
 }
 
-func create_grasp_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name, tiles_name string) {
+func create_grasp_graph(base comps.IGraphBase, weight comps.IWeighting, graph_name, out_name, tiles_name string) {
 	g := graph.BuildGraph(base, weight)
 	tiles := graph.ReadNodeTiles(tiles_name)
-	partition := graph.NewPartition(tiles)
+	partition := comps.NewPartition(tiles)
 
-	td := graph.PrepareOverlay(g, partition)
+	td := preproc.PrepareOverlay(g, partition)
 
-	mapping := graph.ComputeTileOrdering(g, partition)
-	graph.ReorderNodes(td, mapping)
+	mapping := preproc.ComputeTileOrdering(g, partition)
+	comps.ReorderNodes(td, mapping)
 
-	graph.PrepareGRASPCellIndex(g, partition)
+	preproc.PrepareGRASPCellIndex(g, partition)
 	// TODO
 }
 
-func create_isophast_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name, tiles_name string) {
-	g := graph.BuildGraph(base, weight)
+func create_isophast_graph(base comps.IGraphBase, weight comps.IWeighting, graph_name, out_name, tiles_name string) {
 	tiles := graph.ReadNodeTiles(tiles_name)
-	partition := graph.NewPartition(tiles)
+	partition := comps.NewPartition(tiles)
 
-	graph.PrepareIsoPHAST(g, partition)
+	preproc.PrepareIsoPHAST(base, weight, partition)
 	// TODO
 }
 
-func create_ch_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name string) {
-	g := graph.BuildGraph(base, weight)
+func create_ch_graph(base comps.IGraphBase, weight comps.IWeighting, graph_name, out_name string) {
+	cd := preproc.CalcContraction6(base, weight)
 
-	cd := graph.CalcContraction6(g)
-
-	graph.PreparePHASTIndex(g, cd)
+	preproc.PreparePHASTIndex(base, weight, cd)
 	// TODO
 }
 
-func create_tiled_ch_graph(base graph.IGraphBase, weight graph.IWeighting, graph_name, out_name, tiles_name string) {
-	g := graph.BuildGraph(base, weight)
+func create_tiled_ch_graph(base comps.IGraphBase, weight comps.IWeighting, graph_name, out_name, tiles_name string) {
 	tiles := graph.ReadNodeTiles(tiles_name)
-	partition := graph.NewPartition(tiles)
+	partition := comps.NewPartition(tiles)
 
-	cd := graph.CalcContraction5(g, partition)
+	cd := preproc.CalcContraction5(base, weight, partition)
 
-	graph.PrepareGSPHASTIndex(g, cd, partition)
+	preproc.PrepareGSPHASTIndex(base, weight, cd, partition)
 	// TODO
 }
 

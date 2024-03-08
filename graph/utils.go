@@ -188,32 +188,3 @@ func ReadNodeOrdering(filename string) Array[int32] {
 	}
 	return ordering
 }
-
-func _IsBorderNode3(graph IGraph, partition *Partition) Array[bool] {
-	is_border := NewArray[bool](graph.NodeCount())
-
-	explorer := graph.GetGraphExplorer()
-	for i := 0; i < graph.NodeCount(); i++ {
-		explorer.ForAdjacentEdges(int32(i), FORWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if partition.GetNodeTile(int32(i)) != partition.GetNodeTile(ref.OtherID) {
-				is_border[i] = true
-			}
-		})
-		explorer.ForAdjacentEdges(int32(i), BACKWARD, ADJACENT_ALL, func(ref EdgeRef) {
-			if partition.GetNodeTile(int32(i)) != partition.GetNodeTile(ref.OtherID) {
-				is_border[i] = true
-			}
-		})
-	}
-
-	return is_border
-}
-
-// Reorders Array based on mapping (old-id -> new-id).
-func Reorder[T any](arr Array[T], mapping Array[int32]) Array[T] {
-	new_arr := NewArray[T](arr.Length())
-	for i, id := range mapping {
-		new_arr[id] = arr[i]
-	}
-	return new_arr
-}

@@ -1,4 +1,4 @@
-package graph
+package structs
 
 import (
 	"errors"
@@ -11,16 +11,16 @@ import (
 // shortcut storage
 //*******************************************
 
-func _NewShortcutStore(cap int, is_static bool) _ShortcutStore {
+func NewShortcutStore(cap int, is_static bool) ShortcutStore {
 	if is_static {
-		return _ShortcutStore{
+		return ShortcutStore{
 			shortcuts:        NewList[Shortcut](cap),
 			_has_static_size: true,
 			_is_node_based:   true,
 			edges_stat:       Some(NewList[[2]Tuple[int32, byte]](cap)),
 		}
 	} else {
-		return _ShortcutStore{
+		return ShortcutStore{
 			shortcuts:        NewList[Shortcut](cap),
 			_has_static_size: false,
 			_is_node_based:   true,
@@ -30,7 +30,7 @@ func _NewShortcutStore(cap int, is_static bool) _ShortcutStore {
 	}
 }
 
-type _ShortcutStore struct {
+type ShortcutStore struct {
 	// list of shortcuts
 	shortcuts List[Shortcut]
 
@@ -51,17 +51,17 @@ type _ShortcutStore struct {
 }
 
 // Number of shortcuts currently stored.
-func (self *_ShortcutStore) ShortcutCount() int {
+func (self *ShortcutStore) ShortcutCount() int {
 	return self.shortcuts.Length()
 }
 
 // Returns shortcut with id.
-func (self *_ShortcutStore) GetShortcut(shc_id int32) Shortcut {
+func (self *ShortcutStore) GetShortcut(shc_id int32) Shortcut {
 	return self.shortcuts[shc_id]
 }
 
 // Adds a new shortcut with static edges-count.
-func (self *_ShortcutStore) AddCHShortcut(shc Shortcut, edges [2]Tuple[int32, byte]) (int32, error) {
+func (self *ShortcutStore) AddCHShortcut(shc Shortcut, edges [2]Tuple[int32, byte]) (int32, error) {
 	if !self._has_static_size || !self.edges_stat.HasValue() {
 		return 0, errors.New("ShortcutStore has dynamic edgerefs")
 	}
@@ -72,7 +72,7 @@ func (self *_ShortcutStore) AddCHShortcut(shc Shortcut, edges [2]Tuple[int32, by
 }
 
 // Adds a new shortcut with dynamic edges-count.
-func (self *_ShortcutStore) AddShortcut(shc Shortcut, edges []int32) (int32, error) {
+func (self *ShortcutStore) AddShortcut(shc Shortcut, edges []int32) (int32, error) {
 	if self._has_static_size || !self.edgerefs_dyn.HasValue() {
 		return 0, errors.New("ShortcutStore has static edgerefs")
 	}
@@ -89,7 +89,7 @@ func (self *_ShortcutStore) AddShortcut(shc Shortcut, edges []int32) (int32, err
 }
 
 // Retrives underlying edges from shortcut.
-func (self *_ShortcutStore) GetEdgesFromShortcut(shc_id int32, reversed bool, handler func(int32)) {
+func (self *ShortcutStore) GetEdgesFromShortcut(shc_id int32, reversed bool, handler func(int32)) {
 	if !self._has_static_size {
 		edgeref := self.edgerefs_dyn.Value[shc_id]
 		edges := self.edges_dyn.Value[edgeref.A : edgeref.A+int32(edgeref.B)]
@@ -106,7 +106,7 @@ func (self *_ShortcutStore) GetEdgesFromShortcut(shc_id int32, reversed bool, ha
 		self._UnpackCHShortcutRecursive(shc_id, reversed, handler)
 	}
 }
-func (self *_ShortcutStore) _UnpackCHShortcutRecursive(shc_id int32, reversed bool, handler func(int32)) {
+func (self *ShortcutStore) _UnpackCHShortcutRecursive(shc_id int32, reversed bool, handler func(int32)) {
 	edges := self.edges_stat.Value[shc_id]
 	if reversed {
 		e := edges[1]
@@ -143,7 +143,7 @@ func (self *_ShortcutStore) _UnpackCHShortcutRecursive(shc_id int32, reversed bo
 
 // reorders node information,
 // mapping: old id -> new id
-func (self *_ShortcutStore) _ReorderNodes(mapping Array[int32]) {
+func (self *ShortcutStore) ReorderNodes(mapping Array[int32]) {
 	if self._is_node_based {
 		// shortcuts
 		for i := 0; i < self.ShortcutCount(); i++ {
@@ -157,7 +157,7 @@ func (self *_ShortcutStore) _ReorderNodes(mapping Array[int32]) {
 
 // reorders edge information,
 // mapping: old id -> new id
-func (self *_ShortcutStore) _ReorderEdges(mapping Array[int32]) {
+func (self *ShortcutStore) ReorderEdges(mapping Array[int32]) {
 	if !self._is_node_based {
 		// shortcuts
 		for i := 0; i < self.ShortcutCount(); i++ {
@@ -191,7 +191,7 @@ func (self *_ShortcutStore) _ReorderEdges(mapping Array[int32]) {
 // shortcut storage IO
 //*******************************************
 
-func _StoreShortcuts(store _ShortcutStore, filename string) {
+func StoreShortcuts(store ShortcutStore, filename string) {
 	writer := NewBufferWriter()
 
 	// write header
@@ -211,7 +211,7 @@ func _StoreShortcuts(store _ShortcutStore, filename string) {
 		Write[int32](writer, shc.From)
 		Write[int32](writer, shc.To)
 		Write[int32](writer, shc.Weight)
-		Write[[4]byte](writer, shc._payload)
+		Write[[4]byte](writer, shc.Payload)
 	}
 
 	// write shortcut edges
@@ -240,7 +240,7 @@ func _StoreShortcuts(store _ShortcutStore, filename string) {
 	shcfile.Write(writer.Bytes())
 }
 
-func _LoadShortcuts(file string) _ShortcutStore {
+func LoadShortcuts(file string) ShortcutStore {
 	_, err := os.Stat(file)
 	if errors.Is(err, os.ErrNotExist) {
 		panic("file not found: " + file)
@@ -260,10 +260,10 @@ func _LoadShortcuts(file string) _ShortcutStore {
 		weight := Read[int32](reader)
 		payload := Read[[4]byte](reader)
 		shortcut := Shortcut{
-			From:     from,
-			To:       to,
-			Weight:   weight,
-			_payload: payload,
+			From:    from,
+			To:      to,
+			Weight:  weight,
+			Payload: payload,
 		}
 		shortcuts.Add(shortcut)
 	}
@@ -282,7 +282,7 @@ func _LoadShortcuts(file string) _ShortcutStore {
 			}
 			edges_stat.Add(edges)
 		}
-		return _ShortcutStore{
+		return ShortcutStore{
 			shortcuts:        shortcuts,
 			_has_static_size: true,
 
@@ -301,7 +301,7 @@ func _LoadShortcuts(file string) _ShortcutStore {
 			edges_dyn.Add(e_id)
 		}
 
-		return _ShortcutStore{
+		return ShortcutStore{
 			shortcuts:        shortcuts,
 			_has_static_size: false,
 

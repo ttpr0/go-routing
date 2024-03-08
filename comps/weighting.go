@@ -1,4 +1,4 @@
-package graph
+package comps
 
 import (
 	"bytes"
@@ -15,22 +15,17 @@ import (
 
 type IWeighting interface {
 	GetEdgeWeight(edge int32) int32
-	GetTurnCost(from, via, to int32) int32
-
-	Type() WeightType
-
-	HasTurnCosts() bool
-	IsDynamic() bool
-	IsTimeDependant() bool
 }
 
-type WeightType byte
+type ITCWeighting interface {
+	GetEdgeWeight(edge int32) int32
+	GetTurnCost(from, via, to int32) int32
+}
 
-const (
-	DEFAULT_WEIGHT   WeightType = 0
-	TURN_COST_WEIGHT WeightType = 1
-	TRAFFIC_WEIGHT   WeightType = 2
-)
+type ITransitWeighting interface {
+	GetNextWeight(connection int32, from int32) Optional[ConnectionWeight]
+	GetWeightsInRange(connection int32, from, to int32) []ConnectionWeight
+}
 
 //*******************************************
 // default weighting without turn costs
@@ -54,19 +49,6 @@ func (self *DefaultWeighting) SetEdgeWeight(edge int32, weight int32) {
 }
 func (self *DefaultWeighting) GetTurnCost(from, via, to int32) int32 {
 	return 0
-}
-
-func (self *DefaultWeighting) Type() WeightType {
-	return DEFAULT_WEIGHT
-}
-func (self *DefaultWeighting) HasTurnCosts() bool {
-	return false
-}
-func (self *DefaultWeighting) IsDynamic() bool {
-	return false
-}
-func (self *DefaultWeighting) IsTimeDependant() bool {
-	return false
 }
 
 func (self *DefaultWeighting) _New() *DefaultWeighting {
@@ -135,19 +117,6 @@ func (self *EqualWeighting) GetTurnCost(from, via, to int32) int32 {
 	return 0
 }
 
-func (self *EqualWeighting) Type() WeightType {
-	return DEFAULT_WEIGHT
-}
-func (self *EqualWeighting) HasTurnCosts() bool {
-	return false
-}
-func (self *EqualWeighting) IsDynamic() bool {
-	return false
-}
-func (self *EqualWeighting) IsTimeDependant() bool {
-	return false
-}
-
 //*******************************************
 // dynamic weighting
 //*******************************************
@@ -167,19 +136,6 @@ func (self *DynamicWeighting) GetEdgeWeight(edge int32) int32 {
 }
 func (self *DynamicWeighting) GetTurnCost(from, via, to int32) int32 {
 	return 0
-}
-
-func (self *DynamicWeighting) Type() WeightType {
-	return DEFAULT_WEIGHT
-}
-func (self *DynamicWeighting) HasTurnCosts() bool {
-	return false
-}
-func (self *DynamicWeighting) IsDynamic() bool {
-	return true
-}
-func (self *DynamicWeighting) IsTimeDependant() bool {
-	return false
 }
 
 //*******************************************
@@ -202,14 +158,14 @@ func NewTCWeighting(base IGraphBase) *TCWeighting {
 	accessor := base.GetAccessor()
 	for i := 0; i < int(base.NodeCount()); i++ {
 		fwd_index := 0
-		accessor.SetBaseNode(int32(i), FORWARD)
+		accessor.SetBaseNode(int32(i), true)
 		for accessor.Next() {
 			edge_id := accessor.GetEdgeID()
 			edge_indices[int(edge_id)].A = byte(fwd_index)
 			fwd_index += 1
 		}
 		bwd_index := 0
-		accessor.SetBaseNode(int32(i), BACKWARD)
+		accessor.SetBaseNode(int32(i), false)
 		for accessor.Next() {
 			edge_id := accessor.GetEdgeID()
 			edge_indices[int(edge_id)].B = byte(bwd_index)
@@ -251,19 +207,6 @@ func (self *TCWeighting) SetTurnCost(from, via, to int32, weight int32) {
 	cols := tc_ref.C
 	loc := tc_ref.A
 	self.turn_weights[loc+int(cols*bwd_index)+int(fwd_index)] = byte(weight)
-}
-
-func (self *TCWeighting) Type() WeightType {
-	return TURN_COST_WEIGHT
-}
-func (self *TCWeighting) HasTurnCosts() bool {
-	return true
-}
-func (self *TCWeighting) IsDynamic() bool {
-	return false
-}
-func (self *TCWeighting) IsTimeDependant() bool {
-	return false
 }
 
 func (self *TCWeighting) _New() *TCWeighting {
@@ -343,46 +286,118 @@ func (self *TCWeighting) _ReorderNodes(mapping Array[int32]) {
 }
 
 //*******************************************
-// weighting with traffic updates
+// weighting with turn costs
 //*******************************************
 
-type TrafficWeighting struct {
-	EdgeWeight []int32
-	Traffic    *TrafficTable
+type TransitWeighting struct {
+	transit_weights Array[List[ConnectionWeight]]
 }
 
-func (self *TrafficWeighting) GetEdgeWeight(edge int32) int32 {
-	factor := 1 + float32(self.Traffic.GetTraffic(edge))/20
-	weight := float32(self.EdgeWeight[edge])
-	return int32(weight * factor)
-}
-func (self *TrafficWeighting) GetTurnCost(from, via, to int32) int32 {
-	return 0
+type ConnectionWeight struct {
+	Departure int32
+	Arrival   int32
+	Trip      int32
 }
 
-func (self *TrafficWeighting) Type() WeightType {
-	return TRAFFIC_WEIGHT
-}
-func (self *TrafficWeighting) HasTurnCosts() bool {
-	return false
-}
-func (self *TrafficWeighting) IsDynamic() bool {
-	return true
-}
-func (self *TrafficWeighting) IsTimeDependant() bool {
-	return false
+func NewTransitWeighting(transit *Transit) *TransitWeighting {
+	transit_weights := NewArray[List[ConnectionWeight]](transit.ConnectionCount())
+
+	return &TransitWeighting{
+		transit_weights: transit_weights,
+	}
 }
 
-type TrafficTable struct {
-	EdgeTraffic []int32
+func (self *TransitWeighting) GetNextWeight(connection int32, from int32) Optional[ConnectionWeight] {
+	conn_weights := self.transit_weights[connection]
+	for i := 0; i < conn_weights.Length(); i++ {
+		if conn_weights[i].Departure >= from {
+			return Some(conn_weights[i])
+		}
+	}
+	return None[ConnectionWeight]()
+}
+func (self *TransitWeighting) GetWeightsInRange(connection int32, from, to int32) []ConnectionWeight {
+	conn_weights := self.transit_weights[connection]
+	start := -1
+	end := -1
+	for i := 0; i < conn_weights.Length(); i++ {
+		if conn_weights[i].Departure >= from && start == -1 {
+			start = i
+		}
+		if start != -1 && conn_weights[i].Departure > to {
+			end = i
+			break
+		}
+	}
+	if start == -1 {
+		return nil
+	}
+	if end == -1 {
+		end = conn_weights.Length()
+	}
+	return conn_weights[start:end]
+}
+func (self *TransitWeighting) SetWeights(connection int32, schedule []ConnectionWeight) {
+	self.transit_weights[connection] = List[ConnectionWeight](schedule)
 }
 
-func (self *TrafficTable) AddTraffic(edge int32) {
-	self.EdgeTraffic[edge] += 1
+func (self *TransitWeighting) _New() *TCWeighting {
+	return &TCWeighting{}
 }
-func (self *TrafficTable) SubTraffic(edge int32) {
-	self.EdgeTraffic[edge] -= 1
+func (self *TransitWeighting) _Load(path string) {
+	file := path + "-weight"
+	_, err := os.Stat(file)
+	if errors.Is(err, os.ErrNotExist) {
+		panic("file not found: " + file)
+	}
+
+	data, _ := os.ReadFile(file)
+	reader := NewBufferReader(data)
+
+	conn_count := Read[int32](reader)
+	transit_weights := NewArray[List[ConnectionWeight]](int(conn_count))
+
+	for i := 0; i < int(conn_count); i++ {
+		schedule_count := Read[int32](reader)
+		schedule := NewList[ConnectionWeight](int(schedule_count))
+		for j := 0; j < int(schedule_count); j++ {
+			departure := Read[int32](reader)
+			arrival := Read[int32](reader)
+			trip := Read[int32](reader)
+			schedule.Add(ConnectionWeight{departure, arrival, trip})
+		}
+		transit_weights[i] = schedule
+	}
+
+	*self = TransitWeighting{
+		transit_weights: transit_weights,
+	}
 }
-func (self *TrafficTable) GetTraffic(edge int32) int32 {
-	return self.EdgeTraffic[edge]
+func (self *TransitWeighting) _Store(path string) {
+	filename := path + "-weight"
+	writer := NewBufferWriter()
+
+	conn_count := self.transit_weights.Length()
+	Write(writer, int32(conn_count))
+	for i := 0; i < conn_count; i++ {
+		conn_weights := self.transit_weights[i]
+		schedule_count := conn_weights.Length()
+		Write(writer, int32(schedule_count))
+		for j := 0; j < schedule_count; j++ {
+			conn_weight := conn_weights[j]
+			Write(writer, int32(conn_weight.Departure))
+			Write(writer, int32(conn_weight.Arrival))
+			Write(writer, int32(conn_weight.Trip))
+		}
+	}
+
+	weightfile, _ := os.Create(filename)
+	defer weightfile.Close()
+	weightfile.Write(writer.Bytes())
+}
+func (self *TransitWeighting) _Remove(path string) {
+	os.Remove(path + "-weight")
+}
+func (self *TransitWeighting) _ReorderNodes(mapping Array[int32]) {
+	panic("not implemented")
 }

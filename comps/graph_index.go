@@ -1,7 +1,8 @@
-package graph
+package comps
 
 import (
 	"github.com/ttpr0/go-routing/geo"
+	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
 )
 
@@ -21,12 +22,19 @@ type BaseGraphIndex struct {
 	index KDTree[int32]
 }
 
+func NewGraphIndex(base IGraphBase) IGraphIndex {
+	index := _BuildKDTreeIndex(base)
+	return &BaseGraphIndex{
+		index: index,
+	}
+}
+
 func (self *BaseGraphIndex) GetClosestNode(point geo.Coord) (int32, bool) {
 	return self.index.GetClosest(point[:], 0.005)
 }
 
 type MappedGraphIndex struct {
-	id_mapping _IDMapping
+	id_mapping structs.IDMapping
 	index      IGraphIndex
 }
 

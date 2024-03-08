@@ -5,26 +5,24 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"runtime/pprof"
 	"strings"
 	"time"
 
 	"github.com/ttpr0/go-routing/algorithm"
-	"github.com/ttpr0/go-routing/algorithm/partitioning"
 	"github.com/ttpr0/go-routing/attr"
+	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/graph"
 	"github.com/ttpr0/go-routing/parser"
+	"github.com/ttpr0/go-routing/preproc"
+	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
 )
 
-// var GRAPH graph.ICHGraph
-// var GRAPH2 graph.ICHGraph
 var GRAPH graph.IGraph
+var GRAPH2 graph.ICHGraph
+var GRAPH3 graph.ITiledGraph
 var ATTR *attr.GraphAttributes
-var GRAPH3 *graph.TransitGraph
-
-// var GRAPH graph.IGraph
-
-// var MANAGER *routing.DistributedManager
 
 type Dummy struct {
 	Val string `json:"val"`
@@ -33,31 +31,22 @@ type Dummy struct {
 func main() {
 	fmt.Println("hello world")
 
-	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
+	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
 	attributes := attr.Load("./graphs/niedersachsen/attr")
-	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
+	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
+	partition := comps.Load[*comps.Partition]("./graphs/niedersachsen/partition")
+	overlay := comps.Load[*comps.Overlay]("./graphs/niedersachsen/grasp-overlay")
+	ch := comps.Load[*comps.CH]("./graphs/niedersachsen/ch")
+
 	GRAPH = graph.BuildGraph(base, weight)
+	GRAPH2 = graph.BuildCHGraph(base, weight, ch, None[*comps.CHIndex]())
+	GRAPH3 = graph.BuildTiledGraph(base, weight, partition, overlay, None[*comps.CellIndex]())
 	ATTR = attributes
-
-	pedestrian_weight := BuildPedestrianWeighting(base, attributes)
-	transit_data := graph.LoadTransitData("./graphs/test/transit_graph")
-	fmt.Println("start buidling transit-graph")
-	GRAPH3 = graph.BuildTransitGraph(base, pedestrian_weight, transit_data)
-
-	// GRAPH = graph.GetBaseGraph(dir, "default")
-
-	// GRAPH = graph.LoadOrCreate("./graphs/default", "./data/niedersachsen.pbf", "./data/landkreise.json")
-	// MANAGER = routing.NewDistributedManager(GRAPH)
-	// GRAPH = graph.LoadCHGraph("./graphs/test_ch")
-	// GRAPH = graph.LoadGraph("./graphs/niedersachsen_sub")
-	// GRAPH = graph.LoadCHGraph("./graphs/niedersachsen_ch_3")
 
 	http.HandleFunc("/v0/routing", HandleRoutingRequest)
 	http.HandleFunc("/v0/routing/draw/create", HandleCreateContextRequest)
 	http.HandleFunc("/v0/routing/draw/step", HandleRoutingStepRequest)
 	http.HandleFunc("/v0/isoraster", HandleIsoRasterRequest)
-	http.HandleFunc("/v0/fca", HandleFCARequest)
-	http.HandleFunc("/v1/accessibility/fca", HandleFCARequest)
 	http.HandleFunc("/v1/matrix", HandleMatrixRequest)
 
 	app := http.DefaultServeMux
@@ -119,84 +108,80 @@ func main2() {
 	fmt.Println("remove", remove_nodes.Length(), "nodes")
 
 	// remove nodes from graph
-	graph.RemoveNodes(base, remove_nodes)
+	comps.RemoveNodes(base, remove_nodes)
 	attributes.RemoveNodes(remove_nodes)
 	attributes.RemoveEdges(remove_edges)
 
-	graph.Store(base, "./graphs/niedersachsen/base")
+	comps.Store(base, "./graphs/niedersachsen/base")
 	attr.Store(attributes, "./graphs/niedersachsen/attr")
 	weight = BuildDefaultWeighting(base, attributes)
-	graph.Store(weight, "./graphs/niedersachsen/default")
+	comps.Store(weight, "./graphs/niedersachsen/default")
 }
 
 // create grasp graph
 func main3() {
-	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
-	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
+	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
+	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
 	g := graph.BuildGraph(base, weight)
 
-	partition := graph.Load[*graph.Partition]("./graphs/niedersachsen/partition")
+	partition := comps.Load[*comps.Partition]("./graphs/niedersachsen/partition")
 
-	td := graph.PrepareOverlay(g, partition)
-	ci := graph.PrepareGRASPCellIndex(g, partition)
+	td := preproc.PrepareOverlay(g, partition)
+	ci := preproc.PrepareGRASPCellIndex(g, partition)
 
-	graph.Store(td, "./graphs/niedersachsen/grasp-overlay")
-	graph.Store(ci, "./graphs/niedersachsen/grasp-index")
+	comps.Store(td, "./graphs/niedersachsen/grasp-overlay")
+	comps.Store(ci, "./graphs/niedersachsen/grasp-index")
 }
 
 // create ch_graph
 func main4() {
-	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
-	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildGraph(base, weight)
+	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
+	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
 
-	ch := graph.CalcContraction6(g)
+	ch := preproc.CalcContraction6(base, weight)
 	// ci := graph.PreparePHASTIndex(g, cd)
 
 	// mapping := graph.ComputeLevelOrdering(g, ch)
 
-	graph.Store(ch, "./graphs/niedersachsen/ch")
+	comps.Store(ch, "./graphs/niedersachsen/ch")
 	// graph.Store(ci, "./graphs/niedersachsen/ch-index")
 }
 
 // create ch_graph with node_tile
 func main5() {
-	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
-	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildGraph(base, weight)
+	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
+	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
 
-	partition := graph.Load[*graph.Partition]("./graphs/niedersachsen/partition")
+	partition := comps.Load[*comps.Partition]("./graphs/niedersachsen/partition")
 
-	ch := graph.CalcContraction5(g, partition)
+	ch := preproc.CalcContraction5(base, weight, partition)
 	// ci := graph.PrepareGSPHASTIndex(g, cd, partition)
 
 	// mapping := graph.ComputeTileLevelOrdering(g, partition, ch)
 
-	graph.Store(ch, "./graphs/niedersachsen/ch")
+	comps.Store(ch, "./graphs/niedersachsen/ch_2")
 	// graph.Store(ci, "./graphs/niedersachsen/ch-index")
 }
 
 // create isophast graph
 func main6() {
-	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
-	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildGraph(base, weight)
+	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
+	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
 
-	partition := graph.Load[*graph.Partition]("./graphs/niedersachsen/partition")
+	partition := comps.Load[*comps.Partition]("./graphs/niedersachsen/partition")
 
-	td, ci := graph.PrepareIsoPHAST(g, partition)
+	td, ci := preproc.PrepareIsoPHAST(base, weight, partition)
 
-	graph.Store(td, "./graphs/niedersachsen/grasp-overlay")
-	graph.Store(ci, "./graphs/niedersachsen/grasp-index")
+	comps.Store(td, "./graphs/niedersachsen/isophast-overlay")
+	comps.Store(ci, "./graphs/niedersachsen/isophast-index")
 }
 
 func main7() {
-	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
-	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildGraph(base, weight)
+	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
+	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
 
-	ch_data := graph.Load[*graph.CH]("./graphs/niedersachsen/ch")
-	ch_index := graph.PreparePHASTIndex(g, ch_data)
+	ch_data := comps.Load[*comps.CH]("./graphs/niedersachsen/ch")
+	ch_index := preproc.PreparePHASTIndex(base, weight, ch_data)
 	cg := graph.BuildCHGraph(base, weight, ch_data, Some(ch_index))
 
 	fmt.Println("finished loading graph")
@@ -205,7 +190,7 @@ func main7() {
 	down_egdes, _ := cg.GetDownEdges(graph.FORWARD)
 	for i := 0; i < len(down_egdes); i++ {
 		edge := down_egdes[i]
-		count := graph.Shortcut_get_payload[int32](&edge, 0)
+		count := structs.Shortcut_get_payload[int32](&edge, 0)
 		if count <= 1 {
 			count += 1
 		}
@@ -273,33 +258,6 @@ func main7() {
 	// fmt.Println("PHAST5:", t2.Milliseconds()/N, "ms")
 }
 
-func main8() {
-	// g := graph.LoadGraph("./graphs/saarland")
-
-	// // file_str, _ := os.ReadFile("./data/landkreise.json")
-	// // collection := geo.FeatureCollection{}
-	// // _ = json.Unmarshal(file_str, &collection)
-	// // tiles := graph.CalcNodeTiles(g.GetGeometry(), collection.Features())
-
-	// tiles := partitioning.InertialFlow(g)
-
-	// nodes, edges := graph.GraphToGeoJSON2(g, tiles)
-	// node_bytes, _ := json.Marshal(&nodes)
-	// edge_bytes, _ := json.Marshal(&edges)
-
-	// node_file, _ := os.Create("./nodes.json")
-	// defer node_file.Close()
-	// node_file.Write(node_bytes)
-
-	// edge_file, _ := os.Create("./edges.json")
-	// defer edge_file.Close()
-	// edge_file.Write(edge_bytes)
-}
-
-func main9() {
-	prepare()
-}
-
 func main10() {
 	// load location-data
 	demand_locs, demand_weights, supply_locs, supply_weights := load_data("./data/population_wittmund.json", "./data/physicians_wittmund.json")
@@ -335,31 +293,19 @@ func main10() {
 	sup_file.Write([]byte(builder.String()))
 }
 
-func main11() {
-	// tg := graph.LoadGraph("./graphs/saarland_sub")
+func main8() {
+	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
+	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
 
-	// nodes, edges := graph.GraphToGeoJSON2(tg, NewArray[int16](tg.NodeCount()))
-	// node_bytes, _ := json.Marshal(&nodes)
-	// edge_bytes, _ := json.Marshal(&edges)
+	f, err := os.Create("test.prof")
+	if err != nil {
+		fmt.Println("failed to create log file")
+	}
+	defer f.Close()
 
-	// node_file, _ := os.Create("./nodes.json")
-	// defer node_file.Close()
-	// node_file.Write(node_bytes)
+	pprof.StartCPUProfile(f)
 
-	// edge_file, _ := os.Create("./edges.json")
-	// defer edge_file.Close()
-	// edge_file.Write(edge_bytes)
-}
+	preproc.CalcContraction6(base, weight)
 
-func main12() {
-	base := graph.Load[*graph.GraphBase]("./graphs/niedersachsen/base")
-	weight := graph.Load[*graph.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildGraph(base, weight)
-
-	tiles := partitioning.InertialFlow(g)
-
-	partition := graph.NewPartition(tiles)
-	graph.Store(partition, "./graphs/niedersachsen/partition")
-
-	graph.StoreNodeTiles("./ni_tiles.txt", tiles)
+	pprof.StopCPUProfile()
 }
