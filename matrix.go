@@ -3,8 +3,9 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"sync"
 
-	"github.com/ttpr0/go-routing/algorithm"
+	"github.com/ttpr0/go-routing/batched/onetomany"
 	"github.com/ttpr0/go-routing/geo"
 	. "github.com/ttpr0/go-routing/util"
 )
@@ -24,24 +25,27 @@ func HandleMatrixRequest(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println("Run Matrix Request")
 
-	source_nodes := NewArray[int32](req.Sources.Length())
-	for i := 0; i < req.Sources.Length(); i++ {
+	source_count := req.Sources.Length()
+	source_chan := make(chan Tuple[int, int32], source_count)
+	for i := 0; i < source_count; i++ {
 		loc := req.Sources[i]
 		id, ok := GRAPH.GetClosestNode(loc)
 		if ok {
-			source_nodes[i] = id
+			source_chan <- MakeTuple(i, id)
 		} else {
-			source_nodes[i] = -1
+			source_chan <- MakeTuple(i, int32(-1))
 		}
 	}
-	destination_nodes := NewArray[int32](req.Destinations.Length())
+	close(source_chan)
+	target_count := req.Destinations.Length()
+	target_nodes := NewArray[int32](target_count)
 	for i := 0; i < req.Destinations.Length(); i++ {
 		loc := req.Destinations[i]
 		id, ok := GRAPH.GetClosestNode(loc)
 		if ok {
-			destination_nodes[i] = id
+			target_nodes[i] = id
 		} else {
-			destination_nodes[i] = -1
+			target_nodes[i] = -1
 		}
 	}
 
@@ -52,7 +56,49 @@ func HandleMatrixRequest(w http.ResponseWriter, r *http.Request) {
 		max_range = 100000000
 	}
 
-	matrix := algorithm.DijkstraTDMatrix(GRAPH, source_nodes, destination_nodes, max_range)
+	matrix := NewMatrix[float32](source_count, target_count)
+	otm := onetomany.NewRangeDijkstra(GRAPH, int32(max_range))
+	wg := sync.WaitGroup{}
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() {
+			solver := otm.CreateSolver()
+			for {
+				// read supply entry from chan
+				temp, ok := <-source_chan
+				if !ok {
+					break
+				}
+				s := temp.A
+				s_node := temp.B
+				// if no node set all distances to -1
+				if s_node == -1 {
+					for i := 0; i < target_nodes.Length(); i++ {
+						matrix.Set(s, i, -1)
+					}
+					continue
+				}
+
+				solver.CalcDistanceFromStart(s_node)
+
+				// set distances in matrix
+				for t, t_node := range target_nodes {
+					if t_node == -1 {
+						matrix.Set(s, t, -1)
+						continue
+					}
+					dist := solver.GetDistance(t_node)
+					if dist > int32(max_range) {
+						matrix.Set(s, t, -1)
+						continue
+					}
+					matrix.Set(s, t, float32(dist))
+				}
+			}
+			wg.Done()
+		}()
+	}
+	wg.Wait()
 
 	resp := MatrixResponse{Durations: matrix}
 	fmt.Println("reponse build")

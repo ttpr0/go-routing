@@ -1,7 +1,7 @@
 package preproc
 
 import (
-	"github.com/ttpr0/go-routing/algorithm"
+	"github.com/ttpr0/go-routing/batched/onetomany"
 	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/graph"
 	"github.com/ttpr0/go-routing/structs"
@@ -28,15 +28,14 @@ func PrepareTransit(g graph.IGraph, stops Array[structs.Node], connections Array
 	}
 	id_mapping := structs.NewIDMapping(mapping)
 	shortcuts := structs.NewShortcutStore(100, false)
-	node_flags := NewFlags[algorithm.DistFlag](int32(g.NodeCount()), algorithm.DistFlag{100000000})
-	edge_flags := NewFlags[algorithm.DistFlag](int32(g.EdgeCount()), algorithm.DistFlag{100000000})
+	otm := onetomany.NewRangeDijkstraTC(g, max_transfer_range)
+	solver := otm.CreateSolver()
 	for i := 0; i < stops.Length(); i++ {
 		s_node := id_mapping.GetSource(int32(i))
 		if s_node == -1 {
 			continue
 		}
-		starts := [1]Tuple[int32, int32]{MakeTuple(s_node, int32(0))}
-		algorithm.CalcRangeDijkstraTC(g, starts[:], node_flags, edge_flags, max_transfer_range)
+		solver.CalcDistanceFromStart(s_node)
 		for j := 0; j < stops.Length(); j++ {
 			if i == j {
 				continue
@@ -45,7 +44,7 @@ func PrepareTransit(g graph.IGraph, stops Array[structs.Node], connections Array
 			if t_node == -1 {
 				continue
 			}
-			dist := node_flags.Get(t_node).GetDist()
+			dist := solver.GetDistance(t_node)
 			if dist > max_transfer_range {
 				continue
 			}

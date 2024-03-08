@@ -1,24 +1,79 @@
-package algorithm
+package onetomany
 
 import (
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
 )
 
-type TransitItem struct {
-	time      int32
-	departure int32
-	stop      int32
+func NewTransitDijkstra(g *graph.TransitGraph, max_range int32, from, to int32) *TransitDijkstra {
+	return &TransitDijkstra{
+		g:         g,
+		max_range: max_range,
+		from:      from,
+		to:        to,
+	}
 }
 
-type TransitFlag struct {
-	trips List[Tuple[int32, int32]]
+type TransitDijkstra struct {
+	g         *graph.TransitGraph
+	max_range int32
+	from      int32
+	to        int32
+}
+
+func (self *TransitDijkstra) CreateSolver() ISolver {
+	node_flags := NewFlags[DistFlag](int32(self.g.NodeCount()), DistFlag{1000000})
+	edge_flags := NewFlags[DistFlag](int32(self.g.EdgeCount()), DistFlag{1000000})
+	stop_flags := NewFlags[TransitFlag](int32(self.g.StopCount()), TransitFlag{})
+	return &TransitDijkstraSolver{
+		g:          self.g,
+		node_flags: node_flags,
+		edge_flags: edge_flags,
+		stop_flags: stop_flags,
+		max_range:  self.max_range,
+		from:       self.from,
+		to:         self.to,
+	}
+}
+
+type TransitDijkstraSolver struct {
+	g          *graph.TransitGraph
+	node_flags Flags[DistFlag]
+	edge_flags Flags[DistFlag]
+	stop_flags Flags[TransitFlag]
+	max_range  int32
+	from       int32
+	to         int32
+}
+
+// CalcDiatanceFromStarts implements ISolver.
+func (self *TransitDijkstraSolver) CalcDistanceFromStarts(starts Array[Tuple[int32, int32]]) error {
+	self.node_flags.Reset()
+	self.edge_flags.Reset()
+	self.stop_flags.Reset()
+	_CalcTransitDijkstra(self.g, starts, self.node_flags, self.edge_flags, self.stop_flags, self.max_range, self.from, self.to)
+	return nil
+}
+
+// CalcDistanceFromStart implements ISolver.
+func (self *TransitDijkstraSolver) CalcDistanceFromStart(start int32) error {
+	self.node_flags.Reset()
+	self.edge_flags.Reset()
+	self.stop_flags.Reset()
+	starts := [1]Tuple[int32, int32]{MakeTuple(start, int32(0))}
+	_CalcTransitDijkstra(self.g, starts[:], self.node_flags, self.edge_flags, self.stop_flags, self.max_range, self.from, self.to)
+	return nil
+}
+
+// GetDistance implements ISolver.
+func (self *TransitDijkstraSolver) GetDistance(node int32) int32 {
+	return self.node_flags.Get(node).Dist
 }
 
 // computes one-to-many distances using forward-dijkstra and public-transit
-func CalcTransitDijkstra(g *graph.TransitGraph, starts Array[Tuple[int32, int32]], node_flags Flags[DistFlag], edge_flags Flags[DistFlag], stop_flags Flags[TransitFlag], max_range int32, from, to int32) {
+func _CalcTransitDijkstra(g *graph.TransitGraph, starts Array[Tuple[int32, int32]], node_flags Flags[DistFlag], edge_flags Flags[DistFlag], stop_flags Flags[TransitFlag], max_range int32, from, to int32) {
 	// step 1: range-dijkstra from start
-	CalcRangeDijkstraTC(g, starts, node_flags, edge_flags, max_range)
+	_CalcRangeDijkstraTC(g, starts, node_flags, edge_flags, max_range)
 
 	// step 2: transit-dijkstra from all found stops
 	heap := NewPriorityQueue[TransitItem, int32](100)
@@ -104,5 +159,5 @@ func CalcTransitDijkstra(g *graph.TransitGraph, starts Array[Tuple[int32, int32]
 		base_node := g.MapStopToNode(int32(i))
 		starts_.Add(MakeTuple(base_node, dist))
 	}
-	CalcRangeDijkstraTC(g, Array[Tuple[int32, int32]](starts_), node_flags, edge_flags, max_range)
+	_CalcRangeDijkstraTC(g, Array[Tuple[int32, int32]](starts_), node_flags, edge_flags, max_range)
 }

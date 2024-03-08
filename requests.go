@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/ttpr0/go-routing/geo"
-	. "github.com/ttpr0/go-routing/util"
 )
 
 type RoutingRequestParams struct {
@@ -26,29 +25,4 @@ type RoutingRequestParams struct {
 	// direction params
 	// *************************************
 	LocationType string `json:"location_type"`
-}
-
-type DemandRequestParams struct {
-	// *************************************
-	// create new view from locations and weights
-	// *************************************
-	Locations Array[geo.Coord] `json:"demand_locations"`
-
-	Weights Array[int32] `json:"demand_weights"`
-}
-
-type SupplyRequestParams struct {
-	// *************************************
-	// create new view from locations and weights
-	// *************************************
-	Locations Array[geo.Coord] `json:"supply_locations"`
-
-	Weights Array[int32] `json:"supply_weights"`
-}
-
-type DecayRequestParams struct {
-	Type         string    `json:"decay_type"`
-	MaxRange     float32   `json:"max_range"`
-	Ranges       []float32 `json:"ranges"`
-	RangeFactors []float32 `json:"range_factors"`
 }
