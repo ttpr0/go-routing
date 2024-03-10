@@ -42,9 +42,15 @@ func (self *Overlay) GetEdgeType(edge int32) byte {
 	return self.edge_types[edge]
 }
 
-func (self *Overlay) _ReorderNodes(mapping Array[int32]) {
-	self.skip_shortcuts.ReorderNodes(mapping)
-	self.skip_topology.ReorderNodes(mapping)
+func (self *Overlay) _ReorderNodes(mapping Array[int32]) *Overlay {
+	new_shortcuts := self.skip_shortcuts.ReorderNodes(mapping)
+	new_topology := self.skip_topology.ReorderNodes(mapping)
+
+	return &Overlay{
+		skip_shortcuts: new_shortcuts,
+		skip_topology:  new_topology,
+		edge_types:     self.edge_types.Copy(),
+	}
 }
 func (self *Overlay) _New() *Overlay {
 	return &Overlay{}

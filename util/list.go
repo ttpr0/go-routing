@@ -43,6 +43,13 @@ func (self *List[T]) Slice(start int, end int) List[T] {
 	return (*self)[start:end]
 }
 
+// Copies the entire List
+func (self *List[T]) Copy() List[T] {
+	new_arr := make([]T, len(*self), cap(*self))
+	copy(new_arr, *self)
+	return new_arr
+}
+
 // Returns an IIterator for all elements of the List.
 func (self *List[T]) Values() IIterator[T] {
 	return _ListIterator[T]{self, 0}

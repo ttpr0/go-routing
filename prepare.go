@@ -1,175 +1,75 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"os"
-	"os/exec"
-	"sync"
-
 	"github.com/ttpr0/go-routing/algorithm"
-	"github.com/ttpr0/go-routing/attr"
+	"github.com/ttpr0/go-routing/algorithm/partitioning"
 	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/graph"
-	"github.com/ttpr0/go-routing/parser"
 	"github.com/ttpr0/go-routing/preproc"
 	. "github.com/ttpr0/go-routing/util"
 )
 
-func prepare() {
-	const DATA_DIR = "./data"
-	const GRAPH_DIR = "./graphs/niedersachsen/"
-	const GRAPH_NAME = "niedersachsen"
-	const KAHIP_EXE = "D:/Dokumente/BA/KaHIP/kaffpa"
-	var PARTITIONS = []int{1000}
-	//*******************************************
-	// Parse graph
-	//*******************************************
-	base, attributes := parser.ParseGraph(DATA_DIR + "/" + GRAPH_NAME + ".pbf")
-	comps.Store(base, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
-	attr.Store(attributes, GRAPH_DIR+"/"+GRAPH_NAME+"_pre")
-
-	//*******************************************
-	// Remove unconnected components
-	//*******************************************
-	// compute closely connected components
+func CreatePartition(base *comps.GraphBase, nodes_per_cell int) *comps.Partition {
 	eq_weight := comps.NewEqualWeighting()
-	g := graph.BuildGraph(base, eq_weight)
-	groups := algorithm.ConnectedComponents(g)
-	// get largest group
-	max_group := GetMostCommon(groups)
-	// get nodes to be removed
-	remove := NewList[int32](100)
-	for i := 0; i < g.NodeCount(); i++ {
-		if groups[i] != max_group {
-			remove.Add(int32(i))
-		}
-	}
-	fmt.Println("remove", remove.Length(), "nodes")
-	// remove nodes from graph
-	comps.RemoveNodes(base, remove)
-	comps.Store(base, GRAPH_DIR+"/"+GRAPH_NAME)
-
-	weight := BuildDefaultWeighting(base, attributes)
-	comps.Store(weight, GRAPH_DIR+"/"+GRAPH_NAME+"-fastest")
-
-	g = graph.BuildGraph(base, weight)
-
-	//*******************************************
-	// Partition with KaHIP
-	//*******************************************
-	// transform to metis graph
-	txt := graph.GraphToMETIS(g)
-	file, _ := os.Create("./" + GRAPH_NAME + "_metis.txt")
-	file.Write([]byte(txt))
-	file.Close()
-	// run commands
-	wg := sync.WaitGroup{}
-	fmt.Println("start partitioning graph")
-	for _, s := range PARTITIONS {
-		size := fmt.Sprint(s)
-		wg.Add(1)
-		go func() {
-			cmd := exec.Command(KAHIP_EXE, GRAPH_NAME+"_metis.txt", "--k="+size, "--preconfiguration=eco", "--output_filename=tmp_"+size+".txt")
-			if err := cmd.Run(); err != nil {
-				log.Fatal(err)
-			}
-			fmt.Println("	done:", size)
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-
-	//*******************************************
-	// Create GRASP-Graphs
-	//*******************************************
-	fmt.Println("start creating grasp-graphs")
-	for _, s := range PARTITIONS {
-		size := fmt.Sprint(s)
-		wg.Add(1)
-		go func() {
-			create_grasp_graph(base, weight, GRAPH_NAME, GRAPH_NAME+"_grasp_"+size, "./tmp_"+size+".txt")
-			fmt.Println("	done:", size)
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-
-	//*******************************************
-	// Create isoPHAST-Graphs
-	//*******************************************
-	fmt.Println("start creating isophast-graphs")
-	for _, s := range PARTITIONS {
-		size := fmt.Sprint(s)
-		wg.Add(1)
-		go func() {
-			create_isophast_graph(base, weight, GRAPH_NAME, GRAPH_NAME+"_isophast_"+size, "./tmp_"+size+".txt")
-			fmt.Println("	done:", size)
-			wg.Done()
-		}()
-	}
-	wg.Wait()
-
-	//*******************************************
-	// Create CH-Graph
-	//*******************************************
-	fmt.Println("start creating ch-graph")
-	create_ch_graph(base, weight, GRAPH_NAME, GRAPH_NAME+"_ch")
-	fmt.Println("	done")
-
-	//*******************************************
-	// Create Tiled-CH-Graph
-	//*******************************************
-	fmt.Println("start creating tiled-ch-graphs")
-	for _, s := range PARTITIONS {
-		size := fmt.Sprint(s)
-		wg.Add(1)
-		go func() {
-			create_tiled_ch_graph(base, weight, GRAPH_NAME, GRAPH_NAME+"_ch_tiled_"+size, "./tmp_"+size+".txt")
-			fmt.Println("	done:", size)
-			wg.Done()
-		}()
-	}
-	wg.Wait()
+	g := graph.BuildGraph(base, eq_weight, None[comps.IGraphIndex]())
+	tiles := partitioning.InertialFlow(g)
+	return comps.NewPartition(tiles)
 }
 
-func create_grasp_graph(base comps.IGraphBase, weight comps.IWeighting, graph_name, out_name, tiles_name string) {
-	g := graph.BuildGraph(base, weight)
-	tiles := graph.ReadNodeTiles(tiles_name)
-	partition := comps.NewPartition(tiles)
-
-	td := preproc.PrepareOverlay(g, partition)
+func CreateGRASP(base *comps.GraphBase, weight comps.IWeighting, partition *comps.Partition, skeleton bool) (*comps.GraphBase, *comps.Partition, *comps.Overlay, *comps.CellIndex, Array[int32]) {
+	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	var overlay *comps.Overlay
+	if skeleton {
+		overlay = preproc.PrepareSkeletonOverlay(g, partition)
+	} else {
+		overlay = preproc.PrepareOverlay(g, partition)
+	}
 
 	mapping := preproc.ComputeTileOrdering(g, partition)
-	comps.ReorderNodes(td, mapping)
+	new_base := comps.ReorderNodes(base, mapping)
+	new_overlay := comps.ReorderNodes(overlay, mapping)
+	new_partition := comps.ReorderNodes(partition, mapping)
 
-	preproc.PrepareGRASPCellIndex(g, partition)
-	// TODO
+	g = graph.BuildGraph(new_base, weight, None[comps.IGraphIndex]())
+	cell_index := preproc.PrepareGRASPCellIndex(g, partition)
+
+	return new_base, new_partition, new_overlay, cell_index, mapping
 }
 
-func create_isophast_graph(base comps.IGraphBase, weight comps.IWeighting, graph_name, out_name, tiles_name string) {
-	tiles := graph.ReadNodeTiles(tiles_name)
-	partition := comps.NewPartition(tiles)
+func CreateIsoPHAST(base *comps.GraphBase, weight comps.IWeighting, partition *comps.Partition) (*comps.GraphBase, *comps.Partition, *comps.Overlay, *comps.CellIndex, Array[int32]) {
+	overlay, cell_index := preproc.PrepareIsoPHAST(base, weight, partition)
 
-	preproc.PrepareIsoPHAST(base, weight, partition)
-	// TODO
+	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	mapping := preproc.ComputeTileOrdering(g, partition)
+	new_base := comps.ReorderNodes(base, mapping)
+	new_overlay := comps.ReorderNodes(overlay, mapping)
+	new_partition := comps.ReorderNodes(partition, mapping)
+	new_cell_index := comps.ReorderNodes(cell_index, mapping)
+
+	return new_base, new_partition, new_overlay, new_cell_index, mapping
 }
 
-func create_ch_graph(base comps.IGraphBase, weight comps.IWeighting, graph_name, out_name string) {
-	cd := preproc.CalcContraction6(base, weight)
+func CreateCH(base *comps.GraphBase, weight comps.IWeighting) (*comps.GraphBase, *comps.CH, Array[int32]) {
+	ch := preproc.CalcContraction6(base, weight)
 
-	preproc.PreparePHASTIndex(base, weight, cd)
-	// TODO
+	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	ordering := preproc.ComputeLevelOrdering(g, ch)
+	new_base := comps.ReorderNodes(base, ordering)
+	new_ch := comps.ReorderNodes(ch, ordering)
+
+	return new_base, new_ch, ordering
 }
 
-func create_tiled_ch_graph(base comps.IGraphBase, weight comps.IWeighting, graph_name, out_name, tiles_name string) {
-	tiles := graph.ReadNodeTiles(tiles_name)
-	partition := comps.NewPartition(tiles)
+func CreateTiledCH(base *comps.GraphBase, weight comps.IWeighting, partition *comps.Partition) (*comps.GraphBase, *comps.Partition, *comps.CH, Array[int32]) {
+	ch := preproc.CalcContraction5(base, weight, partition)
 
-	cd := preproc.CalcContraction5(base, weight, partition)
+	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	ordering := preproc.ComputeTileLevelOrdering(g, partition, ch)
+	new_base := comps.ReorderNodes(base, ordering)
+	new_ch := comps.ReorderNodes(ch, ordering)
+	new_partition := comps.ReorderNodes(partition, ordering)
 
-	preproc.PrepareGSPHASTIndex(base, weight, cd, partition)
-	// TODO
+	return new_base, new_partition, new_ch, ordering
 }
 
 func GetMostCommon[T comparable](arr Array[T]) T {
@@ -187,4 +87,18 @@ func GetMostCommon[T comparable](arr Array[T]) T {
 		counts[val] = count
 	}
 	return max_val
+}
+
+func RemoveConnectedComponents(base *comps.GraphBase) List[int32] {
+	eq_weight := comps.NewEqualWeighting()
+	g := graph.BuildGraph(base, eq_weight, None[comps.IGraphIndex]())
+	groups := algorithm.ConnectedComponents(g)
+	max_group := GetMostCommon(groups)
+	remove := NewList[int32](100)
+	for i := 0; i < g.NodeCount(); i++ {
+		if groups[i] != max_group {
+			remove.Add(int32(i))
+		}
+	}
+	return remove
 }

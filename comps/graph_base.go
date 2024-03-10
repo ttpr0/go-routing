@@ -84,26 +84,32 @@ func (self *GraphBase) GetNodeDegree(node int32, forward bool) int16 {
 // modification methods
 //*******************************************
 
-func (self *GraphBase) _ReorderNodes(mapping Array[int32]) {
+func (self *GraphBase) _ReorderNodes(mapping Array[int32]) *GraphBase {
 	// nodes
 	new_nodes := NewArray[structs.Node](self.NodeCount())
 	for i, id := range mapping {
 		new_nodes[id] = self.nodes[i]
 	}
-	self.nodes = new_nodes
 
 	// edges
+	new_edges := NewArray[structs.Edge](self.EdgeCount())
 	for i := 0; i < self.EdgeCount(); i++ {
 		edge := self.edges[i]
 		edge.NodeA = mapping[edge.NodeA]
 		edge.NodeB = mapping[edge.NodeB]
-		self.edges[i] = edge
+		new_edges[i] = edge
 	}
 
 	// others
-	self.topology.ReorderNodes(mapping)
+	new_topology := self.topology.ReorderNodes(mapping)
+
+	return &GraphBase{
+		nodes:    new_nodes,
+		edges:    new_edges,
+		topology: new_topology,
+	}
 }
-func (self *GraphBase) _RemoveNodes(nodes List[int32]) {
+func (self *GraphBase) _RemoveNodes(nodes List[int32]) *GraphBase {
 	remove := NewArray[bool](self.NodeCount())
 	for _, n := range nodes {
 		remove[n] = true
@@ -133,11 +139,13 @@ func (self *GraphBase) _RemoveNodes(nodes List[int32]) {
 		})
 	}
 
-	self.nodes = Array[structs.Node](new_nodes)
-	self.edges = Array[structs.Edge](new_edges)
-	self.topology = _BuildTopology(self.nodes, self.edges)
+	return &GraphBase{
+		nodes:    Array[structs.Node](new_nodes),
+		edges:    Array[structs.Edge](new_edges),
+		topology: _BuildTopology(Array[structs.Node](new_nodes), Array[structs.Edge](new_edges)),
+	}
 }
-func (self *GraphBase) _RemoveEdges(edges List[int32]) {
+func (self *GraphBase) _RemoveEdges(edges List[int32]) *GraphBase {
 	panic("not implemented")
 }
 

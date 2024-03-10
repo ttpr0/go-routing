@@ -78,24 +78,37 @@ func HandleRoutingRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	start := geo.Coord{req.Start[0], req.Start[1]}
 	end := geo.Coord{req.End[0], req.End[1]}
+	profile_ := ProfileFromAlg(req.Alg)
+	if !profile_.HasValue() {
+		panic("Profile not found")
+	}
+	profile := profile_.Value
+	attr := profile.GetAttributes()
 	var alg routing.IShortestPath
 	switch req.Alg {
 	case "Dijkstra":
-		alg = routing.NewDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewDijkstra(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	case "A*":
-		alg = routing.NewAStar(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewAStar(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	case "Bidirect-Dijkstra":
-		alg = routing.NewBidirectDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewBidirectDijkstra(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	case "Bidirect-A*":
-		alg = routing.NewBidirectAStar(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewBidirectAStar(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	// case "Distributed-Dijkstra":
 	// 	alg = routing.NewDistributedDijkstra(MANAGER, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	case "BODijkstra":
-		alg = routing.NewBODijkstra(GRAPH3, GetClosestNode(start, GRAPH2), GetClosestNode(end, GRAPH2))
+		g := profile.GetTiledGraph()
+		alg = routing.NewBODijkstra(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	case "CH":
-		alg = routing.NewCH(GRAPH2, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetCHGraph()
+		alg = routing.NewCH(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	default:
-		alg = routing.NewDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewDijkstra(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	}
 	fmt.Println("Using algorithm:", req.Alg)
 	fmt.Println("Start Caluclating shortest path between", start, "and", end)
@@ -108,13 +121,13 @@ func HandleRoutingRequest(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("shortest path found")
 	path := alg.GetShortestPath()
 	fmt.Println("start building response")
-	resp := NewRoutingResponse(path.GetGeometry(ATTR), true, int(req.Key))
+	resp := NewRoutingResponse(path.GetGeometry(attr), true, int(req.Key))
 	fmt.Println("reponse build")
 	data, _ = json.Marshal(resp)
 	w.Write(data)
 }
 
-var algs_dict Dict[int, routing.IShortestPath] = NewDict[int, routing.IShortestPath](10)
+var algs_dict Dict[int, Tuple[IRoutingProfile, routing.IShortestPath]] = NewDict[int, Tuple[IRoutingProfile, routing.IShortestPath]](10)
 
 func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
 	// read body
@@ -126,30 +139,42 @@ func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
 	// process request
 	start := geo.Coord{req.Start[0], req.Start[1]}
 	end := geo.Coord{req.End[0], req.End[1]}
+	profile_ := ProfileFromAlg(req.Algorithm)
+	if !profile_.HasValue() {
+		panic("Profile not found")
+	}
+	profile := profile_.Value
 	var alg routing.IShortestPath
 	switch req.Algorithm {
 	case "Dijkstra":
-		alg = routing.NewDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewDijkstra(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	case "A*":
-		alg = routing.NewAStar(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewAStar(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	case "Bidirect-Dijkstra":
-		alg = routing.NewBidirectDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewBidirectDijkstra(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	case "Bidirect-A*":
-		alg = routing.NewBidirectAStar(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewBidirectAStar(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	// case "Distributed-Dijkstra":
 	// 	alg = routing.NewDistributedDijkstra(MANAGER, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
 	case "BODijkstra":
-		alg = routing.NewBODijkstra(GRAPH3, GetClosestNode(start, GRAPH2), GetClosestNode(end, GRAPH2))
+		g := profile.GetTiledGraph()
+		alg = routing.NewBODijkstra(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	case "CH":
-		alg = routing.NewCH(GRAPH2, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetCHGraph()
+		alg = routing.NewCH(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	default:
-		alg = routing.NewDijkstra(GRAPH, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+		g := profile.GetGraph()
+		alg = routing.NewDijkstra(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	}
 	key := -1
 	for {
 		k := rand.Intn(1000)
 		if !algs_dict.ContainsKey(k) {
-			algs_dict[k] = alg
+			algs_dict[k] = MakeTuple(profile, alg)
 			key = k
 			break
 		}
@@ -169,22 +194,27 @@ func HandleRoutingStepRequest(w http.ResponseWriter, r *http.Request) {
 	json.Unmarshal(data, &req)
 
 	// process request
+	var profile IRoutingProfile
 	var alg routing.IShortestPath
 	if req.Key != -1 && algs_dict.ContainsKey(req.Key) {
-		alg = algs_dict[req.Key]
+		item := algs_dict[req.Key]
+		profile = item.A
+		alg = item.B
 	} else {
 		w.WriteHeader(400)
 		return
 	}
+	attr := profile.GetAttributes()
 
 	edges := NewList[geo.CoordArray](10)
 	finished := !alg.Steps(req.Stepcount, func(edge int32) {
-		edges.Add(ATTR.GetEdgeGeom(edge))
+		edges.Add(attr.GetEdgeGeom(edge))
 	})
 	var resp RoutingResponse
 	if finished {
 		path := alg.GetShortestPath()
-		resp = NewRoutingResponse(path.GetGeometry(ATTR), true, req.Key)
+		resp = NewRoutingResponse(path.GetGeometry(attr), true, req.Key)
+		algs_dict.Delete(req.Key)
 	} else {
 		resp = NewRoutingResponse(edges, finished, req.Key)
 	}
@@ -192,4 +222,27 @@ func HandleRoutingStepRequest(w http.ResponseWriter, r *http.Request) {
 	// write response
 	data, _ = json.Marshal(resp)
 	w.Write(data)
+}
+
+func ProfileFromAlg(alg string) Optional[IRoutingProfile] {
+	var profile Optional[IRoutingProfile]
+	switch alg {
+	case "Dijkstra":
+		profile = MANAGER.GetProfile("driving-car-ch")
+	case "A*":
+		profile = MANAGER.GetProfile("driving-car-ch")
+	case "Bidirect-Dijkstra":
+		profile = MANAGER.GetProfile("driving-car-ch")
+	case "Bidirect-A*":
+		profile = MANAGER.GetProfile("driving-car-ch")
+	// case "Distributed-Dijkstra":
+	// 	alg = routing.NewDistributedDijkstra(MANAGER, GetClosestNode(start, GRAPH), GetClosestNode(end, GRAPH))
+	case "BODijkstra":
+		profile = MANAGER.GetProfile("driving-car-overlay")
+	case "CH":
+		profile = MANAGER.GetProfile("driving-car-ch")
+	default:
+		profile = MANAGER.GetProfile("driving-car-ch")
+	}
+	return profile
 }

@@ -66,7 +66,15 @@ func HandleIsoRasterRequest(w http.ResponseWriter, r *http.Request) {
 		}),
 		rasterizer: NewDefaultRasterizer(req.Precession),
 	}
-	spt := routing.NewShortestPathTree(GRAPH, GetClosestNode(start, GRAPH), req.Range, consumer)
+	profile := MANAGER.GetMatchingProfile(DRIVING, CAR, FASTEST)
+	if !profile.HasValue() {
+		panic("Profile not found")
+	}
+	g := profile.Value.GetGraph()
+	if !g.HasValue() {
+		panic("Graph not found")
+	}
+	spt := routing.NewShortestPathTree(g.Value, GetClosestNode(start, g.Value), req.Range, consumer)
 
 	fmt.Println("Start Caluclating shortest-path-tree from", start)
 	spt.CalcShortestPathTree()

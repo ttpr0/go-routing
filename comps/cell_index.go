@@ -37,8 +37,38 @@ func (self *CellIndex) SetBWDIndexEdges(tile int16, edges Array[structs.Shortcut
 	self.bwd_index_edges[tile] = edges
 }
 
-func (self *CellIndex) _ReorderNodes(mapping Array[int32]) {
-	panic("not implemented")
+func (self *CellIndex) _ReorderNodes(mapping Array[int32]) *CellIndex {
+	new_fwd := NewDict[int16, Array[structs.Shortcut]](100)
+	for tile, edges := range self.fwd_index_edges {
+		new_edges := NewArray[structs.Shortcut](edges.Length())
+		for i, edge := range edges {
+			new_edges[i] = structs.Shortcut{
+				From:    mapping[edge.From],
+				To:      mapping[edge.To],
+				Weight:  edge.Weight,
+				Payload: edge.Payload,
+			}
+		}
+		new_fwd[tile] = new_edges
+	}
+	new_bwd := NewDict[int16, Array[structs.Shortcut]](100)
+	for tile, edges := range self.bwd_index_edges {
+		new_edges := NewArray[structs.Shortcut](edges.Length())
+		for i, edge := range edges {
+			new_edges[i] = structs.Shortcut{
+				From:    mapping[edge.From],
+				To:      mapping[edge.To],
+				Weight:  edge.Weight,
+				Payload: edge.Payload,
+			}
+		}
+		new_bwd[tile] = new_edges
+	}
+
+	return &CellIndex{
+		fwd_index_edges: new_fwd,
+		bwd_index_edges: new_bwd,
+	}
 }
 func (self *CellIndex) _Store(path string) {
 	filename := path + "-tileranges"

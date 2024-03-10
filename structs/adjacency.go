@@ -251,7 +251,7 @@ func (self *AdjListAccessor) GetType() byte {
 
 // reorders nodes in topologystore,
 // mapping: old id -> new id
-func (self *AdjacencyArray) ReorderNodes(mapping Array[int32]) {
+func (self *AdjacencyArray) ReorderNodes(mapping Array[int32]) AdjacencyArray {
 	node_refs := NewArray[_NodeEntry](self.node_entries.Length())
 	for i, id := range mapping {
 		node_refs[id] = self.node_entries[i]
@@ -290,9 +290,11 @@ func (self *AdjacencyArray) ReorderNodes(mapping Array[int32]) {
 		fwd_start += fwd_count
 		bwd_start += bwd_count
 	}
-	self.node_entries = Array[_NodeEntry](node_refs)
-	self.fwd_edge_entries = Array[_EdgeEntry](fwd_edge_refs)
-	self.bwd_edge_entries = Array[_EdgeEntry](bwd_edge_refs)
+	return AdjacencyArray{
+		node_entries:     Array[_NodeEntry](node_refs),
+		fwd_edge_entries: Array[_EdgeEntry](fwd_edge_refs),
+		bwd_edge_entries: Array[_EdgeEntry](bwd_edge_refs),
+	}
 }
 
 func StoreAdjacency(store *AdjacencyArray, typed bool, filename string) {

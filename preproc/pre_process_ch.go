@@ -1387,7 +1387,7 @@ func CalcContraction6(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 
 // Computes CH down-edges used in PHAST.
 func PreparePHASTIndex(base comps.IGraphBase, weight comps.IWeighting, ch *comps.CH) *comps.CHIndex {
-	temp_graph := graph.BuildCHGraph(base, weight, ch, None[*comps.CHIndex]())
+	temp_graph := graph.BuildCHGraph(base, weight, None[comps.IGraphIndex](), ch, None[*comps.CHIndex]())
 	explorer := temp_graph.GetGraphExplorer()
 
 	fwd_down_edges := NewList[structs.Shortcut](temp_graph.NodeCount())
@@ -1450,11 +1450,11 @@ func PreparePHASTIndex(base comps.IGraphBase, weight comps.IWeighting, ch *comps
 // Computes CH down-edges used in PHAST+GS.
 // Has to be reordered with tile-level-ordering before calling this function.
 func PrepareGSPHASTIndex(base comps.IGraphBase, weight comps.IWeighting, ch *comps.CH, partition *comps.Partition) *comps.CHIndex {
-	g := graph.BuildGraph(base, weight)
+	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
 
 	is_border := _IsBorderNode3(g, partition)
 
-	temp_graph := graph.BuildCHGraph(base, weight, ch, None[*comps.CHIndex]())
+	temp_graph := graph.BuildCHGraph(base, weight, None[comps.IGraphIndex](), ch, None[*comps.CHIndex]())
 	explorer := temp_graph.GetGraphExplorer()
 	border_count := 0
 

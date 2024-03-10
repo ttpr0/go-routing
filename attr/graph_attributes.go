@@ -7,8 +7,16 @@ import (
 	"os"
 
 	"github.com/ttpr0/go-routing/geo"
+	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
 )
+
+type IAttributes interface {
+	GetNodeAttribs(node int32) NodeAttribs
+	GetEdgeAttribs(edge int32) EdgeAttribs
+	GetNodeGeom(node int32) geo.Coord
+	GetEdgeGeom(edge int32) geo.CoordArray
+}
 
 type GraphAttributes struct {
 	node_attribs Array[NodeAttribs]
@@ -37,6 +45,58 @@ func (self *GraphAttributes) GetNodeGeom(node int32) geo.Coord {
 }
 func (self *GraphAttributes) GetEdgeGeom(edge int32) geo.CoordArray {
 	geom := self.edge_geoms[edge]
+	return geom
+}
+
+func NewMappedAttributes(attributes IAttributes, node_mapping Optional[structs.IDMapping], edge_mapping Optional[structs.IDMapping]) *MappedAttributes {
+	return &MappedAttributes{
+		attributes:   attributes,
+		node_mapping: node_mapping,
+		edge_mapping: edge_mapping,
+	}
+}
+
+type MappedAttributes struct {
+	attributes   IAttributes
+	node_mapping Optional[structs.IDMapping]
+	edge_mapping Optional[structs.IDMapping]
+}
+
+func (self *MappedAttributes) GetNodeAttribs(node int32) NodeAttribs {
+	var m_node int32
+	if self.node_mapping.HasValue() {
+		m_node = self.node_mapping.Value.GetTarget(node)
+	} else {
+		m_node = node
+	}
+	return self.attributes.GetNodeAttribs(m_node)
+}
+func (self *MappedAttributes) GetEdgeAttribs(edge int32) EdgeAttribs {
+	var m_edge int32
+	if self.edge_mapping.HasValue() {
+		m_edge = self.edge_mapping.Value.GetTarget(edge)
+	} else {
+		m_edge = edge
+	}
+	return self.attributes.GetEdgeAttribs(m_edge)
+}
+func (self *MappedAttributes) GetNodeGeom(node int32) geo.Coord {
+	var m_node int32
+	if self.node_mapping.HasValue() {
+		m_node = self.node_mapping.Value.GetTarget(node)
+	} else {
+		m_node = node
+	}
+	return self.attributes.GetNodeGeom(m_node)
+}
+func (self *MappedAttributes) GetEdgeGeom(edge int32) geo.CoordArray {
+	var m_edge int32
+	if self.edge_mapping.HasValue() {
+		m_edge = self.edge_mapping.Value.GetTarget(edge)
+	} else {
+		m_edge = edge
+	}
+	geom := self.attributes.GetEdgeGeom(m_edge)
 	return geom
 }
 

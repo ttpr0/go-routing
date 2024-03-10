@@ -18,7 +18,7 @@ func PrepareIsoPHAST(base comps.IGraphBase, weight comps.IWeighting, partition *
 	fmt.Println("Compute subset contraction:")
 	ch_data := CalcPartialContraction5(base, weight, partition)
 
-	g := graph.BuildGraph(base, weight)
+	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
 
 	fmt.Println("Set border nodes to maxlevel:")
 	border_nodes := _IsBorderNode3(g, partition)
@@ -103,7 +103,7 @@ func CreateCHSkipTopology(base comps.IGraphBase, weight comps.IWeighting, ch_dat
 	dyn_top := structs.NewAdjacencyList(base.NodeCount())
 	shortcuts := structs.NewShortcutStore(100, true)
 
-	temp_graph := graph.BuildCHGraph(base, weight, ch_data, None[*comps.CHIndex]())
+	temp_graph := graph.BuildCHGraph(base, weight, None[comps.IGraphIndex](), ch_data, None[*comps.CHIndex]())
 	explorer := temp_graph.GetGraphExplorer()
 
 	for i := 0; i < temp_graph.NodeCount(); i++ {

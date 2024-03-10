@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+
 	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/geo"
@@ -54,11 +56,25 @@ func NewGeoJSONFeature() GeoJSONFeature {
 	return line
 }
 
-func BuildDefaultWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
+func BuildFastestWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
 	weights := comps.NewDefaultWeighting(base)
 	for i := 0; i < base.EdgeCount(); i++ {
 		attr := attributes.GetEdgeAttribs(int32(i))
 		w := attr.Length * 3.6 / float32(attr.Maxspeed)
+		if w < 1 {
+			w = 1
+		}
+		weights.SetEdgeWeight(int32(i), int32(w))
+	}
+
+	return weights
+}
+
+func BuildShortestWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
+	weights := comps.NewDefaultWeighting(base)
+	for i := 0; i < base.EdgeCount(); i++ {
+		attr := attributes.GetEdgeAttribs(int32(i))
+		w := attr.Length
 		if w < 1 {
 			w = 1
 		}
@@ -91,4 +107,12 @@ func BuildTCWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *
 	}
 
 	return weight
+}
+
+func IsDirectoryEmpty(path string) bool {
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return false
+	}
+	return len(files) == 0
 }

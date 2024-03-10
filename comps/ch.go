@@ -50,10 +50,16 @@ func (self *CH) GetShortcutAccessor() structs.IAdjAccessor {
 	return &acc
 }
 
-func (self *CH) _ReorderNodes(mapping Array[int32]) {
-	self.shortcuts.ReorderNodes(mapping)
-	self.topology.ReorderNodes(mapping)
-	self.node_levels = Reorder[int16](self.node_levels, mapping)
+func (self *CH) _ReorderNodes(mapping Array[int32]) *CH {
+	new_shortcuts := self.shortcuts.ReorderNodes(mapping)
+	new_topology := self.topology.ReorderNodes(mapping)
+	new_levels := Reorder[int16](self.node_levels, mapping)
+
+	return &CH{
+		shortcuts:   new_shortcuts,
+		topology:    new_topology,
+		node_levels: new_levels,
+	}
 }
 func (self *CH) _New() *CH {
 	return &CH{}

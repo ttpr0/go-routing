@@ -60,8 +60,12 @@ func (self *Partition) GetTiles() List[int16] {
 	return tile_list
 }
 
-func (self *Partition) _ReorderNodes(mapping Array[int32]) {
-	Reorder[int16](self.node_tiles, mapping)
+func (self *Partition) _ReorderNodes(mapping Array[int32]) *Partition {
+	new_tiles := Reorder[int16](self.node_tiles, mapping)
+
+	return &Partition{
+		node_tiles: new_tiles,
+	}
 }
 func (self *Partition) _New() *Partition {
 	return &Partition{}

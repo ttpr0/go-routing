@@ -14,7 +14,7 @@ type Path struct {
 	changed bool
 }
 
-func (self *Path) GetGeometry(attributes *attr.GraphAttributes) []geo.CoordArray {
+func (self *Path) GetGeometry(attributes attr.IAttributes) []geo.CoordArray {
 	if self.lines == nil || self.changed {
 		self.lines = make([]geo.CoordArray, 0, 10)
 		for _, edge_id := range self.path {

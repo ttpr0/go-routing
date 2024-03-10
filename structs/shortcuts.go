@@ -16,14 +16,12 @@ func NewShortcutStore(cap int, is_static bool) ShortcutStore {
 		return ShortcutStore{
 			shortcuts:        NewList[Shortcut](cap),
 			_has_static_size: true,
-			_is_node_based:   true,
 			edges_stat:       Some(NewList[[2]Tuple[int32, byte]](cap)),
 		}
 	} else {
 		return ShortcutStore{
 			shortcuts:        NewList[Shortcut](cap),
 			_has_static_size: false,
-			_is_node_based:   true,
 			edgerefs_dyn:     Some(NewList[Tuple[int32, int16]](cap)),
 			edges_dyn:        Some(NewList[int32](cap)),
 		}
@@ -35,7 +33,6 @@ type ShortcutStore struct {
 	shortcuts List[Shortcut]
 
 	_has_static_size bool // true if every edges has two child edges
-	_is_node_based   bool // true if shortcuts are between nodes
 
 	// Dynamic storage of underlying edges.
 	//
@@ -143,31 +140,45 @@ func (self *ShortcutStore) _UnpackCHShortcutRecursive(shc_id int32, reversed boo
 
 // reorders node information,
 // mapping: old id -> new id
-func (self *ShortcutStore) ReorderNodes(mapping Array[int32]) {
-	if self._is_node_based {
-		// shortcuts
-		for i := 0; i < self.ShortcutCount(); i++ {
-			shc := self.shortcuts[i]
-			shc.From = mapping[shc.From]
-			shc.To = mapping[shc.To]
-			self.shortcuts[i] = shc
-		}
+func (self *ShortcutStore) ReorderNodes(mapping Array[int32]) ShortcutStore {
+	new_shortcuts := NewArray[Shortcut](self.shortcuts.Length())
+	// shortcuts
+	for i := 0; i < self.ShortcutCount(); i++ {
+		shc := self.shortcuts[i]
+		shc.From = mapping[shc.From]
+		shc.To = mapping[shc.To]
+		new_shortcuts[i] = shc
+	}
+	var new_edges_stat Optional[List[[2]Tuple[int32, byte]]]
+	var new_edges_dyn Optional[List[int32]]
+	var new_edgerefs_dyn Optional[List[Tuple[int32, int16]]]
+	if self._has_static_size {
+		new_edges_stat = Some(self.edges_stat.Value.Copy())
+	} else {
+		new_edges_dyn = Some(self.edges_dyn.Value.Copy())
+		new_edgerefs_dyn = Some(self.edgerefs_dyn.Value.Copy())
+	}
+
+	return ShortcutStore{
+		shortcuts:        List[Shortcut](new_shortcuts),
+		_has_static_size: self._has_static_size,
+
+		edgerefs_dyn: new_edgerefs_dyn,
+		edges_dyn:    new_edges_dyn,
+
+		edges_stat: new_edges_stat,
 	}
 }
 
 // reorders edge information,
 // mapping: old id -> new id
-func (self *ShortcutStore) ReorderEdges(mapping Array[int32]) {
-	if !self._is_node_based {
-		// shortcuts
-		for i := 0; i < self.ShortcutCount(); i++ {
-			shc := self.shortcuts[i]
-			shc.From = mapping[shc.From]
-			shc.To = mapping[shc.To]
-			self.shortcuts[i] = shc
-		}
-	}
+func (self *ShortcutStore) ReorderEdges(mapping Array[int32]) ShortcutStore {
+	new_shortcuts := self.shortcuts.Copy()
+	var new_edges_stat Optional[List[[2]Tuple[int32, byte]]]
+	var new_edges_dyn Optional[List[int32]]
+	var new_edgerefs_dyn Optional[List[Tuple[int32, int16]]]
 	if self._has_static_size {
+		edges_stat := NewArray[[2]Tuple[int32, byte]](self.edges_stat.Value.Length())
 		for i := 0; i < self.edges_stat.Value.Length(); i++ {
 			edge := self.edges_stat.Value[i]
 			if edge[0].B == 0 {
@@ -176,14 +187,28 @@ func (self *ShortcutStore) ReorderEdges(mapping Array[int32]) {
 			if edge[1].B == 0 {
 				edge[1].A = mapping[edge[1].A]
 			}
-			self.edges_stat.Value[i] = edge
+			edges_stat[i] = edge
 		}
+		new_edges_stat = Some(List[[2]Tuple[int32, byte]](edges_stat))
 	} else {
+		edges_dyn := NewArray[int32](self.edges_dyn.Value.Length())
 		for i := 0; i < self.edges_dyn.Value.Length(); i++ {
 			edge := self.edges_dyn.Value[i]
 			edge = mapping[edge]
-			self.edges_dyn.Value[i] = edge
+			edges_dyn[i] = edge
 		}
+		new_edges_dyn = Some(List[int32](edges_dyn))
+		new_edgerefs_dyn = Some(self.edgerefs_dyn.Value.Copy())
+	}
+
+	return ShortcutStore{
+		shortcuts:        new_shortcuts,
+		_has_static_size: self._has_static_size,
+
+		edgerefs_dyn: new_edgerefs_dyn,
+		edges_dyn:    new_edges_dyn,
+
+		edges_stat: new_edges_stat,
 	}
 }
 

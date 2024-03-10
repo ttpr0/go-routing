@@ -341,8 +341,8 @@ func (self *TransitWeighting) SetWeights(connection int32, schedule []Connection
 	self.transit_weights[connection] = List[ConnectionWeight](schedule)
 }
 
-func (self *TransitWeighting) _New() *TCWeighting {
-	return &TCWeighting{}
+func (self *TransitWeighting) _New() *TransitWeighting {
+	return &TransitWeighting{}
 }
 func (self *TransitWeighting) _Load(path string) {
 	file := path + "-weight"

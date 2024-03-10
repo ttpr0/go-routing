@@ -19,29 +19,13 @@ import (
 	. "github.com/ttpr0/go-routing/util"
 )
 
-var GRAPH graph.IGraph
-var GRAPH2 graph.ICHGraph
-var GRAPH3 graph.ITiledGraph
-var ATTR *attr.GraphAttributes
-
-type Dummy struct {
-	Val string `json:"val"`
-}
+var MANAGER *RoutingManager
 
 func main() {
 	fmt.Println("hello world")
 
-	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
-	attributes := attr.Load("./graphs/niedersachsen/attr")
-	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
-	partition := comps.Load[*comps.Partition]("./graphs/niedersachsen/partition")
-	overlay := comps.Load[*comps.Overlay]("./graphs/niedersachsen/grasp-overlay")
-	ch := comps.Load[*comps.CH]("./graphs/niedersachsen/ch")
-
-	GRAPH = graph.BuildGraph(base, weight)
-	GRAPH2 = graph.BuildCHGraph(base, weight, ch, None[*comps.CHIndex]())
-	GRAPH3 = graph.BuildTiledGraph(base, weight, partition, overlay, None[*comps.CellIndex]())
-	ATTR = attributes
+	config := ReadConfig("./config.yaml")
+	MANAGER = NewRoutingManager("./graphs/test", config)
 
 	http.HandleFunc("/v0/routing", HandleRoutingRequest)
 	http.HandleFunc("/v0/routing/draw/create", HandleCreateContextRequest)
@@ -50,12 +34,11 @@ func main() {
 	http.HandleFunc("/v1/matrix", HandleMatrixRequest)
 
 	app := http.DefaultServeMux
-
-	MapGet(app, "/v1/test", func(v Dummy) Result[string] {
-		return OK("hello world" + v.Val)
-	})
-	MapGet(app, "/test", func(none) Result[int] {
+	MapGet(app, "/test", func(none) Result {
 		return OK(1)
+	})
+	MapPost(app, "/test1", func(a struct{ a string }) Result {
+		return OK(a)
 	})
 
 	http.ListenAndServe(":5002", nil)
@@ -64,8 +47,8 @@ func main() {
 // parse OSM to graph and remove unconnected components
 func main2() {
 	base, attributes := parser.ParseGraph("./data/saarland.pbf")
-	weight := BuildDefaultWeighting(base, attributes)
-	g := graph.BuildGraph(base, weight)
+	weight := BuildFastestWeighting(base, attributes)
+	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
 
 	// compute closely connected components
 	groups := algorithm.ConnectedComponents(g)
@@ -114,7 +97,7 @@ func main2() {
 
 	comps.Store(base, "./graphs/niedersachsen/base")
 	attr.Store(attributes, "./graphs/niedersachsen/attr")
-	weight = BuildDefaultWeighting(base, attributes)
+	weight = BuildFastestWeighting(base, attributes)
 	comps.Store(weight, "./graphs/niedersachsen/default")
 }
 
@@ -122,7 +105,7 @@ func main2() {
 func main3() {
 	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
 	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildGraph(base, weight)
+	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
 
 	partition := comps.Load[*comps.Partition]("./graphs/niedersachsen/partition")
 
@@ -182,7 +165,7 @@ func main7() {
 
 	ch_data := comps.Load[*comps.CH]("./graphs/niedersachsen/ch")
 	ch_index := preproc.PreparePHASTIndex(base, weight, ch_data)
-	cg := graph.BuildCHGraph(base, weight, ch_data, Some(ch_index))
+	cg := graph.BuildCHGraph(base, weight, None[comps.IGraphIndex](), ch_data, Some(ch_index))
 
 	fmt.Println("finished loading graph")
 

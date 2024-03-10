@@ -1,0 +1,27 @@
+build:
+  source:
+    osm: "./data/saarland.pbf"
+    gtfs: "./data/gtfs"
+  profiles:
+    driving-car-ch:
+      type: "driving"
+      vehicle: "car"
+      metric: "fastest"
+      preperation:
+        contraction: true
+    driving-car-overlay:
+      type: "driving"
+      vehicle: "car"
+      metric: "fastest"
+      preperation:
+        overlay: true
+        max-nodes-per-cell: 100
+        overlay-method: "clique"
+    # public-transit:
+    #   type: "transit"
+    #   vehicle: "öpnv"
+    #   preperation:
+    #     filter-polygon: "./data/berlin.json"
+    #     max-transfer-range: 900
+build-graphs: false
+services:

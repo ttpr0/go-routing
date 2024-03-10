@@ -23,6 +23,13 @@ func (self *Array[T]) Slice(start int, end int) List[T] {
 	return List[T]((*self)[start:end])
 }
 
+// Copies the entire Array
+func (self *Array[T]) Copy() Array[T] {
+	new_arr := make([]T, len(*self))
+	copy(new_arr, *self)
+	return new_arr
+}
+
 // Creates and Returns a new Array with capacity cap.
 func NewArray[T any](cap int) Array[T] {
 	return make([]T, cap)
