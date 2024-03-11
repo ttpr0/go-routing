@@ -18,6 +18,9 @@ func _RestrictedTargetSelection(g graph.ICHGraph, target_nodes Array[int32], max
 	node_queue := NewPriorityQueue[int32, int32](10000)
 
 	for i := 0; i < target_nodes.Length(); i++ {
+		if target_nodes[i] == -1 {
+			continue
+		}
 		node_queue.Enqueue(target_nodes[i], 0)
 	}
 

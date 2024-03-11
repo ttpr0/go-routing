@@ -9,27 +9,24 @@ import (
 // build graphs
 //*******************************************
 
-func BuildGraph(base comps.IGraphBase, weight comps.IWeighting, index Optional[comps.IGraphIndex]) *Graph {
+func BuildGraph(base comps.IGraphBase, weight comps.IWeighting) *Graph {
 	return &Graph{
 		base:   base,
 		weight: weight,
-		index:  index,
 	}
 }
 
-func BuildTCGraph(base comps.IGraphBase, weight comps.ITCWeighting, index Optional[comps.IGraphIndex]) *TCGraph {
+func BuildTCGraph(base comps.IGraphBase, weight comps.ITCWeighting) *TCGraph {
 	return &TCGraph{
 		base:   base,
 		weight: weight,
-		index:  index,
 	}
 }
 
-func BuildCHGraph(base comps.IGraphBase, weight comps.IWeighting, index Optional[comps.IGraphIndex], ch_data *comps.CH, ch_index Optional[*comps.CHIndex]) *CHGraph {
+func BuildCHGraph(base comps.IGraphBase, weight comps.IWeighting, ch_data *comps.CH, ch_index Optional[*comps.CHIndex]) *CHGraph {
 	return &CHGraph{
 		base:   base,
 		weight: weight,
-		index:  index,
 
 		ch:        ch_data,
 		partition: None[*comps.Partition](),
@@ -37,11 +34,10 @@ func BuildCHGraph(base comps.IGraphBase, weight comps.IWeighting, index Optional
 	}
 }
 
-func BuildPartitionedCHGraph(base comps.IGraphBase, weight comps.IWeighting, index Optional[comps.IGraphIndex], ch_data *comps.CH, partition Optional[*comps.Partition], ch_index Optional[*comps.CHIndex]) *CHGraph {
+func BuildPartitionedCHGraph(base comps.IGraphBase, weight comps.IWeighting, ch_data *comps.CH, partition Optional[*comps.Partition], ch_index Optional[*comps.CHIndex]) *CHGraph {
 	return &CHGraph{
 		base:   base,
 		weight: weight,
-		index:  index,
 
 		ch:        ch_data,
 		partition: partition,
@@ -49,11 +45,10 @@ func BuildPartitionedCHGraph(base comps.IGraphBase, weight comps.IWeighting, ind
 	}
 }
 
-func BuildTiledGraph(base comps.IGraphBase, weight comps.IWeighting, index Optional[comps.IGraphIndex], partition *comps.Partition, overlay *comps.Overlay, cell_index Optional[*comps.CellIndex]) *TiledGraph {
+func BuildTiledGraph(base comps.IGraphBase, weight comps.IWeighting, partition *comps.Partition, overlay *comps.Overlay, cell_index Optional[*comps.CellIndex]) *TiledGraph {
 	return &TiledGraph{
 		base:   base,
 		weight: weight,
-		index:  index,
 
 		partition:  partition,
 		overlay:    overlay,
@@ -61,10 +56,9 @@ func BuildTiledGraph(base comps.IGraphBase, weight comps.IWeighting, index Optio
 	}
 }
 
-func BuildTransitGraph(base comps.IGraphBase, weight comps.ITCWeighting, index Optional[comps.IGraphIndex], transit *comps.Transit, transit_weight *comps.TransitWeighting) *TransitGraph {
+func BuildTransitGraph(base comps.IGraphBase, weight comps.ITCWeighting, transit *comps.Transit, transit_weight *comps.TransitWeighting) *TransitGraph {
 	return &TransitGraph{
 		base:   base,
-		index:  index,
 		weight: weight,
 
 		transit:        transit,

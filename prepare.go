@@ -11,13 +11,13 @@ import (
 
 func CreatePartition(base *comps.GraphBase, nodes_per_cell int) *comps.Partition {
 	eq_weight := comps.NewEqualWeighting()
-	g := graph.BuildGraph(base, eq_weight, None[comps.IGraphIndex]())
+	g := graph.BuildGraph(base, eq_weight)
 	tiles := partitioning.InertialFlow(g)
 	return comps.NewPartition(tiles)
 }
 
 func CreateGRASP(base *comps.GraphBase, weight comps.IWeighting, partition *comps.Partition, skeleton bool) (*comps.GraphBase, *comps.Partition, *comps.Overlay, *comps.CellIndex, Array[int32]) {
-	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	g := graph.BuildGraph(base, weight)
 	var overlay *comps.Overlay
 	if skeleton {
 		overlay = preproc.PrepareSkeletonOverlay(g, partition)
@@ -30,7 +30,7 @@ func CreateGRASP(base *comps.GraphBase, weight comps.IWeighting, partition *comp
 	new_overlay := comps.ReorderNodes(overlay, mapping)
 	new_partition := comps.ReorderNodes(partition, mapping)
 
-	g = graph.BuildGraph(new_base, weight, None[comps.IGraphIndex]())
+	g = graph.BuildGraph(new_base, weight)
 	cell_index := preproc.PrepareGRASPCellIndex(g, partition)
 
 	return new_base, new_partition, new_overlay, cell_index, mapping
@@ -39,7 +39,7 @@ func CreateGRASP(base *comps.GraphBase, weight comps.IWeighting, partition *comp
 func CreateIsoPHAST(base *comps.GraphBase, weight comps.IWeighting, partition *comps.Partition) (*comps.GraphBase, *comps.Partition, *comps.Overlay, *comps.CellIndex, Array[int32]) {
 	overlay, cell_index := preproc.PrepareIsoPHAST(base, weight, partition)
 
-	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	g := graph.BuildGraph(base, weight)
 	mapping := preproc.ComputeTileOrdering(g, partition)
 	new_base := comps.ReorderNodes(base, mapping)
 	new_overlay := comps.ReorderNodes(overlay, mapping)
@@ -52,7 +52,7 @@ func CreateIsoPHAST(base *comps.GraphBase, weight comps.IWeighting, partition *c
 func CreateCH(base *comps.GraphBase, weight comps.IWeighting) (*comps.GraphBase, *comps.CH, Array[int32]) {
 	ch := preproc.CalcContraction6(base, weight)
 
-	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	g := graph.BuildGraph(base, weight)
 	ordering := preproc.ComputeLevelOrdering(g, ch)
 	new_base := comps.ReorderNodes(base, ordering)
 	new_ch := comps.ReorderNodes(ch, ordering)
@@ -63,7 +63,7 @@ func CreateCH(base *comps.GraphBase, weight comps.IWeighting) (*comps.GraphBase,
 func CreateTiledCH(base *comps.GraphBase, weight comps.IWeighting, partition *comps.Partition) (*comps.GraphBase, *comps.Partition, *comps.CH, Array[int32]) {
 	ch := preproc.CalcContraction5(base, weight, partition)
 
-	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	g := graph.BuildGraph(base, weight)
 	ordering := preproc.ComputeTileLevelOrdering(g, partition, ch)
 	new_base := comps.ReorderNodes(base, ordering)
 	new_ch := comps.ReorderNodes(ch, ordering)
@@ -91,7 +91,7 @@ func GetMostCommon[T comparable](arr Array[T]) T {
 
 func RemoveConnectedComponents(base *comps.GraphBase) (List[int32], List[int32]) {
 	eq_weight := comps.NewEqualWeighting()
-	g := graph.BuildGraph(base, eq_weight, None[comps.IGraphIndex]())
+	g := graph.BuildGraph(base, eq_weight)
 	groups := algorithm.ConnectedComponents(g)
 	max_group := GetMostCommon(groups)
 	// get nodes and edges to be removed

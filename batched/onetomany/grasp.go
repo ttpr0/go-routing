@@ -98,16 +98,6 @@ func _CalcGRASP(g graph.ITiledGraph, starts Array[Tuple[int32, int32]], max_rang
 		if curr_flag.Dist < curr_dist {
 			continue
 		}
-		explorer.ForAdjacentEdges(curr_id, graph.FORWARD, graph.ADJACENT_UPWARDS, func(ref graph.EdgeRef) {
-			other_id := ref.OtherID
-			other_flag := node_flags.Get(other_id)
-			new_length := curr_flag.Dist + explorer.GetEdgeWeight(ref)
-			if other_flag.Dist > new_length {
-				other_flag.Dist = new_length
-				heap.Enqueue(PQItem{other_id, new_length}, new_length)
-			}
-		})
-
 		curr_tile := g.GetNodeTile(curr_id)
 		handler := func(ref graph.EdgeRef) {
 			other_id := ref.OtherID

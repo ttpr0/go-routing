@@ -4,7 +4,6 @@ import (
 	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/structs"
-	. "github.com/ttpr0/go-routing/util"
 )
 
 //*******************************************
@@ -19,7 +18,6 @@ type IGraph interface {
 	GetNode(node int32) structs.Node
 	GetEdge(edge int32) structs.Edge
 	GetNodeGeom(node int32) geo.Coord
-	GetClosestNode(point geo.Coord) (int32, bool)
 }
 
 // not thread safe, use only one instance per thread
@@ -42,7 +40,6 @@ type IGraphExplorer interface {
 type Graph struct {
 	base   comps.IGraphBase
 	weight comps.IWeighting
-	index  Optional[comps.IGraphIndex]
 }
 
 func (self *Graph) GetGraphExplorer() IGraphExplorer {
@@ -59,7 +56,7 @@ func (self *Graph) EdgeCount() int {
 	return self.base.EdgeCount()
 }
 func (self *Graph) IsNode(node int32) bool {
-	return int32(self.base.NodeCount()) < node
+	return node < int32(self.base.NodeCount())
 }
 func (self *Graph) GetNode(node int32) structs.Node {
 	return self.base.GetNode(node)
@@ -69,14 +66,6 @@ func (self *Graph) GetEdge(edge int32) structs.Edge {
 }
 func (self *Graph) GetNodeGeom(node int32) geo.Coord {
 	return self.base.GetNode(node).Loc
-}
-func (self *Graph) GetClosestNode(point geo.Coord) (int32, bool) {
-	if self.index.HasValue() {
-		return self.index.Value.GetClosestNode(point)
-	} else {
-		self.index.Value = comps.NewGraphIndex(self.base)
-		return self.index.Value.GetClosestNode(point)
-	}
 }
 
 //*******************************************
@@ -129,7 +118,6 @@ func (self *BaseGraphExplorer) GetOtherNode(edge EdgeRef, node int32) int32 {
 type TCGraph struct {
 	base   comps.IGraphBase
 	weight comps.ITCWeighting
-	index  Optional[comps.IGraphIndex]
 }
 
 func (self *TCGraph) GetGraphExplorer() IGraphExplorer {
@@ -146,7 +134,7 @@ func (self *TCGraph) EdgeCount() int {
 	return self.base.EdgeCount()
 }
 func (self *TCGraph) IsNode(node int32) bool {
-	return int32(self.base.NodeCount()) < node
+	return node < int32(self.base.NodeCount())
 }
 func (self *TCGraph) GetNode(node int32) structs.Node {
 	return self.base.GetNode(node)
@@ -156,14 +144,6 @@ func (self *TCGraph) GetEdge(edge int32) structs.Edge {
 }
 func (self *TCGraph) GetNodeGeom(node int32) geo.Coord {
 	return self.base.GetNode(node).Loc
-}
-func (self *TCGraph) GetClosestNode(point geo.Coord) (int32, bool) {
-	if self.index.HasValue() {
-		return self.index.Value.GetClosestNode(point)
-	} else {
-		self.index.Value = comps.NewGraphIndex(self.base)
-		return self.index.Value.GetClosestNode(point)
-	}
 }
 
 //*******************************************

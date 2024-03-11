@@ -22,7 +22,6 @@ type ITiledGraph interface {
 	GetNode(node int32) structs.Node
 	GetEdge(edge int32) structs.Edge
 	GetNodeGeom(node int32) geo.Coord
-	GetClosestNode(point geo.Coord) (int32, bool)
 
 	// Additional
 	GetNodeTile(node int32) int16
@@ -41,7 +40,6 @@ type TiledGraph struct {
 	// Base Graph
 	base   comps.IGraphBase
 	weight comps.IWeighting
-	index  Optional[comps.IGraphIndex]
 
 	// Tiles Storage
 	partition  *comps.Partition
@@ -70,7 +68,7 @@ func (self *TiledGraph) TileCount() int16 {
 	return self.partition.TileCount()
 }
 func (self *TiledGraph) IsNode(node int32) bool {
-	return self.base.NodeCount() < int(node)
+	return node < int32(self.base.NodeCount())
 }
 func (self *TiledGraph) GetNode(node int32) structs.Node {
 	return self.base.GetNode(node)
@@ -80,14 +78,6 @@ func (self *TiledGraph) GetEdge(edge int32) structs.Edge {
 }
 func (self *TiledGraph) GetNodeGeom(node int32) geo.Coord {
 	return self.GetNode(node).Loc
-}
-func (self *TiledGraph) GetClosestNode(point geo.Coord) (int32, bool) {
-	if self.index.HasValue() {
-		return self.index.Value.GetClosestNode(point)
-	} else {
-		self.index.Value = comps.NewGraphIndex(self.base)
-		return self.index.Value.GetClosestNode(point)
-	}
 }
 func (self *TiledGraph) GetShortcut(shc int32) structs.Shortcut {
 	return self.overlay.GetShortcut(shc)

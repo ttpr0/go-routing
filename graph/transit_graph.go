@@ -13,7 +13,6 @@ import (
 
 type TransitGraph struct {
 	base   comps.IGraphBase
-	index  Optional[comps.IGraphIndex]
 	weight comps.ITCWeighting
 
 	transit        *comps.Transit
@@ -34,7 +33,7 @@ func (self *TransitGraph) EdgeCount() int {
 	return self.base.EdgeCount()
 }
 func (self *TransitGraph) IsNode(node int32) bool {
-	return int32(self.base.NodeCount()) < node
+	return node < int32(self.base.NodeCount())
 }
 func (self *TransitGraph) GetNode(node int32) structs.Node {
 	return self.base.GetNode(node)
@@ -44,14 +43,6 @@ func (self *TransitGraph) GetEdge(edge int32) structs.Edge {
 }
 func (self *TransitGraph) GetNodeGeom(node int32) geo.Coord {
 	return self.base.GetNode(node).Loc
-}
-func (self *TransitGraph) GetClosestNode(point geo.Coord) (int32, bool) {
-	if self.index.HasValue() {
-		return self.index.Value.GetClosestNode(point)
-	} else {
-		self.index.Value = comps.NewGraphIndex(self.base)
-		return self.index.Value.GetClosestNode(point)
-	}
 }
 
 func (self *TransitGraph) StopCount() int {

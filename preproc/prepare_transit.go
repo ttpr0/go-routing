@@ -17,9 +17,14 @@ func PrepareTransit(g graph.IGraph, stops Array[structs.Node], connections Array
 	for i := 0; i < g.NodeCount(); i++ {
 		mapping[i] = [2]int32{-1, -1}
 	}
+	tree := NewKDTree[int32](2)
+	for i := 0; i < g.NodeCount(); i++ {
+		coord := g.GetNodeGeom(int32(i))
+		tree.Insert(coord[:], int32(i))
+	}
 	for i := 0; i < stops.Length(); i++ {
 		stop := stops[i]
-		closest, ok := g.GetClosestNode(stop.Loc)
+		closest, ok := tree.GetClosest(stop.Loc[:], 0.05)
 		if !ok {
 			continue
 		}

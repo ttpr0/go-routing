@@ -22,11 +22,6 @@ import (
 
 var MANAGER *RoutingManager
 
-type Dummy struct {
-	V int    `json:"v"`
-	S string `json:"s"`
-}
-
 func main() {
 	logger := slog.New(NewLogHandler(os.Stderr, &slog.HandlerOptions{
 		Level: slog.LevelDebug,
@@ -39,24 +34,12 @@ func main() {
 	MANAGER = NewRoutingManager("./graphs", config)
 
 	app := http.DefaultServeMux
+
 	MapPost(app, "/v0/routing", HandleRoutingRequest)
 	MapPost(app, "/v0/routing/draw/create", HandleCreateContextRequest)
 	MapPost(app, "/v0/routing/draw/step", HandleRoutingStepRequest)
 	MapPost(app, "/v0/isoraster", HandleIsoRasterRequest)
 	MapPost(app, "/v1/matrix", HandleMatrixRequest)
-
-	MapGet(app, "/test", func(none) Result {
-		return OK(Dummy{
-			V: 1,
-			S: "hello world",
-		})
-	})
-	MapGet(app, "/test1", func(a struct{ a string }) Result {
-		return BadRequest(Dummy{
-			V: 1,
-			S: "hello world",
-		})
-	})
 
 	http.ListenAndServe(":5002", nil)
 }
@@ -65,7 +48,7 @@ func main() {
 func main2() {
 	base, attributes := parser.ParseGraph("./data/saarland.pbf")
 	weight := BuildFastestWeighting(base, attributes)
-	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	g := graph.BuildGraph(base, weight)
 
 	// compute closely connected components
 	groups := algorithm.ConnectedComponents(g)
@@ -122,7 +105,7 @@ func main2() {
 func main3() {
 	base := comps.Load[*comps.GraphBase]("./graphs/niedersachsen/base")
 	weight := comps.Load[*comps.DefaultWeighting]("./graphs/niedersachsen/default")
-	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	g := graph.BuildGraph(base, weight)
 
 	partition := comps.Load[*comps.Partition]("./graphs/niedersachsen/partition")
 
@@ -182,7 +165,7 @@ func main7() {
 
 	ch_data := comps.Load[*comps.CH]("./graphs/niedersachsen/ch")
 	ch_index := preproc.PreparePHASTIndex(base, weight, ch_data)
-	cg := graph.BuildCHGraph(base, weight, None[comps.IGraphIndex](), ch_data, Some(ch_index))
+	cg := graph.BuildCHGraph(base, weight, ch_data, Some(ch_index))
 
 	fmt.Println("finished loading graph")
 

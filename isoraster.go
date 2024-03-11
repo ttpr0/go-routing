@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"math"
-	"strings"
 
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/routing"
@@ -53,38 +52,17 @@ func NewIsoRasterResponse(nodes []*QuadNode[int], rasterizer IRasterizer) IsoRas
 
 func HandleIsoRasterRequest(req IsoRasterRequest) Result {
 	// get profile
-	var profile IRoutingProfile
-	{
-		tokens := strings.Split(req.Profile, "-")
-		if len(tokens) != 2 {
-			return BadRequest("Invalid profile")
-		}
-		typ, err := ProfileTypeFromString(tokens[0])
-		if err != nil {
-			return BadRequest("Invalid profile type")
-		}
-		vehicle, err := VehicleTypeFromString(tokens[1])
-		if err != nil {
-			return BadRequest("Invalid vehicle type")
-		}
-		var metric MetricType
-		switch req.Metric {
-		case "time":
-			metric = FASTEST
-		case "distance":
-			metric = SHORTEST
-		default:
-			return BadRequest("Invalid metric type")
-		}
-		profile := MANAGER.GetMatchingProfile(typ, vehicle, metric)
-		if !profile.HasValue() {
-			return BadRequest("Profile not found")
-		}
+	profile_, res := GetRequestProfile(MANAGER, req.Profile, req.Metric)
+	if !profile_.HasValue() {
+		return res
 	}
-	g := profile.GetGraph()
-	if !g.HasValue() {
+	profile := profile_.Value
+	g_ := profile.GetGraph()
+	if !g_.HasValue() {
 		return BadRequest("Graph not found")
 	}
+	g := g_.Value
+	att := profile.GetAttributes()
 
 	start := geo.Coord{req.Locations[0][0], req.Locations[0][1]}
 	consumer := &SPTConsumer{
@@ -97,7 +75,8 @@ func HandleIsoRasterRequest(req IsoRasterRequest) Result {
 		}),
 		rasterizer: NewDefaultRasterizer(req.Precession),
 	}
-	spt := routing.NewShortestPathTree(g.Value, GetClosestNode(start, g.Value), req.Range, consumer)
+	s_node, _ := att.GetClosestNode(start)
+	spt := routing.NewShortestPathTree(g, s_node, req.Range, consumer)
 
 	slog.Debug(fmt.Sprintf("Start Caluclating shortest-path-tree from %v", start))
 	spt.CalcShortestPathTree()

@@ -22,7 +22,6 @@ type ICHGraph interface {
 	GetNode(node int32) structs.Node
 	GetEdge(edge int32) structs.Edge
 	GetNodeGeom(node int32) geo.Coord
-	GetClosestNode(point geo.Coord) (int32, bool)
 
 	// CH Specific
 	GetNodeLevel(node int32) int16
@@ -43,7 +42,6 @@ type CHGraph struct {
 	// Base Graph
 	base   comps.IGraphBase
 	weight comps.IWeighting
-	index  Optional[comps.IGraphIndex]
 
 	// Additional Storage
 	ch *comps.CH
@@ -81,7 +79,7 @@ func (self *CHGraph) ShortcutCount() int {
 }
 
 func (self *CHGraph) IsNode(node int32) bool {
-	return self.base.NodeCount() < int(node)
+	return node < int32(self.base.NodeCount())
 }
 
 func (self *CHGraph) GetNode(node int32) structs.Node {
@@ -94,15 +92,6 @@ func (self *CHGraph) GetEdge(edge int32) structs.Edge {
 
 func (self *CHGraph) GetNodeGeom(node int32) geo.Coord {
 	return self.base.GetNode(node).Loc
-}
-
-func (self *CHGraph) GetClosestNode(point geo.Coord) (int32, bool) {
-	if self.index.HasValue() {
-		return self.index.Value.GetClosestNode(point)
-	} else {
-		self.index.Value = comps.NewGraphIndex(self.base)
-		return self.index.Value.GetClosestNode(point)
-	}
 }
 
 func (self *CHGraph) GetShortcut(shortcut int32) structs.Shortcut {

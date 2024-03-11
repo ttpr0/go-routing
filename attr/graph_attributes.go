@@ -16,6 +16,7 @@ type IAttributes interface {
 	GetEdgeAttribs(edge int32) EdgeAttribs
 	GetNodeGeom(node int32) geo.Coord
 	GetEdgeGeom(edge int32) geo.CoordArray
+	GetClosestNode(point geo.Coord) (int32, bool)
 }
 
 type GraphAttributes struct {
@@ -23,6 +24,7 @@ type GraphAttributes struct {
 	edge_attribs Array[EdgeAttribs]
 	node_geoms   []geo.Coord
 	edge_geoms   []geo.CoordArray
+	index        Optional[KDTree[int32]]
 }
 
 func New(nodes Array[NodeAttribs], edges Array[EdgeAttribs], node_geoms Array[geo.Coord], edge_geoms Array[geo.CoordArray]) *GraphAttributes {
@@ -46,6 +48,19 @@ func (self *GraphAttributes) GetNodeGeom(node int32) geo.Coord {
 func (self *GraphAttributes) GetEdgeGeom(edge int32) geo.CoordArray {
 	geom := self.edge_geoms[edge]
 	return geom
+}
+func (self *GraphAttributes) GetClosestNode(point geo.Coord) (int32, bool) {
+	if self.index.HasValue() {
+		return self.index.Value.GetClosest(point[:], 0.05)
+	} else {
+		tree := NewKDTree[int32](2)
+		for i := 0; i < len(self.node_geoms); i++ {
+			coord := self.node_geoms[i]
+			tree.Insert(coord[:], int32(i))
+		}
+		self.index = Some(tree)
+		return self.index.Value.GetClosest(point[:], 0.05)
+	}
 }
 
 func NewMappedAttributes(attributes IAttributes, node_mapping Optional[structs.IDMapping], edge_mapping Optional[structs.IDMapping]) *MappedAttributes {
@@ -99,6 +114,17 @@ func (self *MappedAttributes) GetEdgeGeom(edge int32) geo.CoordArray {
 	geom := self.attributes.GetEdgeGeom(m_edge)
 	return geom
 }
+func (self *MappedAttributes) GetClosestNode(point geo.Coord) (int32, bool) {
+	node, ok := self.attributes.GetClosestNode(point)
+	if !ok {
+		return -1, false
+	}
+	if !self.node_mapping.HasValue() {
+		return node, true
+	}
+	m_node := self.node_mapping.Value.GetTarget(node)
+	return m_node, true
+}
 
 //*******************************************
 // modification methods
@@ -118,6 +144,7 @@ func (self *GraphAttributes) ReorderNodes(mapping Array[int32]) {
 		new_node_geoms[id] = self.node_geoms[i]
 	}
 	self.node_geoms = new_node_geoms
+	self.index = None[KDTree[int32]]()
 }
 func (self *GraphAttributes) RemoveNodes(nodes List[int32]) {
 	remove := NewArray[bool](len(self.node_attribs))
@@ -137,6 +164,7 @@ func (self *GraphAttributes) RemoveNodes(nodes List[int32]) {
 
 	self.node_attribs = Array[NodeAttribs](new_nodes)
 	self.node_geoms = new_node_geoms
+	self.index = None[KDTree[int32]]()
 }
 func (self *GraphAttributes) RemoveEdges(edges List[int32]) {
 	remove := NewArray[bool](len(self.edge_attribs))
@@ -156,6 +184,7 @@ func (self *GraphAttributes) RemoveEdges(edges List[int32]) {
 
 	self.edge_attribs = Array[EdgeAttribs](new_edges)
 	self.edge_geoms = new_edge_geoms
+	self.index = None[KDTree[int32]]()
 }
 
 //*******************************************

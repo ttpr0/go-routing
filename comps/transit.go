@@ -91,7 +91,7 @@ func (self *Transit) _Load(path string) {
 func (self *Transit) _Store(path string) {
 	structs.StoreIDMapping(self.id_mapping, path+"-id_mapping")
 	structs.StoreShortcuts(self.shortcuts, path+"-shortcut")
-	structs.StoreAdjacency(&self.topology, false, path+"-transit_graph")
+	structs.StoreAdjacency(&self.topology, true, path+"-transit_graph")
 	WriteArrayToFile(self.stops, path+"-stops")
 	WriteArrayToFile(self.connections, path+"-connections")
 }

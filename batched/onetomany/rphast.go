@@ -56,6 +56,9 @@ func (self *RPHASTSolver) GetDistance(node int32) int32 {
 func _TargetSelection(g graph.ICHGraph, target_nodes Array[int32]) List[structs.Shortcut] {
 	node_queue := NewQueue[int32]()
 	for i := 0; i < target_nodes.Length(); i++ {
+		if target_nodes[i] == -1 {
+			continue
+		}
 		node_queue.Push(target_nodes[i])
 	}
 

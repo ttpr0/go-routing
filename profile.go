@@ -71,7 +71,6 @@ type DrivingProfile struct {
 	vehicle VehicleType
 
 	base              comps.IGraphBase
-	index             Optional[comps.IGraphIndex]
 	attr_node_mapping Optional[structs.IDMapping]
 	attr_edge_mapping Optional[structs.IDMapping]
 	weight            Optional[comps.IWeighting]
@@ -104,26 +103,18 @@ func (self *DrivingProfile) SetManager(manager *RoutingManager) {
 }
 func (self *DrivingProfile) GetGraph() Optional[graph.IGraph] {
 	base := self.base
-	if !self.index.HasValue() {
-		self.index = Some(comps.NewGraphIndex(base))
-	}
-	index := self.index
 	if self.weight.HasValue() {
-		g := graph.BuildGraph(base, self.weight.Value, index)
+		g := graph.BuildGraph(base, self.weight.Value)
 		return Some(graph.IGraph(g))
 	}
 	if self.tc_weight.HasValue() {
-		g := graph.BuildTCGraph(base, self.tc_weight.Value, index)
+		g := graph.BuildTCGraph(base, self.tc_weight.Value)
 		return Some(graph.IGraph(g))
 	}
 	return None[graph.IGraph]()
 }
 func (self *DrivingProfile) GetCHGraph() Optional[graph.ICHGraph] {
 	base := self.base
-	if !self.index.HasValue() {
-		self.index = Some(comps.NewGraphIndex(base))
-	}
-	index := self.index
 	if !self.weight.HasValue() {
 		return None[graph.ICHGraph]()
 	}
@@ -138,15 +129,11 @@ func (self *DrivingProfile) GetCHGraph() Optional[graph.ICHGraph] {
 		self.ch_speed_up = Some(speed_up)
 	}
 	ch_index := speed_up.ch_index
-	g := graph.BuildCHGraph(base, weight, index, ch, ch_index)
+	g := graph.BuildCHGraph(base, weight, ch, ch_index)
 	return Some(graph.ICHGraph(g))
 }
 func (self *DrivingProfile) GetTiledGraph() Optional[graph.ITiledGraph] {
 	base := self.base
-	if !self.index.HasValue() {
-		self.index = Some(comps.NewGraphIndex(base))
-	}
-	index := self.index
 	if !self.weight.HasValue() {
 		return None[graph.ITiledGraph]()
 	}
@@ -158,7 +145,7 @@ func (self *DrivingProfile) GetTiledGraph() Optional[graph.ITiledGraph] {
 	partition := speed_up.partition
 	overlay := speed_up.overlay
 	cell_index := speed_up.cell_index
-	g := graph.BuildTiledGraph(base, weight, index, partition, overlay, Some(cell_index))
+	g := graph.BuildTiledGraph(base, weight, partition, overlay, Some(cell_index))
 	return Some(graph.ITiledGraph(g))
 }
 func (self *DrivingProfile) GetTransitGraph(schedule string) Optional[*graph.TransitGraph] {
@@ -366,7 +353,6 @@ type WalkingProfile struct {
 	vehicle VehicleType
 
 	base      comps.IGraphBase
-	index     Optional[comps.IGraphIndex]
 	weight    Optional[comps.IWeighting]
 	tc_weight Optional[comps.ITCWeighting]
 }
@@ -385,16 +371,12 @@ func (self *WalkingProfile) SetManager(manager *RoutingManager) {
 }
 func (self *WalkingProfile) GetGraph() Optional[graph.IGraph] {
 	base := self.base
-	if !self.index.HasValue() {
-		self.index = Some(comps.NewGraphIndex(base))
-	}
-	index := self.index
 	if self.weight.HasValue() {
-		g := graph.BuildGraph(base, self.weight.Value, index)
+		g := graph.BuildGraph(base, self.weight.Value)
 		return Some(graph.IGraph(g))
 	}
 	if self.tc_weight.HasValue() {
-		g := graph.BuildTCGraph(base, self.tc_weight.Value, index)
+		g := graph.BuildTCGraph(base, self.tc_weight.Value)
 		return Some(graph.IGraph(g))
 	}
 	return None[graph.IGraph]()
@@ -524,7 +506,6 @@ type TransitProfile struct {
 	vehicle VehicleType
 
 	base            comps.IGraphBase
-	index           Optional[comps.IGraphIndex]
 	tc_weight       comps.ITCWeighting
 	transit         *comps.Transit
 	transit_weights Dict[string, *comps.TransitWeighting]
@@ -544,11 +525,7 @@ func (self *TransitProfile) SetManager(manager *RoutingManager) {
 }
 func (self *TransitProfile) GetGraph() Optional[graph.IGraph] {
 	base := self.base
-	if !self.index.HasValue() {
-		self.index = Some(comps.NewGraphIndex(base))
-	}
-	index := self.index
-	g := graph.BuildTCGraph(base, self.tc_weight, index)
+	g := graph.BuildTCGraph(base, self.tc_weight)
 	return Some(graph.IGraph(g))
 }
 func (self *TransitProfile) GetCHGraph() Optional[graph.ICHGraph] {
@@ -559,16 +536,12 @@ func (self *TransitProfile) GetTiledGraph() Optional[graph.ITiledGraph] {
 }
 func (self *TransitProfile) GetTransitGraph(schedule string) Optional[*graph.TransitGraph] {
 	base := self.base
-	if !self.index.HasValue() {
-		self.index = Some(comps.NewGraphIndex(base))
-	}
-	index := self.index
 	transit := self.transit
 	if !self.transit_weights.ContainsKey(schedule) {
 		return None[*graph.TransitGraph]()
 	}
 	transit_weight := self.transit_weights[schedule]
-	g := graph.BuildTransitGraph(base, self.tc_weight, index, transit, transit_weight)
+	g := graph.BuildTransitGraph(base, self.tc_weight, transit, transit_weight)
 	return Some(g)
 }
 func (self *TransitProfile) GetAttributes() attr.IAttributes {
@@ -679,7 +652,7 @@ func BuildTransitProfile(out_path string, source_ SourceOptions, options_ IProfi
 	comps.Store(weight, prefix+"-weight")
 
 	stops, conns, schedules := parser.ParseGtfs(gtfs, options.Preperation.FilterPolygon)
-	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
+	g := graph.BuildGraph(base, weight)
 	transit := preproc.PrepareTransit(g, stops, conns, options.Preperation.MaxTransferRange)
 	profile.transit = transit
 	comps.Store(transit, prefix+"-transit")

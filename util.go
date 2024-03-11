@@ -2,45 +2,13 @@ package main
 
 import (
 	"os"
+	"strings"
 
 	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/geo"
-	"github.com/ttpr0/go-routing/graph"
+	. "github.com/ttpr0/go-routing/util"
 )
-
-func LoadOrCreate(graph_path string, osm_file string, partition_file string) graph.ITiledGraph {
-	// // check if graph files already exist
-	// _, err1 := os.Stat(graph_path + "-nodes")
-	// _, err2 := os.Stat(graph_path + "-edges")
-	// _, err3 := os.Stat(graph_path + "-geom")
-	// _, err4 := os.Stat(graph_path + "-tiles")
-	// if errors.Is(err1, os.ErrNotExist) || errors.Is(err2, os.ErrNotExist) || errors.Is(err3, os.ErrNotExist) || errors.Is(err4, os.ErrNotExist) {
-	// 	// create graph
-	// 	g := graph.ParseGraph(osm_file)
-
-	// 	file_str, _ := os.ReadFile(partition_file)
-	// 	collection := geo.FeatureCollection{}
-	// 	_ = json.Unmarshal(file_str, &collection)
-
-	// 	graph.BuildGraphIndex(g)
-
-	// 	tiles := partitioning.GeometricPartitioning(g, collection.Features())
-	// 	tg := graph.PreprocessTiledGraph(g, tiles)
-
-	// 	graph.StoreTiledGraph(tg, graph_path)
-
-	// 	return tg
-	// } else {
-	// 	return graph.LoadTiledGraph(graph_path)
-	// }
-	return nil
-}
-
-func GetClosestNode(point geo.Coord, graph graph.IGraph) int32 {
-	id, _ := graph.GetClosestNode(point)
-	return id
-}
 
 type GeoJSONFeature struct {
 	Type  string         `json:"type"`
@@ -117,10 +85,43 @@ func IsDirectoryEmpty(path string) bool {
 	return len(files) == 0
 }
 
-func MapCoordsToNodes(g graph.IGraph, coords []geo.Coord) []int32 {
+func GetRequestProfile(manager *RoutingManager, profile, metric string) (Optional[IRoutingProfile], Result) {
+	var prof IRoutingProfile
+	{
+		tokens := strings.Split(profile, "-")
+		if len(tokens) != 2 {
+			return None[IRoutingProfile](), BadRequest("Invalid profile")
+		}
+		typ, err := ProfileTypeFromString(tokens[0])
+		if err != nil {
+			return None[IRoutingProfile](), BadRequest("Invalid profile type")
+		}
+		vehicle, err := VehicleTypeFromString(tokens[1])
+		if err != nil {
+			return None[IRoutingProfile](), BadRequest("Invalid vehicle type")
+		}
+		var metr MetricType
+		switch metric {
+		case "time":
+			metr = FASTEST
+		case "distance":
+			metr = SHORTEST
+		default:
+			return None[IRoutingProfile](), BadRequest("Invalid metric type")
+		}
+		prof_ := MANAGER.GetMatchingProfile(typ, vehicle, metr)
+		if !prof_.HasValue() {
+			return None[IRoutingProfile](), BadRequest("Profile not found")
+		}
+		prof = prof_.Value
+	}
+	return Some(prof), OK("")
+}
+
+func MapCoordsToNodes(att attr.IAttributes, coords []geo.Coord) Array[int32] {
 	nodes := make([]int32, len(coords))
 	for i, coord := range coords {
-		id, ok := g.GetClosestNode(coord)
+		id, ok := att.GetClosestNode(coord)
 		if ok {
 			nodes[i] = id
 		} else {
