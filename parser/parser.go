@@ -217,6 +217,11 @@ func _WayHandler(scanner *osmpbf.Scanner, decoder IOSMDecoder, edges *List[OSMEd
 			continue
 		}
 	}
+	for i := 0; i < edges.Length(); i++ {
+		e := edges.Get(i)
+		e.Attr.Length = float32(geo.HaversineLength(geo.CoordArray(e.Nodes)))
+		edges.Set(i, e)
+	}
 }
 
 //*******************************************

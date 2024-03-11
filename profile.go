@@ -50,6 +50,10 @@ var PROFILE_HANDLERS = Dict[ProfileType, ProfileHandler]{
 		Build: BuildWalkingProfile,
 		Load:  LoadWalkingProfile,
 	},
+	CYCLING: {
+		Build: BuildCyclingProfile,
+		Load:  LoadCyclingProfile,
+	},
 	TRANSIT: {
 		Build: BuildTransitProfile,
 		Load:  LoadTransitProfile,
