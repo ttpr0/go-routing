@@ -84,12 +84,12 @@ type IProfileOptions interface {
 type DrivingOptions struct {
 	Vehicle     VehicleType `yaml:"vehicle"`
 	Metric      MetricType  `yaml:"metric"`
-	Preperation struct {
+	Preparation struct {
 		Contraction     bool   `yaml:"contraction"`
 		Overlay         bool   `yaml:"overlay"`
 		MaxNodesPerCell int    `yaml:"max-nodes-per-cell"`
 		OverlayMethod   string `yaml:"overlay-method"`
-	} `yaml:"preperation"`
+	} `yaml:"preparation"`
 }
 
 func (self DrivingOptions) Type() ProfileType {
@@ -117,10 +117,10 @@ func (self CyclingOptions) Type() ProfileType {
 type TransitOptions struct {
 	Vehicle VehicleType `yaml:"vehicle"`
 	// Metric      MetricType  `yaml:"metric"`
-	Preperation struct {
+	Preparation struct {
 		FilterPolygon    string `yaml:"filter-polygon"`
 		MaxTransferRange int32  `yaml:"max-transfer-range"`
-	} `yaml:"preperation"`
+	} `yaml:"preparation"`
 }
 
 func (self TransitOptions) Type() ProfileType {

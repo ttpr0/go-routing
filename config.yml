@@ -7,21 +7,21 @@ build:
       type: "driving"
       vehicle: "car"
       metric: "fastest"
-      preperation:
+      preparation:
         contraction: true
     driving-car-overlay:
-      type: "driving"
-      vehicle: "car"
+      type: "cycling"
+      vehicle: "bike"
       metric: "fastest"
-      preperation:
+      preparation:
         overlay: true
         max-nodes-per-cell: 100
         overlay-method: "clique"
-    # public-transit:
-    #   type: "transit"
-    #   vehicle: "öpnv"
-    #   preperation:
-    #     filter-polygon: "./data/berlin.json"
-    #     max-transfer-range: 900
+    public-transit:
+      type: "transit"
+      vehicle: "öpnv"
+      preparation:
+        filter-polygon: "./data/berlin.json"
+        max-transfer-range: 900
 build-graphs: false
 services:

@@ -286,7 +286,7 @@ func BuildDrivingProfile(out_path string, source_ SourceOptions, options_ IProfi
 	// node mapping of attributes of nodes are reordered
 	attr_node_mapping := structs.NewIdendityMapping(base.NodeCount())
 
-	if options.Preperation.Contraction {
+	if options.Preparation.Contraction {
 		slog.Info("Building contraction hierarchy")
 		new_base, ch, ordering := CreateCH(base, weight)
 		slog.Info("Contraction hierarchy successfully built")
@@ -303,15 +303,15 @@ func BuildDrivingProfile(out_path string, source_ SourceOptions, options_ IProfi
 		comps.Store(base, prefix+"-base")
 		comps.Store(weight, prefix+"-weight")
 		comps.Store(ch, prefix+"-ch")
-	} else if options.Preperation.Overlay {
+	} else if options.Preparation.Overlay {
 		slog.Info("Building overlay")
-		partition := CreatePartition(base, options.Preperation.MaxNodesPerCell)
+		partition := CreatePartition(base, options.Preparation.MaxNodesPerCell)
 		slog.Info("Overlay successfully built")
 		var overlay *comps.Overlay
 		var cell_index *comps.CellIndex
 		var ordering Array[int32]
-		slog.Info("Building Cell-Index with method: " + options.Preperation.OverlayMethod)
-		switch options.Preperation.OverlayMethod {
+		slog.Info("Building Cell-Index with method: " + options.Preparation.OverlayMethod)
+		switch options.Preparation.OverlayMethod {
 		case "skeleton":
 			base, partition, overlay, cell_index, ordering = CreateGRASP(base, weight, partition, true)
 		case "isophast":
@@ -831,9 +831,9 @@ func BuildTransitProfile(out_path string, source_ SourceOptions, options_ IProfi
 	comps.Store(base, prefix+"-base")
 	comps.Store(weight, prefix+"-weight")
 
-	stops, conns, schedules := parser.ParseGtfs(gtfs, options.Preperation.FilterPolygon)
+	stops, conns, schedules := parser.ParseGtfs(gtfs, options.Preparation.FilterPolygon)
 	g := graph.BuildGraph(base, weight)
-	transit := preproc.PrepareTransit(g, stops, conns, options.Preperation.MaxTransferRange)
+	transit := preproc.PrepareTransit(g, stops, conns, options.Preparation.MaxTransferRange)
 	profile.transit = transit
 	comps.Store(transit, prefix+"-transit")
 	transit_weights := NewDict[string, *comps.TransitWeighting](7)
