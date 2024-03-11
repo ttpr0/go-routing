@@ -245,7 +245,7 @@ func BuildDrivingProfile(out_path string, source_ SourceOptions, options_ IProfi
 	} else {
 		slog.Info("Parsing graph...")
 		// parse graph from osm
-		base, attributes = parser.ParseGraph(osm)
+		base, attributes = parser.ParseGraph(osm, &parser.DrivingDecoder{})
 		// remove closely connected components
 		slog.Info("Removing unconnected components...")
 		remove_nodes, remove_edges := RemoveConnectedComponents(base)
@@ -268,7 +268,12 @@ func BuildDrivingProfile(out_path string, source_ SourceOptions, options_ IProfi
 	var weight *comps.DefaultWeighting
 	switch profile.metric {
 	case FASTEST:
-		weight = BuildFastestWeighting(base, attributes)
+		switch profile.vehicle {
+		case CAR:
+			weight = BuildCarWeighting(base, attributes)
+		default:
+			weight = BuildCarWeighting(base, attributes)
+		}
 	case SHORTEST:
 		weight = BuildShortestWeighting(base, attributes)
 	default:
@@ -358,7 +363,7 @@ type WalkingProfile struct {
 }
 
 func (self *WalkingProfile) Profile() ProfileType {
-	return TRANSIT
+	return WALKING
 }
 func (self *WalkingProfile) Vehicle() VehicleType {
 	return self.vehicle
@@ -457,7 +462,7 @@ func BuildWalkingProfile(out_path string, source_ SourceOptions, options_ IProfi
 		attributes = item.B
 	} else {
 		// parse graph from osm
-		base, attributes = parser.ParseGraph(osm)
+		base, attributes = parser.ParseGraph(osm, &parser.WalkingDecoder{})
 		// remove closely connected components
 		remove_nodes, remove_edges := RemoveConnectedComponents(base)
 		slog.Info(fmt.Sprintf("removed %v nodes", remove_nodes.Length()))
@@ -477,7 +482,12 @@ func BuildWalkingProfile(out_path string, source_ SourceOptions, options_ IProfi
 	var weight *comps.DefaultWeighting
 	switch profile.metric {
 	case FASTEST:
-		weight = BuildPedestrianWeighting(base, attributes)
+		switch profile.vehicle {
+		case FOOT:
+			weight = BuildFootWeighting(base, attributes)
+		default:
+			weight = BuildFootWeighting(base, attributes)
+		}
 	case SHORTEST:
 		weight = BuildShortestWeighting(base, attributes)
 	default:
@@ -497,7 +507,165 @@ func BuildWalkingProfile(out_path string, source_ SourceOptions, options_ IProfi
 }
 
 //**********************************************************
-// walking profile
+// cycling profile
+//**********************************************************
+
+type CyclingProfile struct {
+	manager *RoutingManager
+	metric  MetricType
+	vehicle VehicleType
+
+	base      comps.IGraphBase
+	weight    Optional[comps.IWeighting]
+	tc_weight Optional[comps.ITCWeighting]
+}
+
+func (self *CyclingProfile) Profile() ProfileType {
+	return CYCLING
+}
+func (self *CyclingProfile) Vehicle() VehicleType {
+	return self.vehicle
+}
+func (self *CyclingProfile) Metric() MetricType {
+	return self.metric
+}
+func (self *CyclingProfile) SetManager(manager *RoutingManager) {
+	self.manager = manager
+}
+func (self *CyclingProfile) GetGraph() Optional[graph.IGraph] {
+	base := self.base
+	if self.weight.HasValue() {
+		g := graph.BuildGraph(base, self.weight.Value)
+		return Some(graph.IGraph(g))
+	}
+	if self.tc_weight.HasValue() {
+		g := graph.BuildTCGraph(base, self.tc_weight.Value)
+		return Some(graph.IGraph(g))
+	}
+	return None[graph.IGraph]()
+}
+func (self *CyclingProfile) GetCHGraph() Optional[graph.ICHGraph] {
+	return None[graph.ICHGraph]()
+}
+func (self *CyclingProfile) GetTiledGraph() Optional[graph.ITiledGraph] {
+	return None[graph.ITiledGraph]()
+}
+func (self *CyclingProfile) GetTransitGraph(schedule string) Optional[*graph.TransitGraph] {
+	return None[*graph.TransitGraph]()
+}
+func (self *CyclingProfile) GetAttributes() attr.IAttributes {
+	att := self.manager._GetAttributes(WALKING)
+	return attr.NewMappedAttributes(att, None[structs.IDMapping](), None[structs.IDMapping]())
+}
+func (self *CyclingProfile) _GetMetadata() ProfileMeta {
+	meta := CyclingMeta{
+		Metric:  self.metric,
+		Vehicle: self.vehicle,
+
+		TurnCosts: self.tc_weight.HasValue(),
+	}
+	meta_str, _ := json.Marshal(meta)
+	return ProfileMeta{
+		Type: CYCLING,
+		Meta: meta_str,
+	}
+}
+
+type CyclingMeta struct {
+	Metric  MetricType  `json:"metric"`
+	Vehicle VehicleType `json:"vehicle"`
+
+	TurnCosts bool `json:"turn-costs"`
+}
+
+func LoadCyclingProfile(path string, p_meta ProfileMeta) IRoutingProfile {
+	if p_meta.Type != CYCLING {
+		panic("not a cycling profile")
+	}
+	meta := CyclingMeta{}
+	json.Unmarshal(p_meta.Meta, &meta)
+
+	prefix := path
+
+	base := comps.Load[*comps.GraphBase](prefix + "-base")
+	var weight Optional[comps.IWeighting]
+	var tc_weight Optional[comps.ITCWeighting]
+	if meta.TurnCosts {
+		weight = None[comps.IWeighting]()
+		tc_weight = Some(comps.ITCWeighting(comps.Load[*comps.TCWeighting](prefix + "-weight")))
+	} else {
+		weight = Some(comps.IWeighting(comps.Load[*comps.DefaultWeighting](prefix + "-weight")))
+		tc_weight = None[comps.ITCWeighting]()
+	}
+
+	return &CyclingProfile{
+		metric:  meta.Metric,
+		vehicle: meta.Vehicle,
+
+		base:      base,
+		weight:    weight,
+		tc_weight: tc_weight,
+	}
+}
+
+func BuildCyclingProfile(out_path string, source_ SourceOptions, options_ IProfileOptions, prep_cache PrepDict) IRoutingProfile {
+	options := options_.(CyclingOptions)
+	osm := source_.OSM
+
+	var base *comps.GraphBase
+	var attributes *attr.GraphAttributes
+	if prep_cache.ContainsKey(CYCLING) {
+		item := prep_cache.Get(CYCLING)
+		base = item.A
+		attributes = item.B
+	} else {
+		// parse graph from osm
+		base, attributes = parser.ParseGraph(osm, &parser.CyclingDecoder{})
+		// remove closely connected components
+		remove_nodes, remove_edges := RemoveConnectedComponents(base)
+		slog.Info(fmt.Sprintf("removed %v nodes", remove_nodes.Length()))
+		base = comps.RemoveNodes(base, remove_nodes)
+		attributes.RemoveNodes(remove_nodes)
+		attributes.RemoveEdges(remove_edges)
+		prep_cache.Set(CYCLING, MakeTuple(base, attributes))
+	}
+
+	// build profile
+	profile := &CyclingProfile{
+		metric:  options.Metric,
+		vehicle: options.Vehicle,
+	}
+
+	// build metric
+	var weight *comps.DefaultWeighting
+	switch profile.metric {
+	case FASTEST:
+		switch profile.vehicle {
+		case BIKE:
+			weight = BuildBikeWeighting(base, attributes)
+		default:
+			weight = BuildBikeWeighting(base, attributes)
+		}
+	case SHORTEST:
+		weight = BuildShortestWeighting(base, attributes)
+	default:
+		panic("unknown metric-type")
+	}
+
+	// store prefix
+	prefix := out_path
+
+	// node mapping of attributes of nodes are reordered
+	profile.base = base
+	profile.weight = Some(comps.IWeighting(weight))
+	comps.Store(base, prefix+"-base")
+	comps.Store(weight, prefix+"-weight")
+
+	return profile
+}
+
+//**********************************************************
+// transit profile
 //**********************************************************
 
 type TransitProfile struct {
@@ -607,22 +775,32 @@ func BuildTransitProfile(out_path string, source_ SourceOptions, options_ IProfi
 	osm := source_.OSM
 	gtfs := source_.GTFS
 
+	var prep_type ProfileType
+	switch options.Vehicle {
+	case CAR:
+		prep_type = DRIVING
+	case BIKE:
+		prep_type = CYCLING
+	default:
+		prep_type = WALKING
+	}
+
 	var base *comps.GraphBase
 	var attributes *attr.GraphAttributes
-	if prep_cache.ContainsKey(WALKING) {
-		item := prep_cache.Get(WALKING)
+	if prep_cache.ContainsKey(prep_type) {
+		item := prep_cache.Get(prep_type)
 		base = item.A
 		attributes = item.B
 	} else {
 		// parse graph from osm
-		base, attributes = parser.ParseGraph(osm)
+		base, attributes = parser.ParseGraph(osm, GetDecoder(prep_type))
 		// remove closely connected components
 		remove_nodes, remove_edges := RemoveConnectedComponents(base)
 		slog.Info(fmt.Sprintf("removed %v nodes", remove_nodes.Length()))
 		base = comps.RemoveNodes(base, remove_nodes)
 		attributes.RemoveNodes(remove_nodes)
 		attributes.RemoveEdges(remove_edges)
-		prep_cache.Set(WALKING, MakeTuple(base, attributes))
+		prep_cache.Set(prep_type, MakeTuple(base, attributes))
 	}
 
 	// build profile
@@ -633,13 +811,15 @@ func BuildTransitProfile(out_path string, source_ SourceOptions, options_ IProfi
 
 	// build metric
 	var weight *comps.DefaultWeighting
-	switch profile.metric {
-	case FASTEST:
-		weight = BuildPedestrianWeighting(base, attributes)
-	case SHORTEST:
-		weight = BuildShortestWeighting(base, attributes)
+	switch options.Vehicle {
+	case FOOT:
+		weight = BuildFootWeighting(base, attributes)
+	case BIKE:
+		weight = BuildBikeWeighting(base, attributes)
+	case CAR:
+		weight = BuildCarWeighting(base, attributes)
 	default:
-		panic("unknown metric-type")
+		weight = BuildFootWeighting(base, attributes)
 	}
 
 	// store prefix

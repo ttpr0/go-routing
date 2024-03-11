@@ -3,11 +3,76 @@ package main
 import (
 	"github.com/ttpr0/go-routing/algorithm"
 	"github.com/ttpr0/go-routing/algorithm/partitioning"
+	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/graph"
 	"github.com/ttpr0/go-routing/preproc"
 	. "github.com/ttpr0/go-routing/util"
 )
+
+//**********************************************************
+// build weighting
+//**********************************************************
+
+func BuildShortestWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
+	weights := comps.NewDefaultWeighting(base)
+	for i := 0; i < base.EdgeCount(); i++ {
+		attr := attributes.GetEdgeAttribs(int32(i))
+		w := attr.Length
+		if w < 1 {
+			w = 1
+		}
+		weights.SetEdgeWeight(int32(i), int32(w))
+	}
+
+	return weights
+}
+
+func BuildCarWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
+	weights := comps.NewDefaultWeighting(base)
+	for i := 0; i < base.EdgeCount(); i++ {
+		attr := attributes.GetEdgeAttribs(int32(i))
+		w := attr.Length * 3.6 / float32(attr.Maxspeed)
+		if w < 1 {
+			w = 1
+		}
+		weights.SetEdgeWeight(int32(i), int32(w))
+	}
+
+	return weights
+}
+
+func BuildFootWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
+	weights := comps.NewDefaultWeighting(base)
+	for i := 0; i < base.EdgeCount(); i++ {
+		attr := attributes.GetEdgeAttribs(int32(i))
+		w := attr.Length * 3.6 / 3
+		if w < 1 {
+			w = 1
+		}
+		weights.SetEdgeWeight(int32(i), int32(w))
+	}
+
+	return weights
+}
+
+func BuildBikeWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
+	weights := comps.NewDefaultWeighting(base)
+	for i := 0; i < base.EdgeCount(); i++ {
+		attr := attributes.GetEdgeAttribs(int32(i))
+		w := attr.Length * 3.6 / 18
+		if w < 1 {
+			w = 1
+		}
+		weights.SetEdgeWeight(int32(i), int32(w))
+	}
+
+	return weights
+}
+
+//**********************************************************
+// preprocess speed-up components
+//**********************************************************
 
 func CreatePartition(base *comps.GraphBase, nodes_per_cell int) *comps.Partition {
 	eq_weight := comps.NewEqualWeighting()

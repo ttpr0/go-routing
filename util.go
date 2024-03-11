@@ -5,63 +5,10 @@ import (
 	"strings"
 
 	"github.com/ttpr0/go-routing/attr"
-	"github.com/ttpr0/go-routing/comps"
 	"github.com/ttpr0/go-routing/geo"
+	"github.com/ttpr0/go-routing/parser"
 	. "github.com/ttpr0/go-routing/util"
 )
-
-func BuildFastestWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
-	weights := comps.NewDefaultWeighting(base)
-	for i := 0; i < base.EdgeCount(); i++ {
-		attr := attributes.GetEdgeAttribs(int32(i))
-		w := attr.Length * 3.6 / float32(attr.Maxspeed)
-		if w < 1 {
-			w = 1
-		}
-		weights.SetEdgeWeight(int32(i), int32(w))
-	}
-
-	return weights
-}
-
-func BuildShortestWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
-	weights := comps.NewDefaultWeighting(base)
-	for i := 0; i < base.EdgeCount(); i++ {
-		attr := attributes.GetEdgeAttribs(int32(i))
-		w := attr.Length
-		if w < 1 {
-			w = 1
-		}
-		weights.SetEdgeWeight(int32(i), int32(w))
-	}
-
-	return weights
-}
-
-func BuildPedestrianWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
-	weights := comps.NewDefaultWeighting(base)
-	for i := 0; i < base.EdgeCount(); i++ {
-		attr := attributes.GetEdgeAttribs(int32(i))
-		w := attr.Length * 3.6 / 3
-		if w < 1 {
-			w = 1
-		}
-		weights.SetEdgeWeight(int32(i), int32(w))
-	}
-
-	return weights
-}
-
-func BuildTCWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.TCWeighting {
-	weight := comps.NewTCWeighting(base)
-
-	for i := 0; i < int(base.EdgeCount()); i++ {
-		attr := attributes.GetEdgeAttribs(int32(i))
-		weight.SetEdgeWeight(int32(i), int32(attr.Length/float32(attr.Maxspeed)))
-	}
-
-	return weight
-}
 
 func IsDirectoryEmpty(path string) bool {
 	files, err := os.ReadDir(path)
@@ -115,4 +62,17 @@ func MapCoordsToNodes(att attr.IAttributes, coords []geo.Coord) Array[int32] {
 		}
 	}
 	return nodes
+}
+
+func GetDecoder(typ ProfileType) parser.IOSMDecoder {
+	var decoder parser.IOSMDecoder
+	switch typ {
+	case DRIVING:
+		decoder = &parser.DrivingDecoder{}
+	case CYCLING:
+		decoder = &parser.CyclingDecoder{}
+	case WALKING:
+		decoder = &parser.WalkingDecoder{}
+	}
+	return decoder
 }

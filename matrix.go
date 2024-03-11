@@ -3,6 +3,7 @@ package main
 import (
 	"sync"
 
+	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/batched/onetomany"
 	"github.com/ttpr0/go-routing/geo"
 	. "github.com/ttpr0/go-routing/util"
@@ -21,6 +22,8 @@ type MatrixRequest struct {
 	MaxRange     int32            `json:"max_range"`
 	TimeWindow   [2]int32         `json:"time_window"`
 	ScheduleDay  string           `json:"schedule_day"`
+	AvoidRoads   []attr.RoadType  `json:"avoid_roads"`
+	AvoidArea    geo.Feature      `json:"avoid_area"`
 }
 
 type MatrixResponse struct {
@@ -59,22 +62,43 @@ func HandleMatrixRequest(req MatrixRequest) Result {
 	// get graph
 	var otm onetomany.IOneToMany
 	{
-		transit_g := profile.GetTransitGraph(req.ScheduleDay)
-		if transit_g.HasValue() {
-			slog.Info("Using Transit-Dijkstra")
-			otm = onetomany.NewTransitDijkstra(transit_g.Value, max_range, req.TimeWindow[0], req.TimeWindow[1])
-		} else {
-			ch_g := profile.GetCHGraph()
-			if ch_g.HasValue() {
-				slog.Info("Using Range-RPHAST")
-				otm = onetomany.NewRangeRPHAST(ch_g.Value, target_nodes, max_range)
-			} else {
-				s_g := profile.GetGraph()
-				if !s_g.HasValue() {
-					return BadRequest("Graph not found")
-				}
+		if req.AvoidRoads != nil || req.AvoidArea.Geometry() != nil {
+			s_g := profile.GetGraph()
+			if s_g.HasValue() {
 				slog.Info("Using Range-Dijkstra")
-				otm = onetomany.NewRangeDijkstra(s_g.Value, max_range)
+				var a_r Optional[[]attr.RoadType]
+				if req.AvoidRoads != nil {
+					a_r = Some(req.AvoidRoads)
+				} else {
+					a_r = None[[]attr.RoadType]()
+				}
+				var a_a Optional[geo.Feature]
+				if req.AvoidArea.Geometry() != nil {
+					a_a = Some(req.AvoidArea)
+				} else {
+					a_a = None[geo.Feature]()
+				}
+				otm = onetomany.NewAvoidDijkstra(s_g.Value, max_range, att, a_r, a_a)
+			}
+		}
+		if otm == nil {
+			transit_g := profile.GetTransitGraph(req.ScheduleDay)
+			if transit_g.HasValue() {
+				slog.Info("Using Transit-Dijkstra")
+				otm = onetomany.NewTransitDijkstra(transit_g.Value, max_range, req.TimeWindow[0], req.TimeWindow[1])
+			} else {
+				ch_g := profile.GetCHGraph()
+				if ch_g.HasValue() {
+					slog.Info("Using Range-RPHAST")
+					otm = onetomany.NewRangeRPHAST(ch_g.Value, target_nodes, max_range)
+				} else {
+					s_g := profile.GetGraph()
+					if !s_g.HasValue() {
+						return BadRequest("Graph not found")
+					}
+					slog.Info("Using Range-Dijkstra")
+					otm = onetomany.NewRangeDijkstra(s_g.Value, max_range)
+				}
 			}
 		}
 	}

@@ -16,16 +16,12 @@ type TempNode struct {
 }
 type OSMNode struct {
 	Point geo.Coord
-	Type  int32
+	Attr  attr.NodeAttribs
 	Edges List[int32]
 }
 type OSMEdge struct {
-	NodeA     int
-	NodeB     int
-	Oneway    bool
-	Type      attr.RoadType
-	Templimit int32
-	Length    float32
-	Weight    float32
-	Nodes     List[geo.Coord]
+	NodeA int
+	NodeB int
+	Attr  attr.EdgeAttribs
+	Nodes List[geo.Coord]
 }

@@ -105,6 +105,15 @@ func (self WalkingOptions) Type() ProfileType {
 	return WALKING
 }
 
+type CyclingOptions struct {
+	Vehicle VehicleType `yaml:"vehicle"`
+	Metric  MetricType  `yaml:"metric"`
+}
+
+func (self CyclingOptions) Type() ProfileType {
+	return CYCLING
+}
+
 type TransitOptions struct {
 	Vehicle VehicleType `yaml:"vehicle"`
 	// Metric      MetricType  `yaml:"metric"`
@@ -127,7 +136,8 @@ type ProfileType byte
 const (
 	DRIVING ProfileType = 0
 	WALKING ProfileType = 1
-	TRANSIT ProfileType = 2
+	CYCLING ProfileType = 2
+	TRANSIT ProfileType = 3
 )
 
 func (self ProfileType) String() string {
@@ -136,6 +146,8 @@ func (self ProfileType) String() string {
 		return "driving"
 	case WALKING:
 		return "walking"
+	case CYCLING:
+		return "cycling"
 	case TRANSIT:
 		return "transit"
 	default:
@@ -161,6 +173,8 @@ func ProfileTypeFromString(s string) (ProfileType, error) {
 		return DRIVING, nil
 	case "walking":
 		return WALKING, nil
+	case "cycling":
+		return CYCLING, nil
 	case "transit":
 		return TRANSIT, nil
 	default:
@@ -225,6 +239,7 @@ type VehicleType byte
 const (
 	CAR  VehicleType = 0
 	FOOT VehicleType = 1
+	BIKE VehicleType = 2
 )
 
 func (self VehicleType) String() string {
@@ -233,6 +248,8 @@ func (self VehicleType) String() string {
 		return "car"
 	case FOOT:
 		return "foot"
+	case BIKE:
+		return "bike"
 	default:
 		panic("unknown vehicle type")
 	}
@@ -267,6 +284,8 @@ func VehicleTypeFromString(s string) (VehicleType, error) {
 		return CAR, nil
 	case "foot":
 		return FOOT, nil
+	case "bike":
+		return BIKE, nil
 	default:
 		return CAR, errors.New("unknown vehicle type")
 	}
