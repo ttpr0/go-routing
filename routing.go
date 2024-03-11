@@ -10,6 +10,10 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+//**********************************************************
+// routing requests and responses
+//**********************************************************
+
 type RoutingRequest struct {
 	Start     []float32 `json:"start"`
 	End       []float32 `json:"end"`
@@ -35,10 +39,10 @@ type DrawContextResponse struct {
 }
 
 type RoutingResponse struct {
-	Type     string           `json:"type"`
-	Finished bool             `json:"finished"`
-	Features []GeoJSONFeature `json:"features"`
-	Key      int              `json:"key"`
+	Type     string        `json:"type"`
+	Finished bool          `json:"finished"`
+	Features []geo.Feature `json:"features"`
+	Key      int           `json:"key"`
 }
 
 func NewRoutingResponse(lines []geo.CoordArray, finished bool, key int) RoutingResponse {
@@ -46,25 +50,20 @@ func NewRoutingResponse(lines []geo.CoordArray, finished bool, key int) RoutingR
 	resp.Type = "FeatureCollection"
 	resp.Finished = finished
 	resp.Key = key
-	resp.Features = make([]GeoJSONFeature, 0, 10)
+	resp.Features = make([]geo.Feature, 0, 10)
 	for _, line := range lines {
-		obj := NewGeoJSONFeature()
-		obj.Geom["type"] = "LineString"
-		iter := line.GetIterator()
-		arr := make([][2]float32, 0, 2)
-		for {
-			coord, ok := iter.Next()
-			if !ok {
-				break
-			}
-			arr = append(arr, coord)
-		}
-		obj.Geom["coordinates"] = arr
-		obj.Props["value"] = 0
+		geom := geo.NewLineString(line)
+		props := NewDict[string, any](1)
+		props["value"] = 0
+		obj := geo.NewFeature(&geom, props)
 		resp.Features = append(resp.Features, obj)
 	}
 	return resp
 }
+
+//**********************************************************
+// routing handlers
+//**********************************************************
 
 func HandleRoutingRequest(req RoutingRequest) Result {
 	if req.Draw {
@@ -198,6 +197,10 @@ func HandleRoutingStepRequest(req DrawRoutingRequest) Result {
 
 	return OK(resp)
 }
+
+//**********************************************************
+// routing utilities
+//**********************************************************
 
 func ProfileFromAlg(alg string) Optional[IRoutingProfile] {
 	var profile Optional[IRoutingProfile]

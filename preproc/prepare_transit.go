@@ -40,7 +40,8 @@ func PrepareTransit(g graph.IGraph, stops Array[structs.Node], connections Array
 		if s_node == -1 {
 			continue
 		}
-		solver.CalcDistanceFromStart(s_node)
+		start := [1]Tuple[int32, int32]{{s_node, 0}}
+		solver.CalcDistanceFromStart(start[:])
 		for j := 0; j < stops.Length(); j++ {
 			if i == j {
 				continue

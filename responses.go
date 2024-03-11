@@ -2,10 +2,10 @@ package main
 
 type ErrorResponse struct {
 	Request string `json:"request"`
-	Error   string `json:"error"`
+	Error   any    `json:"error"`
 }
 
-func NewErrorResponse(request, error string) ErrorResponse {
+func NewErrorResponse(request string, error any) ErrorResponse {
 	return ErrorResponse{
 		Request: request,
 		Error:   error,

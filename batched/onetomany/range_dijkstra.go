@@ -30,17 +30,9 @@ type RangeDijkstraSolver struct {
 }
 
 // CalcDiatanceFromStarts implements ISolver.
-func (self *RangeDijkstraSolver) CalcDistanceFromStarts(starts Array[Tuple[int32, int32]]) error {
+func (self *RangeDijkstraSolver) CalcDistanceFromStart(starts Array[Tuple[int32, int32]]) error {
 	self.node_flags.Reset()
 	_CalcRangeDijkstra(self.g, starts, self.node_flags, self.max_range)
-	return nil
-}
-
-// CalcDistanceFromStart implements ISolver.
-func (self *RangeDijkstraSolver) CalcDistanceFromStart(start int32) error {
-	self.node_flags.Reset()
-	starts := [1]Tuple[int32, int32]{MakeTuple(start, int32(0))}
-	_CalcRangeDijkstra(self.g, starts[:], self.node_flags, self.max_range)
 	return nil
 }
 

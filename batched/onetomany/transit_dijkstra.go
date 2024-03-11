@@ -47,21 +47,11 @@ type TransitDijkstraSolver struct {
 }
 
 // CalcDiatanceFromStarts implements ISolver.
-func (self *TransitDijkstraSolver) CalcDistanceFromStarts(starts Array[Tuple[int32, int32]]) error {
+func (self *TransitDijkstraSolver) CalcDistanceFromStart(starts Array[Tuple[int32, int32]]) error {
 	self.node_flags.Reset()
 	self.edge_flags.Reset()
 	self.stop_flags.Reset()
 	_CalcTransitDijkstra(self.g, starts, self.node_flags, self.edge_flags, self.stop_flags, self.max_range, self.from, self.to)
-	return nil
-}
-
-// CalcDistanceFromStart implements ISolver.
-func (self *TransitDijkstraSolver) CalcDistanceFromStart(start int32) error {
-	self.node_flags.Reset()
-	self.edge_flags.Reset()
-	self.stop_flags.Reset()
-	starts := [1]Tuple[int32, int32]{MakeTuple(start, int32(0))}
-	_CalcTransitDijkstra(self.g, starts[:], self.node_flags, self.edge_flags, self.stop_flags, self.max_range, self.from, self.to)
 	return nil
 }
 

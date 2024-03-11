@@ -10,20 +10,6 @@ import (
 	. "github.com/ttpr0/go-routing/util"
 )
 
-type GeoJSONFeature struct {
-	Type  string         `json:"type"`
-	Geom  map[string]any `json:"geometry"`
-	Props map[string]any `json:"properties"`
-}
-
-func NewGeoJSONFeature() GeoJSONFeature {
-	line := GeoJSONFeature{}
-	line.Type = "Feature"
-	line.Geom = make(map[string]any)
-	line.Props = make(map[string]any)
-	return line
-}
-
 func BuildFastestWeighting(base comps.IGraphBase, attributes *attr.GraphAttributes) *comps.DefaultWeighting {
 	weights := comps.NewDefaultWeighting(base)
 	for i := 0; i < base.EdgeCount(); i++ {

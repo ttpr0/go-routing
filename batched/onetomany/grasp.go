@@ -48,23 +48,12 @@ type GRASPSolver struct {
 }
 
 // CalcDiatanceFromStarts implements ISolver.
-func (self *GRASPSolver) CalcDistanceFromStarts(starts Array[Tuple[int32, int32]]) error {
+func (self *GRASPSolver) CalcDistanceFromStart(starts Array[Tuple[int32, int32]]) error {
 	self.node_flags.Reset()
 	for i := 0; i < self.found_tiles.Length(); i++ {
 		self.found_tiles[i] = false
 	}
 	_CalcGRASP(self.g, starts, self.max_range, self.node_flags, self.active_tiles, self.found_tiles)
-	return nil
-}
-
-// CalcDistanceFromStart implements ISolver.
-func (self *GRASPSolver) CalcDistanceFromStart(start int32) error {
-	self.node_flags.Reset()
-	for i := 0; i < self.found_tiles.Length(); i++ {
-		self.found_tiles[i] = false
-	}
-	starts := [1]Tuple[int32, int32]{MakeTuple(start, int32(0))}
-	_CalcGRASP(self.g, starts[:], self.max_range, self.node_flags, self.active_tiles, self.found_tiles)
 	return nil
 }
 

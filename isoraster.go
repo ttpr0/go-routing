@@ -10,6 +10,10 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+//**********************************************************
+// isoraster request and response
+//**********************************************************
+
 type IsoRasterRequest struct {
 	Locations  [][]float32 `json:"locations"`
 	Range      int32       `json:"range"`
@@ -19,19 +23,19 @@ type IsoRasterRequest struct {
 }
 
 type IsoRasterResponse struct {
-	Type     string           `json:"type"`
-	Features []GeoJSONFeature `json:"features"`
+	Type     string        `json:"type"`
+	Features []geo.Feature `json:"features"`
 }
 
 func NewIsoRasterResponse(nodes []*QuadNode[int], rasterizer IRasterizer) IsoRasterResponse {
 	resp := IsoRasterResponse{}
 	resp.Type = "FeatureCollection"
 
-	resp.Features = make([]GeoJSONFeature, len(nodes))
+	resp.Features = make([]geo.Feature, len(nodes))
 	for i := 0; i < len(nodes); i++ {
 		ul := rasterizer.IndexToPoint(nodes[i].X, nodes[i].Y)
 		lr := rasterizer.IndexToPoint(nodes[i].X+1, nodes[i].Y+1)
-		line := make([][2]float32, 5)
+		line := make([]geo.Coord, 5)
 		line[0][0] = ul[0]
 		line[0][1] = ul[1]
 		line[1][0] = lr[0]
@@ -42,13 +46,17 @@ func NewIsoRasterResponse(nodes []*QuadNode[int], rasterizer IRasterizer) IsoRas
 		line[3][1] = lr[1]
 		line[4][0] = ul[0]
 		line[4][1] = ul[1]
-		resp.Features[i] = NewGeoJSONFeature()
-		resp.Features[i].Geom["type"] = "Polygon"
-		resp.Features[i].Geom["coordinates"] = [][][2]float32{line}
-		resp.Features[i].Props["value"] = nodes[i].Value
+		geom := geo.NewPolygon([][]geo.Coord{line})
+		props := NewDict[string, any](1)
+		props["value"] = nodes[i].Value
+		resp.Features[i] = geo.NewFeature(&geom, props)
 	}
 	return resp
 }
+
+//**********************************************************
+// isoraster handler
+//**********************************************************
 
 func HandleIsoRasterRequest(req IsoRasterRequest) Result {
 	// get profile
@@ -86,6 +94,10 @@ func HandleIsoRasterRequest(req IsoRasterRequest) Result {
 	slog.Debug("reponse build")
 	return OK(resp)
 }
+
+//**********************************************************
+// isoraster builder
+//**********************************************************
 
 type SPTConsumer struct {
 	points     *QuadTree[int]

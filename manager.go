@@ -100,6 +100,14 @@ func (self *RoutingManager) GetMatchingProfile(profile ProfileType, vehicle Vehi
 	return None[IRoutingProfile]()
 }
 
+func (self *RoutingManager) GetProfiles() []string {
+	profiles := NewList[string](self.profiles.Length())
+	for p := range self.profiles {
+		profiles.Add(p)
+	}
+	return profiles
+}
+
 func (self *RoutingManager) _GetAttributes(profile ProfileType) attr.IAttributes {
 	return self.attributes.Get(profile)
 }

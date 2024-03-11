@@ -9,7 +9,11 @@ type IOneToMany interface {
 }
 
 type ISolver interface {
-	CalcDistanceFromStart(start int32) error
-	CalcDistanceFromStarts(starts Array[Tuple[int32, int32]]) error
+	// Computes distances from start nodes to all other nodes.
+	//
+	// Multiple start nodes are specified as (node, initial distance) tuples to account for start locations not identical to graph node locations.
+	CalcDistanceFromStart(starts Array[Tuple[int32, int32]]) error
+
+	// Returns the computed distance.
 	GetDistance(node int32) int32
 }

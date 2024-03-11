@@ -13,21 +13,31 @@ import (
 
 type none struct{}
 
-func ReadRequestBody[T any](r *http.Request) T {
+func ReadRequestBody[T any](r *http.Request) (T, error) {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		slog.Error(err.Error())
+		var t T
+		return t, err
 	}
 	var req T
 	err = json.Unmarshal(data, &req)
 	if err != nil {
 		slog.Error(err.Error())
+		var t T
+		return t, err
 	}
-	return req
+	return req, nil
 }
 
 func WriteResponse[T any](w http.ResponseWriter, resp T, status int) {
-	data, _ := json.Marshal(resp)
+	data, err := json.Marshal(resp)
+	if err != nil {
+		slog.Error(err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(err.Error()))
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	w.Write(data)
@@ -55,14 +65,19 @@ func BadRequest[T any](value T) Result {
 func MapPost[F any](app *http.ServeMux, path string, handler func(F) Result) {
 	app.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
 		slog.Info("POST " + path)
-		body := ReadRequestBody[F](r)
+		body, err := ReadRequestBody[F](r)
+		if err != nil {
+			slog.Error("failed POST " + err.Error())
+			WriteResponse(w, NewErrorResponse(path, err.Error()), http.StatusInternalServerError)
+		}
 		res := handler(body)
 		if res.status != http.StatusOK {
 			slog.Error("failed POST " + path)
+			WriteResponse(w, NewErrorResponse(path, res.result), res.status)
 		} else {
 			slog.Info("successfully finished POST")
+			WriteResponse(w, res.result, res.status)
 		}
-		WriteResponse(w, res.result, res.status)
 	})
 }
 
@@ -124,9 +139,10 @@ func MapGet[F any](app *http.ServeMux, path string, handler func(F) Result) {
 		res := handler(value)
 		if res.status != http.StatusOK {
 			slog.Error("failed GET " + path)
+			WriteResponse(w, NewErrorResponse(path, res.result), res.status)
 		} else {
 			slog.Info("successfully finished GET")
+			WriteResponse(w, res.result, res.status)
 		}
-		WriteResponse(w, res.result, res.status)
 	})
 }

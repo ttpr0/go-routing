@@ -47,17 +47,9 @@ type RangeRPHASTSolver struct {
 }
 
 // CalcDiatanceFromStarts implements ISolver.
-func (self *RangeRPHASTSolver) CalcDistanceFromStarts(starts Array[Tuple[int32, int32]]) error {
+func (self *RangeRPHASTSolver) CalcDistanceFromStart(starts Array[Tuple[int32, int32]]) error {
 	self.node_flags.Reset()
 	_CalcRangeRPHAST(self.g, starts, self.max_range, self.node_flags, self.down_edges_subset)
-	return nil
-}
-
-// CalcDistanceFromStart implements ISolver.
-func (self *RangeRPHASTSolver) CalcDistanceFromStart(start int32) error {
-	self.node_flags.Reset()
-	starts := [1]Tuple[int32, int32]{MakeTuple(start, int32(0))}
-	_CalcRangeRPHAST(self.g, starts[:], self.max_range, self.node_flags, self.down_edges_subset)
 	return nil
 }
 

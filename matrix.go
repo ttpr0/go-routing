@@ -9,6 +9,10 @@ import (
 	"golang.org/x/exp/slog"
 )
 
+//**********************************************************
+// matrix request and response
+//**********************************************************
+
 type MatrixRequest struct {
 	Sources      Array[geo.Coord] `json:"sources"`
 	Destinations Array[geo.Coord] `json:"destinations"`
@@ -22,6 +26,10 @@ type MatrixRequest struct {
 type MatrixResponse struct {
 	Distances Matrix[float32] `json:"distances"`
 }
+
+//**********************************************************
+// matrix handler
+//**********************************************************
 
 func HandleMatrixRequest(req MatrixRequest) Result {
 	slog.Info("Run Matrix Request")
@@ -93,7 +101,8 @@ func HandleMatrixRequest(req MatrixRequest) Result {
 					continue
 				}
 
-				solver.CalcDistanceFromStart(s_node)
+				start := [1]Tuple[int32, int32]{{s_node, 0}}
+				solver.CalcDistanceFromStart(start[:])
 
 				// set distances in matrix
 				for t, t_node := range target_nodes {
