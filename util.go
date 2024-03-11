@@ -116,3 +116,16 @@ func IsDirectoryEmpty(path string) bool {
 	}
 	return len(files) == 0
 }
+
+func MapCoordsToNodes(g graph.IGraph, coords []geo.Coord) []int32 {
+	nodes := make([]int32, len(coords))
+	for i, coord := range coords {
+		id, ok := g.GetClosestNode(coord)
+		if ok {
+			nodes[i] = id
+		} else {
+			nodes[i] = -1
+		}
+	}
+	return nodes
+}

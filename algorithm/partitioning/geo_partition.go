@@ -7,6 +7,7 @@ import (
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 // computes node tiles based on geo-polygons
@@ -17,7 +18,7 @@ func GeometricPartitioning(g graph.IGraph, features []geo.Feature) Array[int16] 
 	for i := 0; i < int(g.NodeCount()); i++ {
 		node := g.GetNodeGeom(int32(i))
 		if c%1000 == 0 {
-			fmt.Println("finished node ", c)
+			slog.Debug(fmt.Sprintf("finished node: %v", c))
 		}
 		point := geo.NewPoint(node)
 		node_tiles[i] = -1

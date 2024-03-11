@@ -10,6 +10,7 @@ import (
 	"github.com/ttpr0/go-routing/graph"
 	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 //*******************************************
@@ -372,7 +373,7 @@ func _GetShortcut(from, to, via int32, explorer *CHPreprocGraphExplorer, flags F
 func CalcContraction(base comps.IGraphBase, weight comps.IWeighting) *comps.CH {
 	graph := TransformToCHPreprocGraph(base, weight)
 
-	fmt.Println("started contracting graph")
+	slog.Debug("started contracting graph")
 	// initialize graph
 	//graph.resetContraction();
 	for i := 0; i < graph.NodeCount(); i++ {
@@ -397,7 +398,7 @@ func CalcContraction(base comps.IGraphBase, weight comps.IWeighting) *comps.CH {
 		}
 
 		// sort nodes by number of adjacent edges
-		fmt.Println("start ordering nodes")
+		slog.Debug("start ordering nodes")
 		sort.Slice(nodes, func(i, j int) bool {
 			a := nodes[i]
 			c1 := graph.base.GetNodeDegree(a, true) + graph.base.GetNodeDegree(a, false)
@@ -409,7 +410,7 @@ func CalcContraction(base comps.IGraphBase, weight comps.IWeighting) *comps.CH {
 			count_b := c1 + c2
 			return count_a < count_b
 		})
-		fmt.Println("finished ordering nodes")
+		slog.Debug("finished ordering nodes")
 
 		// contract nodes
 		sc1 := graph.shortcuts.ShortcutCount()
@@ -427,10 +428,10 @@ func CalcContraction(base comps.IGraphBase, weight comps.IWeighting) *comps.CH {
 			}
 			count += 1
 			if count%1000 == 0 {
-				fmt.Println("node :", count)
+				slog.Debug(fmt.Sprintf("node: %v", count))
 			}
 			if count == 35393 {
-				fmt.Println("test")
+				slog.Debug("test")
 			}
 			in_neigbours, out_neigbours := _FindNeighbours(explorer, node_id, is_contracted)
 			for i := 0; i < len(in_neigbours); i++ {
@@ -466,13 +467,13 @@ func CalcContraction(base comps.IGraphBase, weight comps.IWeighting) *comps.CH {
 				nc2 += 1
 			}
 		}
-		fmt.Println("contracted level", level+1, ":", sc2-sc1, "shortcuts added,", nc1-nc2, "/", nc1, "nodes contracted")
+		slog.Debug(fmt.Sprintf("contracted level %v: %v shortcuts added, %v nodes contracted", level+1, sc2-sc1, nc1-nc2))
 
 		// advance level
 		level += 1
 		nodes.Clear()
 	}
-	fmt.Println("finished contracting graph")
+	slog.Debug("finished contracting graph")
 
 	ch_data := TransformToCHData(graph)
 	return ch_data
@@ -485,7 +486,7 @@ func CalcContraction(base comps.IGraphBase, weight comps.IWeighting) *comps.CH {
 func CalcContraction2(base comps.IGraphBase, weight comps.IWeighting, contraction_order Array[int32]) *comps.CH {
 	graph := TransformToCHPreprocGraph(base, weight)
 
-	fmt.Println("started contracting graph")
+	slog.Debug("started contracting graph")
 	// initialize graph
 	for i := 0; i < graph.NodeCount(); i++ {
 		graph.SetNodeLevel(int32(i), 0)
@@ -501,7 +502,7 @@ func CalcContraction2(base comps.IGraphBase, weight comps.IWeighting, contractio
 	for _, node_id := range contraction_order {
 		count += 1
 		if count%1000 == 0 {
-			fmt.Println("node :", count, "/", graph.NodeCount(), "contracted in", dt_1, "ns /", dt_2, "ns")
+			slog.Debug(fmt.Sprintf("node: %v/%v contracted in %v ns / %v ns", count, graph.NodeCount(), dt_1, dt_2))
 			dt_1 = 0
 			dt_2 = 0
 		}
@@ -543,7 +544,7 @@ func CalcContraction2(base comps.IGraphBase, weight comps.IWeighting, contractio
 
 		dt_1 += time.Since(t1).Nanoseconds()
 	}
-	fmt.Println("finished contracting graph")
+	slog.Debug("finished contracting graph")
 
 	ch_data := TransformToCHData(graph)
 	return ch_data
@@ -556,7 +557,7 @@ func SimpleNodeOrdering(graph *CHPreprocGraph) Array[int32] {
 	}
 
 	// sort nodes by number of adjacent edges
-	fmt.Println("start ordering nodes")
+	slog.Debug("start ordering nodes")
 	sort.Slice(nodes, func(i, j int) bool {
 		a := nodes[i]
 		c1 := graph.base.GetNodeDegree(a, true) + graph.base.GetNodeDegree(a, false)
@@ -568,14 +569,14 @@ func SimpleNodeOrdering(graph *CHPreprocGraph) Array[int32] {
 		count_b := c1 + c2
 		return count_a < count_b
 	})
-	fmt.Println("finished ordering nodes")
+	slog.Debug("finished ordering nodes")
 
 	return nodes
 }
 
 // computes n random shortest paths and sorts nodes by number of paths they are on
 func ShortestPathNodeOrdering(g graph.IGraph, n int) Array[int32] {
-	fmt.Println("start computing random shortest paths")
+	slog.Debug("start computing random shortest paths")
 	sp_counts := NewArray[int32](int(g.NodeCount()))
 	heap := NewPriorityQueue[int32, float64](100)
 	flags := NewArray[flag_d](int(g.NodeCount()))
@@ -583,20 +584,20 @@ func ShortestPathNodeOrdering(g graph.IGraph, n int) Array[int32] {
 	for i := 0; i < n; i++ {
 		c += 1
 		if c%100 == 0 {
-			fmt.Println(c, "/", n)
+			slog.Debug(fmt.Sprintf("%v/%v", c, n))
 		}
 		start := rand.Int31n(int32(g.NodeCount()))
 		end := rand.Int31n(int32(g.NodeCount()))
 		MarkNodesOnPath(start, end, sp_counts, g, heap, flags)
 	}
-	fmt.Println("finished shortest paths")
+	slog.Debug("finished shortest paths")
 
 	nodes := NewArray[int32](int(g.NodeCount()))
 	for i := 0; i < int(g.NodeCount()); i++ {
 		nodes[i] = int32(i)
 	}
 	// sort nodes by number of shortest path they are on
-	fmt.Println("start ordering nodes")
+	slog.Debug("start ordering nodes")
 	sort.Slice(nodes, func(i, j int) bool {
 		a := nodes[i]
 		count_a := sp_counts[a]
@@ -604,7 +605,7 @@ func ShortestPathNodeOrdering(g graph.IGraph, n int) Array[int32] {
 		count_b := sp_counts[b]
 		return count_a < count_b
 	})
-	fmt.Println("finished ordering nodes")
+	slog.Debug("finished ordering nodes")
 
 	return nodes
 }
@@ -682,7 +683,7 @@ func MarkNodesOnPath(start, end int32, sp_counts Array[int32], g graph.IGraph, h
 func CalcContraction3(base comps.IGraphBase, weight comps.IWeighting) *comps.CH {
 	graph := TransformToCHPreprocGraph(base, weight)
 
-	fmt.Println("started contracting graph...")
+	slog.Debug("started contracting graph...")
 
 	// initialize
 	is_contracted := NewArray[bool](graph.NodeCount())
@@ -699,7 +700,7 @@ func CalcContraction3(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 	hop_limit := int32(5)
 
 	// compute node priorities
-	fmt.Println("computing priorities...")
+	slog.Debug("computing priorities...")
 	node_priorities := NewArray[int](graph.NodeCount())
 	for i := 0; i < graph.NodeCount(); i++ {
 		node_priorities[i] = _ComputeNodePriority(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, hop_limit)
@@ -712,7 +713,7 @@ func CalcContraction3(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
 	}
 
-	fmt.Println("start contracting nodes...")
+	slog.Debug("start contracting nodes...")
 	count := 0
 	for {
 		temp, ok := contraction_order.Dequeue()
@@ -727,7 +728,7 @@ func CalcContraction3(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 		node_count -= 1
 		count += 1
 		if count%1000 == 0 {
-			fmt.Println("	node :", count, "/", graph.NodeCount())
+			slog.Debug(fmt.Sprintf("	node : %v/%v", count, graph.NodeCount()))
 		}
 
 		// contract node
@@ -801,7 +802,7 @@ func CalcContraction3(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 	for i := 0; i < graph.NodeCount(); i++ {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
-	fmt.Println("finished contracting graph")
+	slog.Debug("finished contracting graph")
 
 	ch_data := TransformToCHData(graph)
 	return ch_data
@@ -852,7 +853,7 @@ func _ComputeNodePriority(node int32, explorer *CHPreprocGraphExplorer, heap Pri
 func CalcContraction4(base comps.IGraphBase, weight comps.IWeighting) *comps.CH {
 	graph := TransformToCHPreprocGraph(base, weight)
 
-	fmt.Println("started contracting graph...")
+	slog.Debug("started contracting graph...")
 
 	// initialize
 	is_contracted := NewArray[bool](graph.NodeCount())
@@ -865,7 +866,7 @@ func CalcContraction4(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 	explorer := graph.GetExplorer()
 
 	// compute node priorities
-	fmt.Println("computing priorities...")
+	slog.Debug("computing priorities...")
 	node_priorities := NewArray[int](graph.NodeCount())
 	for i := 0; i < graph.NodeCount(); i++ {
 		node_priorities[i] = _ComputeNodePriority2(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours)
@@ -878,7 +879,7 @@ func CalcContraction4(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
 	}
 
-	fmt.Println("start contracting nodes...")
+	slog.Debug("start contracting nodes...")
 	count := 0
 	for {
 		temp, ok := contraction_order.Dequeue()
@@ -893,7 +894,7 @@ func CalcContraction4(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 
 		count += 1
 		if count%1000 == 0 {
-			fmt.Println("	node :", count, "/", graph.NodeCount())
+			slog.Debug(fmt.Sprintf("node %v/%v", count, graph.NodeCount()))
 		}
 
 		// contract node
@@ -941,7 +942,7 @@ func CalcContraction4(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 	for i := 0; i < graph.NodeCount(); i++ {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
-	fmt.Println("finished contracting graph")
+	slog.Debug("finished contracting graph")
 
 	ch_data := TransformToCHData(graph)
 	return ch_data
@@ -981,7 +982,7 @@ func _ComputeNodePriority2(node int32, explorer *CHPreprocGraphExplorer, heap Pr
 func CalcContraction5(base comps.IGraphBase, weight comps.IWeighting, partition *comps.Partition) *comps.CH {
 	graph := TransformToCHPreprocGraph(base, weight)
 
-	fmt.Println("started contracting graph...")
+	slog.Debug("started contracting graph...")
 
 	// initialize
 	is_contracted := NewArray[bool](graph.NodeCount())
@@ -995,7 +996,7 @@ func CalcContraction5(base comps.IGraphBase, weight comps.IWeighting, partition 
 	explorer := graph.GetExplorer()
 
 	// compute node priorities
-	fmt.Println("computing priorities...")
+	slog.Debug("computing priorities...")
 	is_border := _IsBorderNode(graph, partition)
 	border_count := 0
 	node_priorities := NewArray[int](graph.NodeCount())
@@ -1010,7 +1011,7 @@ func CalcContraction5(base comps.IGraphBase, weight comps.IWeighting, partition 
 		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
 	}
 
-	fmt.Println("start contracting nodes...")
+	slog.Debug("start contracting nodes...")
 	contract_count := 0
 	is_border_contraction := false
 	for {
@@ -1026,7 +1027,7 @@ func CalcContraction5(base comps.IGraphBase, weight comps.IWeighting, partition 
 
 		contract_count += 1
 		if contract_count%1000 == 0 {
-			fmt.Println("	node :", contract_count, "/", graph.NodeCount())
+			slog.Debug(fmt.Sprintf("node %v/%v", contract_count, graph.NodeCount()))
 		}
 
 		if contract_count == graph.NodeCount()-border_count {
@@ -1109,7 +1110,7 @@ func CalcContraction5(base comps.IGraphBase, weight comps.IWeighting, partition 
 	for i := 0; i < graph.NodeCount(); i++ {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
-	fmt.Println("finished contracting graph")
+	slog.Debug("finished contracting graph")
 
 	ch_data := TransformToCHData(graph)
 	return ch_data
@@ -1140,7 +1141,7 @@ func _IsBorderNode(g *CHPreprocGraph, partition *comps.Partition) Array[bool] {
 func CalcPartialContraction5(base comps.IGraphBase, weight comps.IWeighting, partition *comps.Partition) *comps.CH {
 	graph := TransformToCHPreprocGraph(base, weight)
 
-	fmt.Println("started contracting graph...")
+	slog.Debug("started contracting graph...")
 
 	// initialize
 	is_contracted := NewArray[bool](graph.NodeCount())
@@ -1154,7 +1155,7 @@ func CalcPartialContraction5(base comps.IGraphBase, weight comps.IWeighting, par
 	explorer := graph.GetExplorer()
 
 	// compute node priorities
-	fmt.Println("computing priorities...")
+	slog.Debug("computing priorities...")
 	is_border := _IsBorderNode(graph, partition)
 	node_priorities := NewArray[int](graph.NodeCount())
 	contraction_order := NewPriorityQueue[Tuple[int32, int], int](graph.NodeCount())
@@ -1168,7 +1169,7 @@ func CalcPartialContraction5(base comps.IGraphBase, weight comps.IWeighting, par
 		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
 	}
 
-	fmt.Println("start contracting nodes...")
+	slog.Debug("start contracting nodes...")
 	contract_count := 0
 	for {
 		temp, ok := contraction_order.Dequeue()
@@ -1186,7 +1187,7 @@ func CalcPartialContraction5(base comps.IGraphBase, weight comps.IWeighting, par
 
 		contract_count += 1
 		if contract_count%1000 == 0 {
-			fmt.Println("	node :", contract_count, "/", graph.NodeCount())
+			slog.Debug(fmt.Sprintf("node %v/%v", contract_count, graph.NodeCount()))
 		}
 
 		// contract node
@@ -1257,7 +1258,7 @@ func CalcPartialContraction5(base comps.IGraphBase, weight comps.IWeighting, par
 	for i := 0; i < graph.NodeCount(); i++ {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
-	fmt.Println("finished contracting graph")
+	slog.Debug("finished contracting graph")
 
 	ch_data := TransformToCHData(graph)
 	return ch_data
@@ -1266,7 +1267,7 @@ func CalcPartialContraction5(base comps.IGraphBase, weight comps.IWeighting, par
 // Computes contraction using 2*ED + CN + EC + 5*L without hop-limits.
 func CalcContraction6(base comps.IGraphBase, weight comps.IWeighting) *comps.CH {
 	graph := TransformToCHPreprocGraph(base, weight)
-	fmt.Println("started contracting graph...")
+	slog.Debug("started contracting graph...")
 
 	// initialize
 	is_contracted := NewArray[bool](graph.NodeCount())
@@ -1281,7 +1282,7 @@ func CalcContraction6(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 	hop_limit := int32(10000000)
 
 	// compute node priorities
-	fmt.Println("computing priorities...")
+	slog.Debug("computing priorities...")
 	node_priorities := NewArray[int](graph.NodeCount())
 	for i := 0; i < graph.NodeCount(); i++ {
 		node_priorities[i] = _ComputeNodePriority(int32(i), explorer, heap, flags, is_contracted, node_levels, contracted_neighbours, shortcut_edgecount, hop_limit)
@@ -1294,7 +1295,7 @@ func CalcContraction6(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 		contraction_order.Enqueue(MakeTuple(int32(i), prio), prio)
 	}
 
-	fmt.Println("start contracting nodes...")
+	slog.Debug("start contracting nodes...")
 	count := 0
 	for {
 		temp, ok := contraction_order.Dequeue()
@@ -1308,7 +1309,7 @@ func CalcContraction6(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 		}
 		count += 1
 		if count%1000 == 0 {
-			fmt.Println("	node :", count, "/", graph.NodeCount())
+			slog.Debug(fmt.Sprintf("node %v/%v", count, graph.NodeCount()))
 		}
 
 		// contract node
@@ -1375,7 +1376,7 @@ func CalcContraction6(base comps.IGraphBase, weight comps.IWeighting) *comps.CH 
 	for i := 0; i < graph.NodeCount(); i++ {
 		graph.SetNodeLevel(int32(i), node_levels[i])
 	}
-	fmt.Println("finished contracting graph")
+	slog.Debug("finished contracting graph")
 
 	ch_data := TransformToCHData(graph)
 	return ch_data

@@ -11,6 +11,7 @@ import (
 	"github.com/ttpr0/go-routing/preproc"
 	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 //**********************************************************
@@ -44,6 +45,14 @@ var PROFILE_HANDLERS = Dict[ProfileType, ProfileHandler]{
 	DRIVING: {
 		Build: BuildDrivingProfile,
 		Load:  LoadDrivingProfile,
+	},
+	WALKING: {
+		Build: BuildWalkingProfile,
+		Load:  LoadWalkingProfile,
+	},
+	TRANSIT: {
+		Build: BuildTransitProfile,
+		Load:  LoadTransitProfile,
 	},
 }
 
@@ -237,22 +246,28 @@ func LoadDrivingProfile(path string, p_meta ProfileMeta) IRoutingProfile {
 func BuildDrivingProfile(out_path string, source_ SourceOptions, options_ IProfileOptions, prep_cache PrepDict) IRoutingProfile {
 	options := options_.(DrivingOptions)
 	osm := source_.OSM
+	slog.Info("Building driving profile from " + osm)
 
 	var base *comps.GraphBase
 	var attributes *attr.GraphAttributes
 	if prep_cache.ContainsKey(DRIVING) {
+		slog.Info("Using cached graph")
 		item := prep_cache.Get(DRIVING)
 		base = item.A
 		attributes = item.B
 	} else {
+		slog.Info("Parsing graph...")
 		// parse graph from osm
 		base, attributes = parser.ParseGraph(osm)
 		// remove closely connected components
-		remove := RemoveConnectedComponents(base)
-		fmt.Println("remove", remove.Length(), "nodes")
-		base = comps.RemoveNodes(base, remove)
-		attributes.RemoveNodes(remove)
+		slog.Info("Removing unconnected components...")
+		remove_nodes, remove_edges := RemoveConnectedComponents(base)
+		slog.Info(fmt.Sprintf("removed %v nodes", remove_nodes.Length()))
+		base = comps.RemoveNodes(base, remove_nodes)
+		attributes.RemoveNodes(remove_nodes)
+		attributes.RemoveEdges(remove_edges)
 		prep_cache.Set(DRIVING, MakeTuple(base, attributes))
+		slog.Info("Successfully parsed graph")
 	}
 
 	// build profile
@@ -262,6 +277,7 @@ func BuildDrivingProfile(out_path string, source_ SourceOptions, options_ IProfi
 	}
 
 	// build metric
+	slog.Info("Building metric: " + profile.metric.String())
 	var weight *comps.DefaultWeighting
 	switch profile.metric {
 	case FASTEST:
@@ -279,7 +295,9 @@ func BuildDrivingProfile(out_path string, source_ SourceOptions, options_ IProfi
 	attr_node_mapping := structs.NewIdendityMapping(base.NodeCount())
 
 	if options.Preperation.Contraction {
+		slog.Info("Building contraction hierarchy")
 		new_base, ch, ordering := CreateCH(base, weight)
+		slog.Info("Contraction hierarchy successfully built")
 		base = new_base
 		attr_node_mapping.ReorderTargets(ordering)
 		profile.attr_node_mapping = Some(attr_node_mapping)
@@ -294,10 +312,13 @@ func BuildDrivingProfile(out_path string, source_ SourceOptions, options_ IProfi
 		comps.Store(weight, prefix+"-weight")
 		comps.Store(ch, prefix+"-ch")
 	} else if options.Preperation.Overlay {
+		slog.Info("Building overlay")
 		partition := CreatePartition(base, options.Preperation.MaxNodesPerCell)
+		slog.Info("Overlay successfully built")
 		var overlay *comps.Overlay
 		var cell_index *comps.CellIndex
 		var ordering Array[int32]
+		slog.Info("Building Cell-Index with method: " + options.Preperation.OverlayMethod)
 		switch options.Preperation.OverlayMethod {
 		case "skeleton":
 			base, partition, overlay, cell_index, ordering = CreateGRASP(base, weight, partition, true)
@@ -306,6 +327,7 @@ func BuildDrivingProfile(out_path string, source_ SourceOptions, options_ IProfi
 		default:
 			base, partition, overlay, cell_index, ordering = CreateGRASP(base, weight, partition, false)
 		}
+		slog.Info("Cell-Index successfully built")
 		attr_node_mapping.ReorderTargets(ordering)
 		profile.attr_node_mapping = Some(attr_node_mapping)
 		profile.base = base
@@ -455,10 +477,11 @@ func BuildWalkingProfile(out_path string, source_ SourceOptions, options_ IProfi
 		// parse graph from osm
 		base, attributes = parser.ParseGraph(osm)
 		// remove closely connected components
-		remove := RemoveConnectedComponents(base)
-		fmt.Println("remove", remove.Length(), "nodes")
-		base = comps.RemoveNodes(base, remove)
-		attributes.RemoveNodes(remove)
+		remove_nodes, remove_edges := RemoveConnectedComponents(base)
+		slog.Info(fmt.Sprintf("removed %v nodes", remove_nodes.Length()))
+		base = comps.RemoveNodes(base, remove_nodes)
+		attributes.RemoveNodes(remove_nodes)
+		attributes.RemoveEdges(remove_edges)
 		prep_cache.Set(WALKING, MakeTuple(base, attributes))
 	}
 
@@ -587,7 +610,7 @@ func LoadTransitProfile(path string, p_meta ProfileMeta) IRoutingProfile {
 	prefix := path
 
 	base := comps.Load[*comps.GraphBase](prefix + "-base")
-	tc_weight := comps.Load[*comps.TCWeighting](prefix + "-weight")
+	tc_weight := comps.Load[*comps.DefaultWeighting](prefix + "-weight")
 
 	transit := comps.Load[*comps.Transit](prefix + "-transit")
 	transit_weights := NewDict[string, *comps.TransitWeighting](7)
@@ -621,10 +644,11 @@ func BuildTransitProfile(out_path string, source_ SourceOptions, options_ IProfi
 		// parse graph from osm
 		base, attributes = parser.ParseGraph(osm)
 		// remove closely connected components
-		remove := RemoveConnectedComponents(base)
-		fmt.Println("remove", remove.Length(), "nodes")
-		base = comps.RemoveNodes(base, remove)
-		attributes.RemoveNodes(remove)
+		remove_nodes, remove_edges := RemoveConnectedComponents(base)
+		slog.Info(fmt.Sprintf("removed %v nodes", remove_nodes.Length()))
+		base = comps.RemoveNodes(base, remove_nodes)
+		attributes.RemoveNodes(remove_nodes)
+		attributes.RemoveEdges(remove_edges)
 		prep_cache.Set(WALKING, MakeTuple(base, attributes))
 	}
 

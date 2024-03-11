@@ -4,11 +4,14 @@ import (
 	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/comps"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 func NewRoutingManager(path string, config Config) *RoutingManager {
+	slog.Info("Initializing Routing Manager...")
 	build := config.BuildGraphs
 	if IsDirectoryEmpty(path) {
+		slog.Warn("Graphs directory is empty! Profiles need to be rebuild.")
 		build = true
 	}
 	graph_path := path + "/"
@@ -22,12 +25,14 @@ func NewRoutingManager(path string, config Config) *RoutingManager {
 	attributes := NewDict[ProfileType, attr.IAttributes](10)
 	// build/load profiles
 	if build {
+		slog.Info("Building Profiles...")
 		prep_cache := NewDict[ProfileType, Tuple[*comps.GraphBase, *attr.GraphAttributes]](10)
 		profile_meta := NewDict[string, ProfileMeta](10)
 		for name, options := range config.Build.Profiles {
 			if options.Value == nil {
 				continue
 			}
+			slog.Info("Building Profile: " + name)
 			handler := PROFILE_HANDLERS[options.Value.Type()]
 			profile := handler.Build(graph_path+name, config.Build.Source, options.Value, prep_cache)
 			profile.SetManager(manager)
@@ -46,9 +51,12 @@ func NewRoutingManager(path string, config Config) *RoutingManager {
 			Attributes: attr_meta,
 		}
 		WriteJSONToFile(meta, graph_path+"meta")
+		slog.Info("Profiles rebuilt successfully!")
 	} else {
+		slog.Info("Loading Profiles...")
 		meta := ReadJSONFromFile[RoutingManagerMeta](graph_path + "meta")
 		for name, item := range meta.Profiles {
+			slog.Info("Loading Profile: " + name)
 			handler := PROFILE_HANDLERS[item.Type]
 			profile := handler.Load(graph_path+name, item)
 			profile.SetManager(manager)
@@ -57,6 +65,7 @@ func NewRoutingManager(path string, config Config) *RoutingManager {
 		for _, typ := range meta.Attributes {
 			attributes.Set(typ, attr.Load(graph_path+"attr-"+typ.String()))
 		}
+		slog.Info("Profiles loaded successfully!")
 	}
 
 	manager.profiles = profiles

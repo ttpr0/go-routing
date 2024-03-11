@@ -5,6 +5,7 @@ import (
 
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 // Group closely connected components.
@@ -16,13 +17,13 @@ func ConnectedComponents(graph graph.IGraph) Array[int] {
 		if groups[i] != 0 {
 			continue
 		}
-		fmt.Println("iteration:", group)
+		slog.Debug(fmt.Sprintf("iteration: %v", group))
 		start := int32(i)
 		visited := CalcBidirectBFS(graph, start)
 		for i := 0; i < graph.NodeCount(); i++ {
 			if visited[i] {
 				if groups[i] != 0 {
-					fmt.Println("failure 1")
+					slog.Debug("failure 1")
 				}
 				groups[i] = group
 			}

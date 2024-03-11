@@ -17,28 +17,45 @@ import (
 	"github.com/ttpr0/go-routing/preproc"
 	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 var MANAGER *RoutingManager
 
+type Dummy struct {
+	V int    `json:"v"`
+	S string `json:"s"`
+}
+
 func main() {
-	fmt.Println("hello world")
+	logger := slog.New(NewLogHandler(os.Stderr, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	slog.SetDefault(logger)
+
+	slog.Info("Initializing GoRouting Server...")
 
 	config := ReadConfig("./config.yaml")
-	MANAGER = NewRoutingManager("./graphs/test", config)
-
-	http.HandleFunc("/v0/routing", HandleRoutingRequest)
-	http.HandleFunc("/v0/routing/draw/create", HandleCreateContextRequest)
-	http.HandleFunc("/v0/routing/draw/step", HandleRoutingStepRequest)
-	http.HandleFunc("/v0/isoraster", HandleIsoRasterRequest)
-	http.HandleFunc("/v1/matrix", HandleMatrixRequest)
+	MANAGER = NewRoutingManager("./graphs", config)
 
 	app := http.DefaultServeMux
+	MapPost(app, "/v0/routing", HandleRoutingRequest)
+	MapPost(app, "/v0/routing/draw/create", HandleCreateContextRequest)
+	MapPost(app, "/v0/routing/draw/step", HandleRoutingStepRequest)
+	MapPost(app, "/v0/isoraster", HandleIsoRasterRequest)
+	MapPost(app, "/v1/matrix", HandleMatrixRequest)
+
 	MapGet(app, "/test", func(none) Result {
-		return OK(1)
+		return OK(Dummy{
+			V: 1,
+			S: "hello world",
+		})
 	})
-	MapPost(app, "/test1", func(a struct{ a string }) Result {
-		return OK(a)
+	MapGet(app, "/test1", func(a struct{ a string }) Result {
+		return BadRequest(Dummy{
+			V: 1,
+			S: "hello world",
+		})
 	})
 
 	http.ListenAndServe(":5002", nil)

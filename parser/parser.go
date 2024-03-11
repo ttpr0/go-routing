@@ -14,6 +14,7 @@ import (
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 func ParseGraph(pbf_file string) (*comps.GraphBase, *attr.GraphAttributes) {
@@ -184,7 +185,7 @@ func _NodeHandler(scanner *osmpbf.Scanner, osm_nodes *Dict[int64, TempNode], nod
 			}
 			c += 1
 			if c%1000 == 0 {
-				fmt.Println(c)
+				slog.Debug(fmt.Sprintf("%v", c))
 			}
 			on := osm_nodes.Get(id)
 			if on.Count > 1 {
@@ -223,7 +224,7 @@ func _WayHandler(scanner *osmpbf.Scanner, edges *List[OSMEdge], osm_nodes *Dict[
 			}
 			c += 1
 			if c%1000 == 0 {
-				fmt.Println(c)
+				slog.Debug(fmt.Sprintf("%v", c))
 			}
 
 			nodes := object.Nodes.NodeIDs()

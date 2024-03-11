@@ -7,6 +7,7 @@ import (
 
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 type DD_RoutingRequest struct {
@@ -155,7 +156,7 @@ func (self *DistributedRoutingRunner) RunRouting() {
 			}
 		}
 		if curr_id == self.end_id {
-			fmt.Println("end found")
+			slog.Debug("end found")
 			self.is_end = true
 			self.max_length = curr_flag.path_length
 			self.handler.SendStopRequest(self.key, curr_flag.path_length)
@@ -426,7 +427,7 @@ func (self *DistributedManager) AddRetrivelRequest(request Tuple[int, int32]) {
 }
 func (self *DistributedManager) AddStopRequest(key int, path_length float64) {
 	if self.run_count.Get(key) == 1 && self.req_count.Get(key) == 0 {
-		fmt.Println("stoped1")
+		slog.Debug("stoped1")
 		self.stop_chan <- key
 	}
 	for _, handler := range self.handlers {
@@ -439,9 +440,9 @@ func (self *DistributedManager) AddExitRequest(request int) {
 
 func (self *DistributedManager) DecrementRunningCount(key int) {
 	self.run_lock.Lock()
-	fmt.Println(self.run_count.Get(key), self.req_count.Get(key))
+	slog.Debug(fmt.Sprintf("%v %v", self.run_count.Get(key), self.req_count.Get(key)))
 	if self.run_count.Get(key) == 1 && self.req_count.Get(key) == 0 {
-		fmt.Println("stoped2")
+		slog.Debug("stoped2")
 		self.stop_chan <- key
 	}
 	self.run_count.Set(key, self.run_count.Get(key)-1)
@@ -615,7 +616,7 @@ type DistributedDijkstra struct {
 }
 
 func NewDistributedDijkstra(manager *DistributedManager, start, end int32) *DistributedDijkstra {
-	fmt.Println(start, end)
+	slog.Debug(fmt.Sprintf("start: %v, end: %v", start, end))
 	return &DistributedDijkstra{
 		manager:  manager,
 		start_id: start,
@@ -625,9 +626,9 @@ func NewDistributedDijkstra(manager *DistributedManager, start, end int32) *Dist
 }
 
 func (self *DistributedDijkstra) CalcShortestPath() bool {
-	fmt.Println("Start RunRouting")
+	slog.Debug("Start RunRouting")
 	key := self.manager.RunRouting(self.start_id, self.end_id)
-	fmt.Println("Finished RunRouting")
+	slog.Debug("Finished RunRouting")
 	self.key = key
 	return true
 }

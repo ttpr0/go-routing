@@ -1,14 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"math/rand"
-	"net/http"
 
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/routing"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 type RoutingRequest struct {
@@ -67,20 +66,15 @@ func NewRoutingResponse(lines []geo.CoordArray, finished bool, key int) RoutingR
 	return resp
 }
 
-func HandleRoutingRequest(w http.ResponseWriter, r *http.Request) {
-	data := make([]byte, r.ContentLength)
-	r.Body.Read(data)
-	req := RoutingRequest{}
-	json.Unmarshal(data, &req)
+func HandleRoutingRequest(req RoutingRequest) Result {
 	if req.Draw {
-		w.WriteHeader(400)
-		return
+		return BadRequest("Draw not implemented")
 	}
 	start := geo.Coord{req.Start[0], req.Start[1]}
 	end := geo.Coord{req.End[0], req.End[1]}
 	profile_ := ProfileFromAlg(req.Alg)
 	if !profile_.HasValue() {
-		panic("Profile not found")
+		return BadRequest("Profile not found")
 	}
 	profile := profile_.Value
 	attr := profile.GetAttributes()
@@ -110,38 +104,30 @@ func HandleRoutingRequest(w http.ResponseWriter, r *http.Request) {
 		g := profile.GetGraph()
 		alg = routing.NewDijkstra(g.Value, GetClosestNode(start, g.Value), GetClosestNode(end, g.Value))
 	}
-	fmt.Println("Using algorithm:", req.Alg)
-	fmt.Println("Start Caluclating shortest path between", start, "and", end)
+	slog.Debug(fmt.Sprintf("Using algorithm: %v", req.Alg))
+	slog.Debug(fmt.Sprintf("Start Caluclating shortest path between %v and %v", start, end))
 	ok := alg.CalcShortestPath()
 	if !ok {
-		fmt.Println("routing failed")
-		w.WriteHeader(400)
-		return
+		slog.Debug("routing failed")
+		return BadRequest("routing failed")
 	}
-	fmt.Println("shortest path found")
+	slog.Debug("shortest path found")
 	path := alg.GetShortestPath()
-	fmt.Println("start building response")
+	slog.Debug("start building response")
 	resp := NewRoutingResponse(path.GetGeometry(attr), true, int(req.Key))
-	fmt.Println("reponse build")
-	data, _ = json.Marshal(resp)
-	w.Write(data)
+	slog.Debug("reponse build")
+	return OK(resp)
 }
 
 var algs_dict Dict[int, Tuple[IRoutingProfile, routing.IShortestPath]] = NewDict[int, Tuple[IRoutingProfile, routing.IShortestPath]](10)
 
-func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
-	// read body
-	data := make([]byte, r.ContentLength)
-	r.Body.Read(data)
-	req := DrawContextRequest{}
-	json.Unmarshal(data, &req)
-
+func HandleCreateContextRequest(req DrawContextRequest) Result {
 	// process request
 	start := geo.Coord{req.Start[0], req.Start[1]}
 	end := geo.Coord{req.End[0], req.End[1]}
 	profile_ := ProfileFromAlg(req.Algorithm)
 	if !profile_.HasValue() {
-		panic("Profile not found")
+		return BadRequest("Profile not found")
 	}
 	profile := profile_.Value
 	var alg routing.IShortestPath
@@ -180,19 +166,10 @@ func HandleCreateContextRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	resp := DrawContextResponse{key}
-
-	// write response
-	data, _ = json.Marshal(resp)
-	w.Write(data)
+	return OK(resp)
 }
 
-func HandleRoutingStepRequest(w http.ResponseWriter, r *http.Request) {
-	// read body
-	data := make([]byte, r.ContentLength)
-	r.Body.Read(data)
-	req := DrawRoutingRequest{}
-	json.Unmarshal(data, &req)
-
+func HandleRoutingStepRequest(req DrawRoutingRequest) Result {
 	// process request
 	var profile IRoutingProfile
 	var alg routing.IShortestPath
@@ -201,8 +178,7 @@ func HandleRoutingStepRequest(w http.ResponseWriter, r *http.Request) {
 		profile = item.A
 		alg = item.B
 	} else {
-		w.WriteHeader(400)
-		return
+		return BadRequest("key not found")
 	}
 	attr := profile.GetAttributes()
 
@@ -219,9 +195,7 @@ func HandleRoutingStepRequest(w http.ResponseWriter, r *http.Request) {
 		resp = NewRoutingResponse(edges, finished, req.Key)
 	}
 
-	// write response
-	data, _ = json.Marshal(resp)
-	w.Write(data)
+	return OK(resp)
 }
 
 func ProfileFromAlg(alg string) Optional[IRoutingProfile] {

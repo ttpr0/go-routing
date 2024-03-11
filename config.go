@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"os"
 
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 	"gopkg.in/yaml.v3"
 )
 
@@ -13,8 +15,10 @@ import (
 //**********************************************************
 
 func ReadConfig(file string) Config {
+	slog.Info("Reading config file")
 	data, err := os.ReadFile(file)
 	if err != nil {
+		slog.Error("failed to read config file: " + err.Error())
 		panic(err)
 	}
 	var config Config
@@ -50,7 +54,10 @@ func (self *ProfileOptions) UnmarshalYAML(value *yaml.Node) error {
 	if err := value.Decode(&m); err != nil {
 		return err
 	}
-	typ := ProfileTypeFromString(m["type"].(string))
+	typ, err := ProfileTypeFromString(m["type"].(string))
+	if err != nil {
+		return err
+	}
 	switch typ {
 	case DRIVING:
 		val := DrivingOptions{}
@@ -143,20 +150,21 @@ func (self *ProfileType) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &typ); err != nil {
 		return err
 	}
-	*self = ProfileTypeFromString(typ)
-	return nil
+	prof_typ, err := ProfileTypeFromString(typ)
+	*self = prof_typ
+	return err
 }
 
-func ProfileTypeFromString(s string) ProfileType {
+func ProfileTypeFromString(s string) (ProfileType, error) {
 	switch s {
 	case "driving":
-		return DRIVING
+		return DRIVING, nil
 	case "walking":
-		return WALKING
+		return WALKING, nil
 	case "transit":
-		return TRANSIT
+		return TRANSIT, nil
 	default:
-		panic("unknown profile type")
+		return DRIVING, errors.New("unknown profile type")
 	}
 }
 
@@ -182,28 +190,33 @@ func (self MetricType) MarshalJSON() ([]byte, error) {
 }
 func (self *MetricType) UnmarshalJSON(data []byte) error {
 	var typ string
-	if err := json.Unmarshal(data, &typ); err != nil {
+	err := json.Unmarshal(data, &typ)
+	if err != nil {
 		return err
 	}
-	*self = MetricTypeFromString(typ)
-	return nil
+	*self, err = MetricTypeFromString(typ)
+	return err
 }
 func (self MetricType) MarshalYAML() (any, error) {
 	return self.String(), nil
 }
 func (self *MetricType) UnmarshalYAML(value *yaml.Node) error {
-	*self = MetricTypeFromString(value.Value)
+	typ, err := MetricTypeFromString(value.Value)
+	if err != nil {
+		return err
+	}
+	*self = typ
 	return nil
 }
 
-func MetricTypeFromString(s string) MetricType {
+func MetricTypeFromString(s string) (MetricType, error) {
 	switch s {
 	case "fastest":
-		return FASTEST
+		return FASTEST, nil
 	case "shortest":
-		return SHORTEST
+		return SHORTEST, nil
 	default:
-		panic("unknown metric type")
+		return FASTEST, errors.New("unknown metric type")
 	}
 }
 
@@ -229,27 +242,32 @@ func (self VehicleType) MarshalJSON() ([]byte, error) {
 }
 func (self *VehicleType) UnmarshalJSON(data []byte) error {
 	var typ string
-	if err := json.Unmarshal(data, &typ); err != nil {
+	err := json.Unmarshal(data, &typ)
+	if err != nil {
 		return err
 	}
-	*self = VehicleTypeFromString(typ)
-	return nil
+	*self, err = VehicleTypeFromString(typ)
+	return err
 }
 func (self VehicleType) MarshalYAML() (any, error) {
 	return self.String(), nil
 }
 func (self *VehicleType) UnmarshalYAML(value *yaml.Node) error {
-	*self = VehicleTypeFromString(value.Value)
+	typ, err := VehicleTypeFromString(value.Value)
+	if err != nil {
+		return err
+	}
+	*self = typ
 	return nil
 }
 
-func VehicleTypeFromString(s string) VehicleType {
+func VehicleTypeFromString(s string) (VehicleType, error) {
 	switch s {
 	case "car":
-		return CAR
+		return CAR, nil
 	case "foot":
-		return FOOT
+		return FOOT, nil
 	default:
-		panic("unknown vehicle type")
+		return CAR, errors.New("unknown vehicle type")
 	}
 }

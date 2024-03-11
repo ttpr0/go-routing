@@ -65,7 +65,7 @@ type MappedAttributes struct {
 func (self *MappedAttributes) GetNodeAttribs(node int32) NodeAttribs {
 	var m_node int32
 	if self.node_mapping.HasValue() {
-		m_node = self.node_mapping.Value.GetTarget(node)
+		m_node = self.node_mapping.Value.GetSource(node)
 	} else {
 		m_node = node
 	}
@@ -74,7 +74,7 @@ func (self *MappedAttributes) GetNodeAttribs(node int32) NodeAttribs {
 func (self *MappedAttributes) GetEdgeAttribs(edge int32) EdgeAttribs {
 	var m_edge int32
 	if self.edge_mapping.HasValue() {
-		m_edge = self.edge_mapping.Value.GetTarget(edge)
+		m_edge = self.edge_mapping.Value.GetSource(edge)
 	} else {
 		m_edge = edge
 	}
@@ -83,7 +83,7 @@ func (self *MappedAttributes) GetEdgeAttribs(edge int32) EdgeAttribs {
 func (self *MappedAttributes) GetNodeGeom(node int32) geo.Coord {
 	var m_node int32
 	if self.node_mapping.HasValue() {
-		m_node = self.node_mapping.Value.GetTarget(node)
+		m_node = self.node_mapping.Value.GetSource(node)
 	} else {
 		m_node = node
 	}
@@ -92,7 +92,7 @@ func (self *MappedAttributes) GetNodeGeom(node int32) geo.Coord {
 func (self *MappedAttributes) GetEdgeGeom(edge int32) geo.CoordArray {
 	var m_edge int32
 	if self.edge_mapping.HasValue() {
-		m_edge = self.edge_mapping.Value.GetTarget(edge)
+		m_edge = self.edge_mapping.Value.GetSource(edge)
 	} else {
 		m_edge = edge
 	}

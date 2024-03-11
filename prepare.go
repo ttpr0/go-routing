@@ -89,16 +89,43 @@ func GetMostCommon[T comparable](arr Array[T]) T {
 	return max_val
 }
 
-func RemoveConnectedComponents(base *comps.GraphBase) List[int32] {
+func RemoveConnectedComponents(base *comps.GraphBase) (List[int32], List[int32]) {
 	eq_weight := comps.NewEqualWeighting()
 	g := graph.BuildGraph(base, eq_weight, None[comps.IGraphIndex]())
 	groups := algorithm.ConnectedComponents(g)
 	max_group := GetMostCommon(groups)
-	remove := NewList[int32](100)
+	// get nodes and edges to be removed
+	e := g.GetGraphExplorer()
+	nodes_remove := NewArray[bool](g.NodeCount())
+	edges_remove := NewArray[bool](g.EdgeCount())
 	for i := 0; i < g.NodeCount(); i++ {
-		if groups[i] != max_group {
-			remove.Add(int32(i))
+		if groups[i] == max_group {
+			continue
+		}
+		// mark nodes not part of largest group
+		nodes_remove[i] = true
+		// mark all in- and out-going edges of those nodes
+		e.ForAdjacentEdges(int32(i), graph.FORWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
+			edges_remove[ref.EdgeID] = true
+		})
+		e.ForAdjacentEdges(int32(i), graph.BACKWARD, graph.ADJACENT_ALL, func(ref graph.EdgeRef) {
+			edges_remove[ref.EdgeID] = true
+		})
+	}
+
+	// get remove lists
+	remove_nodes := NewList[int32](100)
+	remove_edges := NewList[int32](100)
+	for i := 0; i < g.NodeCount(); i++ {
+		if nodes_remove[i] {
+			remove_nodes.Add(int32(i))
 		}
 	}
-	return remove
+	for i := 0; i < g.EdgeCount(); i++ {
+		if edges_remove[i] {
+			remove_edges.Add(int32(i))
+		}
+	}
+
+	return remove_nodes, remove_edges
 }

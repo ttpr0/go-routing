@@ -8,6 +8,7 @@ import (
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 func SortNodes(g graph.IGraph, coord_func func(geo.Coord) float32) Array[int32] {
@@ -85,7 +86,7 @@ func InertialFlow(g graph.IGraph) Array[int16] {
 		// compute max-flow for every direction
 		var max_alg *EdmondsKarp
 		max_flow := -1
-		fmt.Println("start computing flows")
+		slog.Debug("start computing flows")
 		for _, order := range orders {
 			// select nodes from current tile
 			nodes := NewList[int32](node_count)
@@ -102,7 +103,7 @@ func InertialFlow(g graph.IGraph) Array[int16] {
 			// compute max-flow for current direction
 			alg := NewEdmondsKarp(g, nodes[:so_c], source_tile, nodes[si_c:], sink_tile, nodes[so_c:si_c], curr_tile)
 			flow := alg.ComputeMaxFlow()
-			fmt.Println("computed flow:", flow)
+			slog.Debug(fmt.Sprintf("flow: %v", flow))
 
 			// select minimum max-flow
 			if flow < max_flow || max_flow == -1 {
@@ -111,7 +112,7 @@ func InertialFlow(g graph.IGraph) Array[int16] {
 			}
 		}
 		// compute min-cut on minimum max-flow
-		fmt.Println("start computing min cut")
+		slog.Debug("start computing min cut")
 		max_alg.ComputeMinCut()
 
 		// set computed tiles
@@ -129,6 +130,6 @@ func InertialFlow(g graph.IGraph) Array[int16] {
 		proc_queue.Push(sink_tile)
 	}
 
-	fmt.Println("inertial flow finished")
+	slog.Debug("inertial flow finished")
 	return node_tiles
 }

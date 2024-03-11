@@ -1,20 +1,22 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"net/http"
+	"strings"
 
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/routing"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 type IsoRasterRequest struct {
 	Locations  [][]float32 `json:"locations"`
 	Range      int32       `json:"range"`
 	Precession int32       `json:"precession"`
+	Profile    string      `json:"profile"`
+	Metric     string      `json:"metric"`
 }
 
 type IsoRasterResponse struct {
@@ -49,11 +51,40 @@ func NewIsoRasterResponse(nodes []*QuadNode[int], rasterizer IRasterizer) IsoRas
 	return resp
 }
 
-func HandleIsoRasterRequest(w http.ResponseWriter, r *http.Request) {
-	data := make([]byte, r.ContentLength)
-	r.Body.Read(data)
-	req := IsoRasterRequest{}
-	json.Unmarshal(data, &req)
+func HandleIsoRasterRequest(req IsoRasterRequest) Result {
+	// get profile
+	var profile IRoutingProfile
+	{
+		tokens := strings.Split(req.Profile, "-")
+		if len(tokens) != 2 {
+			return BadRequest("Invalid profile")
+		}
+		typ, err := ProfileTypeFromString(tokens[0])
+		if err != nil {
+			return BadRequest("Invalid profile type")
+		}
+		vehicle, err := VehicleTypeFromString(tokens[1])
+		if err != nil {
+			return BadRequest("Invalid vehicle type")
+		}
+		var metric MetricType
+		switch req.Metric {
+		case "time":
+			metric = FASTEST
+		case "distance":
+			metric = SHORTEST
+		default:
+			return BadRequest("Invalid metric type")
+		}
+		profile := MANAGER.GetMatchingProfile(typ, vehicle, metric)
+		if !profile.HasValue() {
+			return BadRequest("Profile not found")
+		}
+	}
+	g := profile.GetGraph()
+	if !g.HasValue() {
+		return BadRequest("Graph not found")
+	}
 
 	start := geo.Coord{req.Locations[0][0], req.Locations[0][1]}
 	consumer := &SPTConsumer{
@@ -66,24 +97,15 @@ func HandleIsoRasterRequest(w http.ResponseWriter, r *http.Request) {
 		}),
 		rasterizer: NewDefaultRasterizer(req.Precession),
 	}
-	profile := MANAGER.GetMatchingProfile(DRIVING, CAR, FASTEST)
-	if !profile.HasValue() {
-		panic("Profile not found")
-	}
-	g := profile.Value.GetGraph()
-	if !g.HasValue() {
-		panic("Graph not found")
-	}
 	spt := routing.NewShortestPathTree(g.Value, GetClosestNode(start, g.Value), req.Range, consumer)
 
-	fmt.Println("Start Caluclating shortest-path-tree from", start)
+	slog.Debug(fmt.Sprintf("Start Caluclating shortest-path-tree from %v", start))
 	spt.CalcShortestPathTree()
-	fmt.Println("shortest-path-tree finished")
-	fmt.Println("start building response")
+	slog.Debug("shortest-path-tree finished")
+	slog.Debug("start building response")
 	resp := NewIsoRasterResponse(consumer.points.ToSlice(), consumer.rasterizer)
-	fmt.Println("reponse build")
-	data, _ = json.Marshal(resp)
-	w.Write(data)
+	slog.Debug("reponse build")
+	return OK(resp)
 }
 
 type SPTConsumer struct {

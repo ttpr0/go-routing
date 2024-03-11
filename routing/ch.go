@@ -5,6 +5,7 @@ import (
 
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 type flag_ch struct {
@@ -297,6 +298,6 @@ func (self *CH) GetShortestPath() Path {
 			curr_id = explorer.GetOtherNode(graph.CreateEdgeRef(curr_flag.prev_edge2), curr_id)
 		}
 	}
-	fmt.Println("length:", length)
+	slog.Debug(fmt.Sprintf("length: %v", length))
 	return NewPath(self.graph, path)
 }

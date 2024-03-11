@@ -5,6 +5,7 @@ import (
 
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 type _FlagBOD struct {
@@ -190,6 +191,6 @@ func (self *BODijkstra) GetShortestPath() Path {
 	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
 		path[i], path[j] = path[j], path[i]
 	}
-	fmt.Println("length:", length)
+	slog.Debug(fmt.Sprintf("length: %v", length))
 	return NewPath(self.graph, path)
 }

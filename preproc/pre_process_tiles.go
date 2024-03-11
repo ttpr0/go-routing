@@ -7,6 +7,7 @@ import (
 	"github.com/ttpr0/go-routing/graph"
 	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 //*******************************************
@@ -25,12 +26,12 @@ func PrepareSkeletonOverlay(g *graph.Graph, partition *comps.Partition) *comps.O
 	tile_count := tiles.Length()
 	c := 1
 	for _, tile_id := range tiles {
-		fmt.Printf("tile %v: %v / %v \n", tile_id, c, tile_count)
-		fmt.Printf("tile %v: getting start nodes \n", tile_id)
+		slog.Debug(fmt.Sprintf("tile %v: %v / %v \n", tile_id, c, tile_count))
+		slog.Debug(fmt.Sprintf("tile %v: getting start nodes \n", tile_id))
 		start_nodes, end_nodes := _GetInOutNodes(g, tile_id, partition)
-		fmt.Printf("tile %v: calculating skip edges \n", tile_id)
+		slog.Debug(fmt.Sprintf("tile %v: calculating skip edges \n", tile_id))
 		_CalcSkipEdges(g, start_nodes, end_nodes, edge_types)
-		fmt.Printf("tile %v: finished \n", tile_id)
+		slog.Debug(fmt.Sprintf("tile %v: finished \n", tile_id))
 		c += 1
 	}
 
@@ -51,12 +52,12 @@ func PrepareOverlay(g *graph.Graph, partition *comps.Partition) *comps.Overlay {
 	tile_count := tiles.Length()
 	c := 1
 	for _, tile_id := range tiles {
-		fmt.Printf("tile %v: %v / %v \n", tile_id, c, tile_count)
-		fmt.Printf("tile %v: getting start nodes \n", tile_id)
+		slog.Debug(fmt.Sprintf("tile %v: %v / %v \n", tile_id, c, tile_count))
+		slog.Debug(fmt.Sprintf("tile %v: getting start nodes \n", tile_id))
 		start_nodes, end_nodes := _GetInOutNodes(g, tile_id, partition)
-		fmt.Printf("tile %v: calculating skip edges \n", tile_id)
+		slog.Debug(fmt.Sprintf("tile %v: calculating skip edges \n", tile_id))
 		_CalcShortcutEdges(g, start_nodes, end_nodes, edge_types, &skip_shortcuts)
-		fmt.Printf("tile %v: finished \n", tile_id)
+		slog.Debug(fmt.Sprintf("tile %v: finished \n", tile_id))
 		c += 1
 	}
 
@@ -305,7 +306,7 @@ func PrepareGRASPCellIndex(g *graph.Graph, partition *comps.Partition) *comps.Ce
 	tiles := partition.GetTiles()
 	cell_index := comps.NewCellIndex()
 	for index, tile := range tiles {
-		fmt.Println("Process Tile:", index, "/", len(tiles))
+		slog.Debug(fmt.Sprintf("Process Tile: %v/%v", index, len(tiles)))
 		index_edges := NewList[structs.Shortcut](4)
 		b_nodes, i_nodes := _GetBorderNodes(g, partition, tile)
 		flags := NewDict[int32, _Flag](100)

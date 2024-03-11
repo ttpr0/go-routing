@@ -5,6 +5,7 @@ import (
 
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 type flag_bd struct {
@@ -277,6 +278,6 @@ func (self *BidirectDijkstra) GetShortestPath() Path {
 		path = append(path, edge)
 		curr_id = explorer.GetOtherNode(graph.CreateEdgeRef(edge), curr_id)
 	}
-	fmt.Println("length:", length)
+	slog.Debug(fmt.Sprintf("length: %v", length))
 	return NewPath(self.graph, path)
 }

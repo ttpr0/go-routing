@@ -6,6 +6,7 @@ import (
 	"github.com/ttpr0/go-routing/geo"
 	"github.com/ttpr0/go-routing/graph"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 type flag_a struct {
@@ -140,6 +141,6 @@ func (self *AStar) GetShortestPath() Path {
 	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
 		path[i], path[j] = path[j], path[i]
 	}
-	fmt.Println("count:", len(path))
+	slog.Debug(fmt.Sprintf("count: %v", len(path)))
 	return NewPath(self.graph, path)
 }

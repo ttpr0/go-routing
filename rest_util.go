@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"reflect"
 	"strconv"
 
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 type none struct{}
@@ -16,12 +16,12 @@ type none struct{}
 func ReadRequestBody[T any](r *http.Request) T {
 	data, err := io.ReadAll(r.Body)
 	if err != nil {
-		fmt.Println(err.Error())
+		slog.Error(err.Error())
 	}
 	var req T
 	err = json.Unmarshal(data, &req)
 	if err != nil {
-		fmt.Println(err.Error())
+		slog.Error(err.Error())
 	}
 	return req
 }
@@ -54,8 +54,14 @@ func BadRequest[T any](value T) Result {
 
 func MapPost[F any](app *http.ServeMux, path string, handler func(F) Result) {
 	app.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("POST " + path)
 		body := ReadRequestBody[F](r)
 		res := handler(body)
+		if res.status != http.StatusOK {
+			slog.Error("failed POST " + path)
+		} else {
+			slog.Info("successfully finished POST")
+		}
 		WriteResponse(w, res.result, res.status)
 	})
 }
@@ -85,6 +91,7 @@ func MapGet[F any](app *http.ServeMux, path string, handler func(F) Result) {
 		}
 	}
 	app.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		slog.Info("GET " + path)
 		query := r.URL.Query()
 		t := reflect.New(typ).Elem()
 		for _, field := range fields {
@@ -115,6 +122,11 @@ func MapGet[F any](app *http.ServeMux, path string, handler func(F) Result) {
 		}
 		value := t.Interface().(F)
 		res := handler(value)
+		if res.status != http.StatusOK {
+			slog.Error("failed GET " + path)
+		} else {
+			slog.Info("successfully finished GET")
+		}
 		WriteResponse(w, res.result, res.status)
 	})
 }

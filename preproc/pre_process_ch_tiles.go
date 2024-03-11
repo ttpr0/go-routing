@@ -8,6 +8,7 @@ import (
 	"github.com/ttpr0/go-routing/graph"
 	"github.com/ttpr0/go-routing/structs"
 	. "github.com/ttpr0/go-routing/util"
+	"golang.org/x/exp/slog"
 )
 
 //*******************************************
@@ -15,12 +16,12 @@ import (
 //*******************************************
 
 func PrepareIsoPHAST(base comps.IGraphBase, weight comps.IWeighting, partition *comps.Partition) (*comps.Overlay, *comps.CellIndex) {
-	fmt.Println("Compute subset contraction:")
+	slog.Debug("Compute subset contraction:")
 	ch_data := CalcPartialContraction5(base, weight, partition)
 
 	g := graph.BuildGraph(base, weight, None[comps.IGraphIndex]())
 
-	fmt.Println("Set border nodes to maxlevel:")
+	slog.Debug("Set border nodes to maxlevel:")
 	border_nodes := _IsBorderNode3(g, partition)
 	max_level := int16(0)
 	node_levels := NewArray[int16](base.NodeCount())
@@ -36,19 +37,19 @@ func PrepareIsoPHAST(base comps.IGraphBase, weight comps.IWeighting, partition *
 		}
 	}
 
-	fmt.Println("Create topology from shortcuts:")
+	slog.Debug("Create topology from shortcuts:")
 	edge_types := NewArray[byte](g.EdgeCount())
 	_UpdateCrossBorder(g, partition, edge_types)
 	skip_topology, skip_shortcuts := CreateCHSkipTopology(base, weight, ch_data, border_nodes, partition)
 	tiled_data := comps.NewOverlay(skip_shortcuts, *skip_topology, edge_types)
 
 	// create cell-index
-	fmt.Println("Create downwards edge lists:")
+	slog.Debug("Create downwards edge lists:")
 	explorer := g.GetGraphExplorer()
 	tiles := partition.GetTiles()
 	cell_index := comps.NewCellIndex()
 	for index, tile := range tiles {
-		fmt.Println("Process Tile:", index+1, "/", len(tiles))
+		slog.Debug(fmt.Sprintf("Process Tile: %v/%v", index+1, len(tiles)))
 		// get all down edges or shortcuts
 		edge_list := NewList[structs.Shortcut](100)
 		for i := 0; i < ch_data.ShortcutCount(); i++ {
