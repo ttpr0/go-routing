@@ -109,6 +109,8 @@ func (self *SPTConsumer) ConsumePoint(point geo.Coord, value int) {
 	self.points.Insert(x, y, value)
 }
 
+func (self *SPTConsumer) ConsumeEdge(edge int32, start_value int, end_value int) {}
+
 type IProjection interface {
 	Proj(geo.Coord) geo.Coord
 	ReProj(geo.Coord) geo.Coord
@@ -128,6 +130,13 @@ func NewDefaultRasterizer(precession int32) *DefaultRasterizer {
 	return &DefaultRasterizer{
 		factor:     1 / float32(precession),
 		projection: &WebMercatorProjection{},
+	}
+}
+
+func NewDummyRasterizer(precession int32) *DefaultRasterizer {
+	return &DefaultRasterizer{
+		factor:     1 / float32(precession),
+		projection: &NullProjection{},
 	}
 }
 
@@ -155,4 +164,13 @@ func (self *WebMercatorProjection) ReProj(point geo.Coord) geo.Coord {
 	c[0] = float32(float64(point[0]) * 180 / (a * math.Pi))
 	c[1] = float32(360 * (math.Atan(math.Exp(float64(point[1])/a)) - math.Pi/4) / math.Pi)
 	return c
+}
+
+type NullProjection struct{}
+
+func (self *NullProjection) Proj(point geo.Coord) geo.Coord {
+	return point
+}
+func (self *NullProjection) ReProj(point geo.Coord) geo.Coord {
+	return point
 }

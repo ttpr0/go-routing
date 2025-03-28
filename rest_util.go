@@ -71,6 +71,7 @@ func MapPost[F any](app *http.ServeMux, path string, handler func(F) Result) {
 			WriteResponse(w, NewErrorResponse(path, err.Error()), http.StatusInternalServerError)
 		}
 		res := handler(body)
+		_SetCORSHeaders(w)
 		if res.status != http.StatusOK {
 			slog.Error("failed POST " + path)
 			WriteResponse(w, NewErrorResponse(path, res.result), res.status)
@@ -137,6 +138,7 @@ func MapGet[F any](app *http.ServeMux, path string, handler func(F) Result) {
 		}
 		value := t.Interface().(F)
 		res := handler(value)
+		_SetCORSHeaders(w)
 		if res.status != http.StatusOK {
 			slog.Error("failed GET " + path)
 			WriteResponse(w, NewErrorResponse(path, res.result), res.status)
@@ -145,4 +147,13 @@ func MapGet[F any](app *http.ServeMux, path string, handler func(F) Result) {
 			WriteResponse(w, res.result, res.status)
 		}
 	})
+}
+
+type handler func(http.ResponseWriter, *http.Request)
+
+func _SetCORSHeaders(w http.ResponseWriter) {
+	headers := w.Header()
+	headers.Add("Access-Control-Allow-Origin", "*")
+	headers.Add("Access-Control-Allow-Headers", "*")
+	headers.Add("Access-Control-Allow-Methods", "*")
 }

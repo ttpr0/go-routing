@@ -27,6 +27,10 @@ func main() {
 	MapPost(app, "/v0/routing/draw/step", HandleRoutingStepRequest)
 	MapPost(app, "/v0/isoraster", HandleIsoRasterRequest)
 	MapPost(app, "/v1/matrix", HandleMatrixRequest)
+	MapPost(app, "/v2/isochrones/driving-car/geojson", HandleIsochroneRequest)
 
-	http.ListenAndServe(":5002", nil)
+	err := http.ListenAndServe("127.0.0.1:5002", nil)
+	if err != nil {
+		panic(err)
+	}
 }

@@ -8,6 +8,7 @@ import (
 
 type ISPTConsumer interface {
 	ConsumePoint(point geo.Coord, value int)
+	ConsumeEdge(edge int32, start_value int, end_value int)
 }
 
 type flag_spt struct {
@@ -79,6 +80,7 @@ func (self *ShortestPathTree) CalcShortestPathTree() {
 				other_flag.prev_edge = edge_id
 				other_flag.path_length = new_length
 				self.heap.Enqueue(other_id, new_length)
+				self.consumer.ConsumeEdge(edge_id, int(curr_flag.path_length), int(new_length))
 			}
 			self.flags[other_id] = other_flag
 		})

@@ -1,6 +1,6 @@
 module github.com/ttpr0/go-routing
 
-go 1.19
+go 1.23
 
 require github.com/paulmach/osm v0.7.1
 
