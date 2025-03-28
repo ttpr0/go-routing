@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ttpr0/go-routing/geo"
+	. "github.com/ttpr0/go-routing/util"
 	"golang.org/x/exp/slog"
 )
 
@@ -11,8 +12,13 @@ import (
 // marching squares
 //**********************************************************
 
+type Square struct {
+	index  int
+	values [4]int
+}
+
 // Returns the type of square at the given location (x,y is lower left corner of the square)
-func _GetMarchingSquareIndex(tree *IsoTree[int], x, y int32, max_range int) int {
+func _GetMarchingSquare(tree *IsoTree[int], x, y int32, max_range int) Square {
 	range0, active0 := tree.Get(x, y)
 	range1, active1 := tree.Get(x+1, y)
 	range2, active2 := tree.Get(x+1, y+1)
@@ -30,7 +36,7 @@ func _GetMarchingSquareIndex(tree *IsoTree[int], x, y int32, max_range int) int 
 	if active3 && range3 <= max_range {
 		key += 8
 	}
-	return key
+	return Square{key, [4]int{range0, range1, range2, range3}}
 }
 
 // This function processes a single cube
@@ -38,13 +44,13 @@ func _GetMarchingSquareIndex(tree *IsoTree[int], x, y int32, max_range int) int 
 // Takes a square index a direction (i.e. the edge of the square clockwise from the bottom) and the location of the square
 //
 // Returns the next square location and direction as well as a point to add to the polygon and the square index to replace this square with (-1 if remove requested)
-func _ProcessSquare(index int, direction int, x, y int32, rasterizer IRasterizer) (int32, int32, int, geo.Coord, int) {
+func _ProcessSquare(square Square, direction int, x, y int32, rasterizer IRasterizer, max_range int) (int32, int32, int, geo.Coord, int) {
 	new_direction := -1
 	replace_index := -1
 	if direction == -1 {
-		direction = _GetDefaultDirection(index)
+		direction = _GetDefaultDirection(square.index)
 	}
-	switch index {
+	switch square.index {
 	case 0:
 		new_direction, replace_index = _ProcessSquare0(direction)
 	case 1:
@@ -81,15 +87,19 @@ func _ProcessSquare(index int, direction int, x, y int32, rasterizer IRasterizer
 	loc := rasterizer.IndexToPoint(x, y)
 	switch direction {
 	case 0:
-		loc[0] += 0.5 * rasterizer.GetCellSize()
+		factor := _Interpolate(float32(square.values[0]), float32(square.values[1]), float32(max_range))
+		loc[0] += factor * rasterizer.GetCellSize()
 	case 1:
-		loc[1] += 0.5 * rasterizer.GetCellSize()
+		factor := _Interpolate(float32(square.values[0]), float32(square.values[3]), float32(max_range))
+		loc[1] += factor * rasterizer.GetCellSize()
 	case 2:
-		loc[0] += 0.5 * rasterizer.GetCellSize()
+		factor := _Interpolate(float32(square.values[3]), float32(square.values[2]), float32(max_range))
+		loc[0] += factor * rasterizer.GetCellSize()
 		loc[1] += rasterizer.GetCellSize()
 	case 3:
+		factor := _Interpolate(float32(square.values[1]), float32(square.values[2]), float32(max_range))
 		loc[0] += rasterizer.GetCellSize()
-		loc[1] += 0.5 * rasterizer.GetCellSize()
+		loc[1] += factor * rasterizer.GetCellSize()
 	}
 	loc[0] += 0.5 * rasterizer.GetCellSize()
 	loc[1] += 0.5 * rasterizer.GetCellSize()
@@ -107,6 +117,19 @@ func _ProcessSquare(index int, direction int, x, y int32, rasterizer IRasterizer
 	}
 
 	return newx, newy, new_direction, loc, replace_index
+}
+
+func _Interpolate(right, left, target float32) float32 {
+	factor := float32(0.5)
+	if right == 0 || left == 0 {
+		return factor
+	}
+	if right >= left {
+		factor = 1.0 - (target-left)/(right-left)
+	} else {
+		factor = (target - right) / (left - right)
+	}
+	return Min(Max(factor, 0.0), 1.0)
 }
 
 // Returns the default direction for the given square index (leads to counter-clockwise direction for outer polygons)

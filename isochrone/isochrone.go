@@ -36,7 +36,7 @@ func ComputeIsochrone(g graph.IGraph, att attr.IAttributes, location [2]float32,
 	slog.Debug("shortest-path-tree finished")
 	slog.Debug("start building isochrone")
 	// create tree containing marching square cells
-	mq_tree := NewIsoTree[int]([4]int32{centerx - isosize, centery - isosize, centerx + isosize, centery + isosize})
+	mq_tree := NewIsoTree[Square]([4]int32{centerx - isosize, centery - isosize, centerx + isosize, centery + isosize})
 	features := NewList[geo.Feature](len(ranges))
 	for i := len(ranges) - 1; i >= 0; i-- {
 		_features := _ExtractIsochrone(consumer.points, mq_tree, int(ranges[i]), rasterizer, projection)
@@ -168,49 +168,49 @@ func (self *WebMercatorProjection) ReProj(point geo.Coord) geo.Coord {
 // isochrone extractor
 //**********************************************************
 
-func _ExtractIsochrone(points *IsoTree[int], mq_tree *IsoTree[int], max_range int, rasterizer IRasterizer, projection IProjection) List[geo.Feature] {
+func _ExtractIsochrone(points *IsoTree[int], mq_tree *IsoTree[Square], max_range int, rasterizer IRasterizer, projection IProjection) List[geo.Feature] {
 	// create marching-square tree
-	mq_tree.UpdateAll(-1)
+	mq_tree.UpdateAll(Square{index: -1})
 	for cell := range points.Traverse() {
 		x := cell.A
 		y := cell.B
 		if cell.C > max_range {
 			continue
 		}
-		index, exist := mq_tree.Get(x, y)
-		if !exist || index == -1 {
-			mq_tree.InsertValue(x, y, _GetMarchingSquareIndex(points, x, y, max_range))
+		square, exist := mq_tree.Get(x, y)
+		if !exist || square.index == -1 {
+			mq_tree.InsertValue(x, y, _GetMarchingSquare(points, x, y, max_range))
 		}
 		x = cell.A
 		y = cell.B - 1
-		index, exist = mq_tree.Get(x, y)
-		if !exist || index == -1 {
-			mq_tree.InsertValue(x, y, _GetMarchingSquareIndex(points, x, y, max_range))
+		square, exist = mq_tree.Get(x, y)
+		if !exist || square.index == -1 {
+			mq_tree.InsertValue(x, y, _GetMarchingSquare(points, x, y, max_range))
 		}
 		x = cell.A - 1
 		y = cell.B
-		index, exist = mq_tree.Get(x, y)
-		if !exist || index == -1 {
-			mq_tree.InsertValue(x, y, _GetMarchingSquareIndex(points, x, y, max_range))
+		square, exist = mq_tree.Get(x, y)
+		if !exist || square.index == -1 {
+			mq_tree.InsertValue(x, y, _GetMarchingSquare(points, x, y, max_range))
 		}
 		x = cell.A - 1
 		y = cell.B - 1
-		index, exist = mq_tree.Get(x, y)
-		if !exist || index == -1 {
-			mq_tree.InsertValue(x, y, _GetMarchingSquareIndex(points, x, y, max_range))
+		square, exist = mq_tree.Get(x, y)
+		if !exist || square.index == -1 {
+			mq_tree.InsertValue(x, y, _GetMarchingSquare(points, x, y, max_range))
 		}
 	}
 	// extract polygons
 	polygons := NewList[geo.CoordArray](0)
 	for node := range mq_tree.Traverse() {
-		if node.C == -1 {
+		if node.C.index == -1 {
 			continue
 		}
 		startx := node.A
 		starty := node.B
-		currindex := node.C
-		if currindex == 0 || currindex == 15 {
-			mq_tree.UpdateValue(startx, starty, -1)
+		currsquare := node.C
+		if currsquare.index == 0 || currsquare.index == 15 {
+			mq_tree.UpdateValue(startx, starty, Square{index: -1})
 			continue
 		}
 		currx := startx
@@ -218,11 +218,11 @@ func _ExtractIsochrone(points *IsoTree[int], mq_tree *IsoTree[int], max_range in
 		currdirection := -1
 		polygon := make(geo.CoordArray, 0)
 		for {
-			nextx, nexty, nextdirection, coord, replace := _ProcessSquare(currindex, currdirection, currx, curry, rasterizer)
+			nextx, nexty, nextdirection, coord, replace := _ProcessSquare(currsquare, currdirection, currx, curry, rasterizer, max_range)
 			if replace == -1 {
-				mq_tree.UpdateValue(currx, curry, -1)
+				mq_tree.UpdateValue(currx, curry, Square{index: -1})
 			} else {
-				mq_tree.UpdateValue(currx, curry, replace)
+				mq_tree.UpdateValue(currx, curry, Square{index: replace, values: currsquare.values})
 			}
 			// add coordinate to polygon
 			polygon = append(polygon, projection.ReProj(coord))
@@ -230,15 +230,15 @@ func _ExtractIsochrone(points *IsoTree[int], mq_tree *IsoTree[int], max_range in
 				polygons.Add(polygon)
 				break
 			}
-			nextindex, ok := mq_tree.Get(nextx, nexty)
-			if !ok || nextindex == -1 {
+			nextsquare, ok := mq_tree.Get(nextx, nexty)
+			if !ok || nextsquare.index == -1 {
 				// break
 				panic("not implemented")
 			}
 			currx = nextx
 			curry = nexty
 			currdirection = nextdirection
-			currindex = nextindex
+			currsquare = nextsquare
 		}
 	}
 	// seperate outer and inner polygons
