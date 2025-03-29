@@ -1,0 +1,6 @@
+name;age;height;gender
+John;30;170.5;false
+"Jane";25;160.9;true
+;;
+'Joe;35;175.0;true
+;28;;false
