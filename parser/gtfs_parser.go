@@ -1,11 +1,8 @@
 package parser
 
 import (
-	"encoding/csv"
 	"encoding/json"
-	"io"
 	"os"
-	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -43,92 +40,6 @@ func ParseGtfs(gtfs_path string, filter_polygon string) (Array[structs.Node], Ar
 //*******************************************
 // parser utility
 //*******************************************
-
-func ReadCSV[T any](filename string) []T {
-	file, err := os.Open(filename)
-	if err != nil {
-		panic(err)
-	}
-	defer file.Close()
-
-	reader := csv.NewReader(file)
-	header, _ := reader.Read()
-	name_row_mapping := NewDict[string, int](10)
-	for i, name := range header {
-		name_row_mapping[name] = i
-	}
-
-	var val T
-	typ := reflect.TypeOf(val)
-	num_field := typ.NumField()
-	fields := NewList[Triple[int, int, reflect.Kind]](num_field)
-	for i := 0; i < num_field; i++ {
-		field := typ.Field(i)
-		tag := field.Tag.Get("csv")
-		if tag == "" {
-			continue
-		}
-		if !name_row_mapping.ContainsKey(tag) {
-			continue
-		}
-		row := name_row_mapping[tag]
-		switch field.Type.Kind() {
-		case reflect.Bool:
-			fields.Add(MakeTriple(i, row, reflect.Bool))
-		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			fields.Add(MakeTriple(i, row, reflect.Int))
-		case reflect.Float32, reflect.Float64:
-			fields.Add(MakeTriple(i, row, reflect.Float64))
-		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			fields.Add(MakeTriple(i, row, reflect.Uint))
-		case reflect.String:
-			fields.Add(MakeTriple(i, row, reflect.String))
-		}
-	}
-
-	records := NewList[T](100)
-	for {
-		record, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
-		if err == csv.ErrFieldCount {
-			continue
-		}
-
-		t := reflect.New(typ).Elem()
-		for _, field := range fields {
-			index := field.A
-			row := field.B
-			typ := field.C
-			value := record[row]
-			if value == "" {
-				continue
-			}
-			f := t.Field(index)
-			switch typ {
-			case reflect.Bool:
-				num, _ := strconv.ParseBool(value)
-				f.SetBool(num)
-			case reflect.Int:
-				num, _ := strconv.ParseInt(value, 10, 64)
-				f.SetInt(num)
-			case reflect.Uint:
-				num, _ := strconv.ParseUint(value, 10, 64)
-				f.SetUint(num)
-			case reflect.Float64:
-				num, _ := strconv.ParseFloat(value, 64)
-				f.SetFloat(num)
-			case reflect.String:
-				f.SetString(value)
-			}
-		}
-		value := t.Interface().(T)
-		records.Add(value)
-	}
-
-	return records
-}
 
 type GTFSCalendarEntry struct {
 	ServiceID int `csv:"service_id"`
@@ -177,9 +88,8 @@ func (self *GTFSService) GetDays() []int {
 }
 
 func _ReadCalendar(path string) Dict[int, GTFSService] {
-	data := ReadCSV[GTFSCalendarEntry](path + "/calendar.txt")
 	services := NewDict[int, GTFSService](100)
-	for _, service := range data {
+	for service := range ReadCSVFromFile[GTFSCalendarEntry](path+"/calendar.txt", ',') {
 		service_id := service.ServiceID
 		days := NewList[int](3)
 		if service.Monday == 1 {
@@ -234,10 +144,9 @@ func (self *GTFSStop) GetLonLat() (float32, float32) {
 }
 
 func _ReadStopLocations(path string, filter geo.Geometry) Dict[int, GTFSStop] {
-	frame := ReadCSV[GTFSStopEntry](path + "/stops.txt")
 	stops := NewDict[int, GTFSStop](100)
 	point := geo.Point{}
-	for _, entry := range frame {
+	for entry := range ReadCSVFromFile[GTFSStopEntry](path+"/stops.txt", ',') {
 		id := entry.StopID
 		lon := entry.Lon
 		lat := entry.Lat
@@ -324,6 +233,9 @@ func (self *GTFSTrip) OrderStops() {
 
 func _ParseTime(time_str string) int {
 	tokens := strings.Split(time_str, ":")
+	if len(tokens) != 3 {
+		panic("Invalid time format: " + time_str)
+	}
 	time := 0
 	dt, _ := strconv.Atoi(tokens[2])
 	time += dt
@@ -336,8 +248,7 @@ func _ParseTime(time_str string) int {
 
 func _ReadTrips(path string, stops Dict[int, GTFSStop], services Dict[int, GTFSService]) Dict[int, GTFSTrip] {
 	trips := NewDict[int, GTFSTrip](10)
-	frame := ReadCSV[GTFSStopTimesEntry](path + "/stop_times.txt")
-	for _, entry := range frame {
+	for entry := range ReadCSVFromFile[GTFSStopTimesEntry](path+"/stop_times.txt", ',') {
 		trip_id := entry.TripID
 		if !trips.ContainsKey(trip_id) {
 			trips[trip_id] = GTFSTrip{
@@ -359,8 +270,7 @@ func _ReadTrips(path string, stops Dict[int, GTFSStop], services Dict[int, GTFSS
 		trip.OrderStops()
 	}
 
-	frame2 := ReadCSV[GTFSTripsEntry](path + "/trips.txt")
-	for _, entry := range frame2 {
+	for entry := range ReadCSVFromFile[GTFSTripsEntry](path+"/trips.txt", ',') {
 		trip_id := entry.TripID
 		if !trips.ContainsKey(trip_id) {
 			continue
@@ -473,6 +383,16 @@ func _BuildTransitGraph(trips Dict[int, GTFSTrip], stops Dict[int, GTFSStop], se
 					Arrival:   int32(arr),
 				})
 			}
+		}
+	}
+	for _, day := range []string{"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"} {
+		schedule := schedules[day]
+		for i := 0; i < len(schedule); i++ {
+			sc := schedule[i]
+			sort.Slice(sc, func(i, j int) bool {
+				return sc[i].Departure < sc[j].Departure
+			})
+			schedule[i] = sc
 		}
 	}
 	return stops_vec, conns_vec, schedules

@@ -6,7 +6,6 @@ import (
 
 	"github.com/ttpr0/go-routing/attr"
 	"github.com/ttpr0/go-routing/geo"
-	"github.com/ttpr0/go-routing/graph"
 	"github.com/ttpr0/go-routing/routing"
 	. "github.com/ttpr0/go-routing/util"
 	"golang.org/x/exp/slog"
@@ -16,9 +15,9 @@ import (
 // isochrone handler
 //**********************************************************
 
-func ComputeIsochrone(g graph.IGraph, att attr.IAttributes, location [2]float32, ranges []int32) *geo.FeatureCollection {
+func ComputeIsochrone(spt routing.IShortestPathTree, att attr.IAttributes, location [2]float32, ranges []int32) *geo.FeatureCollection {
 	start := geo.Coord{location[0], location[1]}
-	cellsize := int32(500)
+	cellsize := int32(400)
 	projection := &WebMercatorProjection{}
 	rasterizer := NewRasterizer(cellsize)
 	centerx, centery := rasterizer.PointToIndex(projection.Proj(start))
@@ -30,9 +29,8 @@ func ComputeIsochrone(g graph.IGraph, att attr.IAttributes, location [2]float32,
 		att:        att,
 	}
 	s_node, _ := att.GetClosestNode(start)
-	spt := routing.NewShortestPathTree(g, s_node, ranges[len(ranges)-1], consumer)
 	slog.Debug(fmt.Sprintf("Start Caluclating shortest-path-tree from %v", start))
-	spt.CalcShortestPathTree()
+	spt.CalcShortestPathTree(s_node, ranges[len(ranges)-1], consumer)
 	slog.Debug("shortest-path-tree finished")
 	slog.Debug("start building isochrone")
 	// create tree containing marching square cells
